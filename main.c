@@ -355,7 +355,11 @@ Light ind_lights[] = {
 	{ lampsurf, { 407, 161, 14, 22 }, 0 },
 	/* sbr flip-flops */
 	{ lampsurf, {  99,  42, 14, 22 }, 0 },
+	{ lampsurf, {  99,  59, 14, 22 }, 0 },
+	{ lampsurf, {  99,  76, 14, 22 }, 0 },
+	{ lampsurf, {  99,  93, 14, 22 }, 0 },
 };
+
 Light extra_lights[] = {
 	/* MEMBUS */
 	{ lampsurf, {  693, 26, 12, 12 }, 0 },
@@ -837,6 +841,9 @@ error:
 		ff_lght[38].state = apr.uuo_f1;
 		ff_lght[39].state = apr.cpa_pdl_ov;
 		ff_lght[40].state = apr.if1a;
+		ff_lght[41].state = apr.af0;
+		ff_lght[42].state = apr.af3;
+		ff_lght[43].state = apr.af3a;
 
 		setlights(membus0, membus_lght, 36);
 		setlights(apr.pr, pr_lght, 8);

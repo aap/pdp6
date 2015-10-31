@@ -12,7 +12,7 @@ typedef void *Pulse(void);
 Apr apr;
 int extpulse;
 Pulse *nextpulse;
-Pulse *mc_rst1_ret;
+Pulse *mc_rst1_ret, *art3_ret;
 
 void
 set_ex_mode_sync(bool value)
@@ -123,6 +123,7 @@ calcaddr(void)
 pulse(kt4);
 pulse(it1);
 pulse(at1);
+pulse(at0);
 pulse(iat0);
 pulse(mc_wr_rs);
 pulse(mc_rd_rq_pulse);
@@ -172,6 +173,9 @@ pulse(mr_clr){
 	/* sbr flip-flops */
 	apr.key_rd_wr = 0;	// 5-2
 	apr.if1a = 0;		// 5-3
+	apr.af0 = 0;		// 5-3
+	apr.af3 = 0;		// 5-3
+	apr.af3a = 0;		// 5-3
 	mc_rst1_ret = NULL;
 	return NULL;
 }
@@ -221,6 +225,24 @@ pulse(st7){
 }
 
 /*
+ * AR 
+ */
+
+// very temporary
+
+pulse(art3){
+//	apr.ar_com_cont = 0;
+	return art3_ret;
+}
+
+pulse(ar_ast1){
+	printf("AR AST1,2\n");
+	// TODO
+	apr.ar += apr.mb;
+	return art3;
+}
+
+/*
  * Priority Interrupt
  */
 
@@ -244,17 +266,80 @@ pulse(pi_sync){
 }
 
 /*
+ * Fetch
+ */
+
+pulse(ft0){
+	printf("FT0\n");
+	return NULL;
+}
+
+/*
  * Address
  */
 
+pulse(at5){
+	printf("AT5\n");
+	apr.a_long = 1;			// nowhere to be found :(
+	apr.af0 = 1;			// 5-3
+	apr.ma = apr.mb & RT;		// 7-3
+	apr.ir &= ~037;			// 5-7
+	mc_rst1_ret = at0;
+	return mc_rd_rq_pulse;
+}
+
+pulse(at4){
+	printf("AT4\n");
+	apr.ar &= ~LT;			// 6-8
+	// TODO: what is MC DR SPLIT?
+	if(apr.sw_addr_stop || apr.key_mem_stop)
+		apr.mc_split_cyc_sync = 1;	// 7-9
+	if(apr.ir & 020)
+		return at5;		// 5-3
+	return ft0;			// 5-4
+}
+
+pulse(at3a){
+	printf("AT3A\n");
+	apr.af3a = 0;			// 5-3
+	apr.mb = apr.ar;		// 6-3
+	return at4;			// 5-3
+}
+
+pulse(at3){
+	printf("AT3\n");
+	apr.af3 = 0;			// 5-3
+	apr.ma = 0;			// 7-3
+	apr.af3a = 1;			// 5-3
+	art3_ret = at3a;
+	return ar_ast1;
+}
+
+pulse(at2){
+	printf("AT2\n");
+	apr.a_long = 1;			// nowhere to be found :(
+	apr.ma = apr.ir & 017;		// 7-3
+	apr.af3 = 1;			// 5-3
+	mc_rst1_ret = at3;
+	return mc_rd_rq_pulse;
+}
+
 pulse(at1){
 	printf("AT1\n");
-	return NULL;
+	apr.ex_uuo_sync = 1;		// 5-13
+	if((apr.ir & 017) == 0)
+		return at4;		// 5-3
+	return at2;			// 5-3
 }
 
 pulse(at0){
 	printf("AT0\n");
-	return NULL;
+	apr.ar &= ~RT;			// 6-8
+	apr.ar |= apr.mb & RT;		// 6-8
+	apr.ir |= apr.mb>>18 & 037;	// 5-7
+	apr.ma = 0;			// 7-3
+	apr.af0 = 0;			// 5-3
+	return pi_sync;			// 8-4
 }
 
 /*
@@ -271,7 +356,7 @@ pulse(iat0){
 pulse(it1a){
 	printf("IT1A\n");
 	apr.if1a = 0;
-	apr.ir |= (apr.mb & 0777740000000) >> 18;	// 5-7
+	apr.ir |= apr.mb>>18 & 0777740;	// 5-7
 	if(apr.ma & 0777760)
 		set_key_rim_sbr(0);	// 5-2
 	return at0;
@@ -289,7 +374,7 @@ pulse(it1){
 	}else
 		apr.ma = apr.pc;	// 7-3
 	if(apr.pi_ov)
-		apr.ma = (apr.ma+1)&0777777;	// 7-3
+		apr.ma = (apr.ma+1)&RT;	// 7-3
 	apr.if1a = 1;
 	mc_rst1_ret = it1a;
 	return mc_rd_rq_pulse;
@@ -300,7 +385,7 @@ pulse(it0){
 	apr.ma = 0;
 	mr_clr();
 	apr.if1a = 1;		// 5-3
-	return pi_sync;
+	return pi_sync;		// 8-4
 }
 
 /*
@@ -519,13 +604,13 @@ pulse(kt12){
 	if(apr.key_ex)
 		apr.ma = apr.mas;
 	if(apr.key_ex_next)
-		apr.ma = (apr.ma+1)&0777777;
+		apr.ma = (apr.ma+1)&RT;
 	if(apr.key_dep){
 		apr.ma = apr.mas;
 		apr.ar = apr.data;
 	}
 	if(apr.key_dep_next){
-		apr.ma = (apr.ma+1)&0777777;
+		apr.ma = (apr.ma+1)&RT;
 		apr.ar = apr.data;
 	}
 

@@ -11,6 +11,11 @@ typedef uint16_t u16;
 typedef uint8_t  u8;
 typedef char bool;
 
+enum {
+	RT = 0000000777777,
+	LT = 0777777000000,
+};
+
 typedef struct Apr Apr;
 struct Apr {
 	hword ir;
@@ -63,6 +68,7 @@ struct Apr {
 
 	/* sbr flip-flops */
 	bool if1a;
+	bool af0, af3, af3a;
 	bool chf7;
 
 	/* temporaries */
