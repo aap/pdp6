@@ -31,6 +31,25 @@ set_pi_cyc(bool value)
 }
 
 void
+set_pir(u8 value)
+{
+	int chan;
+	u8 req;
+	// 8-3
+	apr.pir = value;
+	apr.pi_req = 0;
+	if(apr.pi_active){
+		req = apr.pir & ~apr.pih;
+		for(chan = 0100; chan; chan >>= 1)
+			if(req & chan){
+				apr.pi_req = chan;
+				break;
+			}
+	}
+	apr.pi_rq = !!apr.pi_req;	// 8-4
+}
+
+void
 set_mc_rq(bool value)
 {
 	apr.mc_rq = value;		// 7-9
@@ -66,6 +85,7 @@ set_mc_rd(bool value)
 void
 set_key_rim_sbr(bool value)
 {
+	// not sure if this is correct
 	apr.key_rim_sbr = value | apr.sw_rim_maint;	// 5-2
 }
 
@@ -77,12 +97,12 @@ calcaddr(void)
 
 	// 5-13
 	apr.ex_inh_rel = !apr.ex_user || apr.ex_pi_sync ||
-	                 (apr.ma&0777760) == 0 || apr.ex_ill_op;
+	                 (apr.ma & 0777760) == 0 || apr.ex_ill_op;
 	// 7-4
 	ma18_25 = apr.ma>>10 & 0377;
 	ma_ok = ma18_25 <= apr.pr;
 	// 7-2
-	ma_fmc_select = !apr.key_rim_sbr && (apr.ma&0777760) == 0;
+	ma_fmc_select = !apr.key_rim_sbr && (apr.ma & 0777760) == 0;
 	// 7-5
 	apr.rla = ma18_25;
 	if(!apr.ex_inh_rel)
@@ -101,15 +121,19 @@ calcaddr(void)
 }
 
 pulse(kt4);
+pulse(it1);
+pulse(at1);
+pulse(iat0);
 pulse(mc_wr_rs);
+pulse(mc_rd_rq_pulse);
 
-// TODO: find PI REQ, A LONG
+// TODO: find A LONG
 
 pulse(pi_reset){
 	printf("PI RESET\n");
 	apr.pi_active = 0;	// 8-4
 	apr.pih = 0;		// 8-4
-	apr.pir = 0;		// 8-4
+	set_pir(0);		// 8-4
 	apr.pio = 0;		// 8-3
 	return NULL;
 }
@@ -141,10 +165,13 @@ pulse(mr_clr){
 	set_ex_mode_sync(0);	// 5-13
 	apr.ex_uuo_sync = 0;	// 5-13
 	apr.ex_pi_sync = 0;	// 5-13
+
+	apr.a_long = 0;		// nowhere to be found :(
 	// TODO: MP CLR, DS CLR
 
 	/* sbr flip-flops */
 	apr.key_rd_wr = 0;	// 5-2
+	apr.if1a = 0;		// 5-3
 	mc_rst1_ret = NULL;
 	return NULL;
 }
@@ -193,9 +220,87 @@ pulse(st7){
 	return NULL;
 }
 
+/*
+ * Priority Interrupt
+ */
+
+pulse(pir_stb){
+	printf("PIR STB\n");
+	set_pir(apr.pir | apr.pio & iobus1);	// 8-3
+	return NULL;
+}
+
+pulse(pi_sync){
+	printf("PI SYNC\n");
+	if(!apr.pi_cyc)
+		pir_stb();
+	// 5-3
+	if(apr.pi_rq && !apr.pi_cyc)
+		return iat0;
+	// TODO: IA INH/AT INH
+	if(apr.if1a)
+		return it1;
+	return at1;
+}
+
+/*
+ * Address
+ */
+
+pulse(at1){
+	printf("AT1\n");
+	return NULL;
+}
+
+pulse(at0){
+	printf("AT0\n");
+	return NULL;
+}
+
+/*
+ * Instruction
+ */
+
+pulse(iat0){
+	printf("IAT0\n");
+	mr_clr();
+	set_pi_cyc(1);
+	return it1;
+}
+
 pulse(it1a){
 	printf("IT1A\n");
-	return NULL;
+	apr.if1a = 0;
+	apr.ir |= (apr.mb & 0777740000000) >> 18;	// 5-7
+	if(apr.ma & 0777760)
+		set_key_rim_sbr(0);	// 5-2
+	return at0;
+}
+
+pulse(it1){
+	printf("IT1\n");
+	hword n;
+	u8 r;
+	if(apr.pi_cyc){
+		// 7-3
+		r = apr.pi_req;
+		for(n = 7; !(r & 1); n--, r >>= 1);
+		apr.ma = 040 | n<<1;
+	}else
+		apr.ma = apr.pc;	// 7-3
+	if(apr.pi_ov)
+		apr.ma = (apr.ma+1)&0777777;	// 7-3
+	apr.if1a = 1;
+	mc_rst1_ret = it1a;
+	return mc_rd_rq_pulse;
+}
+
+pulse(it0){
+	printf("IT0\n");
+	apr.ma = 0;
+	mr_clr();
+	apr.if1a = 1;		// 5-3
+	return pi_sync;
 }
 
 /*
@@ -359,7 +464,7 @@ pulse(key_go){
 	apr.key_dep_st = 0;
 	apr.key_ex_sync = 0;
 	apr.key_dep_sync = 0;
-	return NULL;
+	return it0;
 }
 
 pulse(kt4){

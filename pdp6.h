@@ -22,10 +22,9 @@ struct Apr {
 	word mb;
 	word ar;
 	word mq;
-	u8 pio, pir, pih;
 	u16 sc, fe;
 	u8 pr, rlr, rla;
-	bool run, pi_active;
+	bool run;
 	bool sw_addr_stop, sw_repeat, sw_mem_disable, sw_power;
 	bool sw_rim_maint;
 	/* keys */
@@ -38,10 +37,14 @@ struct Apr {
 	bool key_rd_off, key_rd_on;
 	bool key_pt_rd, key_pt_wr;
 
+	/* PI */
+	u8 pio, pir, pih, pi_req;
+	bool pi_active;
+	bool pi_ov, pi_cyc, pi_rq;
+
 	/* flip-flops */
 	bool ex_mode_sync, ex_uuo_sync, ex_pi_sync, ex_ill_op, ex_user;
 	bool pc_chg_flag, ar_ov_flag, ar_cry0_flag, ar_cry1_flag;
-	bool pi_ov, pi_cyc, pi_req;
 
 	bool key_ex_st, key_ex_sync;
 	bool key_dep_st, key_dep_sync;
@@ -59,6 +62,7 @@ struct Apr {
 	bool iot_go, a_long, uuo_f1;
 
 	/* sbr flip-flops */
+	bool if1a;
 	bool chf7;
 
 	/* temporaries */
@@ -93,3 +97,5 @@ enum {
 	MEMBUS_MAI_ADDR_ACK = 0400000000000,
 };
 extern word membus0, membus1;
+
+extern word iobus0, iobus1;

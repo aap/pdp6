@@ -353,6 +353,8 @@ Light ind_lights[] = {
 	{ lampsurf, { 407, 127, 14, 22 }, 0 },
 	{ lampsurf, { 407, 144, 14, 22 }, 0 },
 	{ lampsurf, { 407, 161, 14, 22 }, 0 },
+	/* sbr flip-flops */
+	{ lampsurf, {  99,  42, 14, 22 }, 0 },
 };
 Light extra_lights[] = {
 	/* MEMBUS */
@@ -828,12 +830,13 @@ error:
 		ff_lght[31].state = apr.cpa_pia35;
 		ff_lght[32].state = apr.pi_ov;
 		ff_lght[33].state = apr.pi_cyc;
-		ff_lght[34].state = apr.pi_req;
+		ff_lght[34].state = apr.pi_rq;
 		ff_lght[35].state = apr.iot_go;
 		ff_lght[36].state = apr.a_long;
 		ff_lght[37].state = apr.ma == apr.mas;
 		ff_lght[38].state = apr.uuo_f1;
 		ff_lght[39].state = apr.cpa_pdl_ov;
+		ff_lght[40].state = apr.if1a;
 
 		setlights(membus0, membus_lght, 36);
 		setlights(apr.pr, pr_lght, 8);
