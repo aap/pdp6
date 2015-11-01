@@ -1,8 +1,5 @@
 #include "pdp6.h"
 
-typedef void *Pulse(void);
-#define pulse(p) void *p(void)
-
 /* external pulses:
  * KEY MANUAL
  * MAI-CMC ADDR ACK
@@ -10,9 +7,57 @@ typedef void *Pulse(void);
  */
 
 Apr apr;
-int extpulse;
-Pulse *nextpulse;
-Pulse *mc_rst1_ret, *art3_ret;
+
+void
+decode_ch(void)
+{
+	int ir6_8;
+	ir6_8 = apr.ir>>9 & 7;
+	if((apr.ir & 0770000) == 0130000){
+		apr.ch_inc = ((ir6_8 & 5) == 4 || ir6_8 == 3) && !apr.chf5;
+		apr.ch_inc_op = apr.ch_inc && !apr.chf7;
+		apr.ch_n_inc_op = (ir6_8 & 5) == 5 && !apr.chf5 ||
+		                  apr.ch_inc && apr.chf7;
+		apr.ch_load = (ir6_8 & 6) == 4 && apr.chf5;
+		apr.ch_dep = (ir6_8 & 6) == 6 && apr.chf5;
+	}else{
+		apr.ch_inc =  apr.ch_inc_op = apr.ch_n_inc_op = 0;
+		apr.ch_load = apr.ch_dep = 0;
+	}
+}
+
+void
+decode_2xx(void)
+{
+	int inst;
+	inst = apr.ir>>9 & 0777;
+	apr.fwt = (apr.ir & 0760000) == 0200000;
+	if(inst >= 0244 && inst <= 0246 ||
+	   (inst & 0774) == 0234)
+		apr.fac2 = 1;
+	apr.fc_c_acrt = (inst & 0776) == 0262;
+	apr.fc_c_aclt = inst == 0251 || inst == 0267;
+}
+
+void
+decodeir(void)
+{
+	bool iot_a, jrst_a, uuo_a;
+
+	apr.fac2 = 0;
+	decode_ch();
+	decode_2xx();
+	uuo_a = (apr.ir & 0700000) == 0;
+	iot_a = (apr.ir & 0700000) == 0700000;
+	jrst_a = (apr.ir & 0777000) == 0254000;
+	// 5-13
+	apr.ex_ir_uuo =
+		uuo_a && apr.ex_uuo_sync ||
+		iot_a && !apr.ex_pi_sync && apr.ex_user && !apr.cpa_iot_user ||
+		jrst_a && (apr.ir & 0000600) && apr.ex_user;
+	apr.ir_jrst = !apr.ex_ir_uuo && jrst_a;
+	apr.ir_iot = !apr.ex_ir_uuo && iot_a;
+}
 
 void
 set_ex_mode_sync(bool value)
@@ -149,6 +194,12 @@ pulse(ar_flag_clr){
 	return NULL;
 }
 
+// TODO
+pulse(mp_clr){
+	apr.chf5 = 0;		// 6-19
+	return NULL;
+}
+
 pulse(mr_clr){
 	printf("MR CLR\n");
 	apr.ir = 0;	// 5-7
@@ -168,7 +219,8 @@ pulse(mr_clr){
 	apr.ex_pi_sync = 0;	// 5-13
 
 	apr.a_long = 0;		// nowhere to be found :(
-	// TODO: MP CLR, DS CLR
+	mp_clr();
+	// TODO: DS CLR
 
 	/* sbr flip-flops */
 	apr.key_rd_wr = 0;	// 5-2
@@ -176,7 +228,11 @@ pulse(mr_clr){
 	apr.af0 = 0;		// 5-3
 	apr.af3 = 0;		// 5-3
 	apr.af3a = 0;		// 5-3
-	mc_rst1_ret = NULL;
+	apr.f1a = 0;		// 5-4
+	apr.f4a = 0;		// 5-4
+	apr.f6a = 0;		// 5-4
+	apr.mc_rst1_ret = NULL;
+	apr.art3_ret = NULL;
 	return NULL;
 }
 
@@ -232,7 +288,7 @@ pulse(st7){
 
 pulse(art3){
 //	apr.ar_com_cont = 0;
-	return art3_ret;
+	return apr.art3_ret;
 }
 
 pulse(ar_ast1){
@@ -269,9 +325,88 @@ pulse(pi_sync){
  * Fetch
  */
 
-pulse(ft0){
-	printf("FT0\n");
+pulse(ft5){
+	printf("FT5\n");
+	apr.ma = apr.mb & RT;		// 7-3
 	return NULL;
+}
+
+pulse(ft4a){
+	word tmp;
+
+	printf("FT4A\n");
+	apr.f4a = 0;			// 5-4
+	apr.ma = 0;			// 7-3
+	tmp = apr.mb;
+	apr.mb = apr.mq;		// 6-3
+	apr.mq = tmp;			// 6-13
+	return ft5;			// 5-4
+}
+
+pulse(ft4){
+	printf("FT4\n");
+	apr.mq = apr.mb;		// 6-13
+	apr.f4a = 1;			// 5-4
+	apr.mc_rst1_ret = ft4a;
+	return mc_rd_rq_pulse;
+}
+
+pulse(ft3){
+	word tmp;
+
+	printf("FT3\n");
+	apr.ma = apr.mb & RT;		// 7-3
+	tmp = apr.mb;			// 6-3
+	apr.mb = apr.ar;
+	apr.ar = tmp;
+	return ft4;			// 5-4
+}
+
+pulse(ft1a){
+	word tmp;
+
+	printf("FT1A\n");
+	apr.f1a = 0;			// 5-4
+	if(apr.fac2)
+		apr.ma = apr.ma+1 & 017;	// 7-1, 7-5
+	else
+		apr.ma = 0;		// 7-3
+	if(!(apr.fc_c_aclt || apr.fc_c_acrt)){
+		tmp = apr.mb;		// 6-3
+		apr.mb = apr.ar;
+		apr.ar = tmp;
+	}
+	if(apr.fc_c_aclt)
+		apr.mb = apr.mb<<18 & LT | apr.mb>>18 & RT;	// 6-3
+	if(apr.fac2)
+		return ft4;		// 5-4
+	if(apr.fc_c_aclt || apr.fc_c_acrt)
+		return ft3;		// 5-4
+	return ft5;			// 5-4
+}
+
+pulse(ft1){
+	printf("FT1\n");
+	apr.ma = apr.ir>>5 & 017;	// 7-3
+	apr.f1a = 1;			// 5-4
+	apr.mc_rst1_ret = ft1a;
+	return mc_rd_rq_pulse;
+}
+
+pulse(ft0){
+	bool fac_inh;
+
+	printf("FT0\n");
+	// 5-4
+	fac_inh = apr.ch_inc_op || apr.ch_n_inc_op || apr.ch_load ||
+		apr.ex_ir_uuo || apr.fwt && (apr.ir & 0003000) != 0002000 ||
+		(apr.ir & 0703000) == 0503000 || apr.ir_iot ||
+		(apr.ir & 0774000) == 0254000 ||	/* 254-257 */
+		(apr.ir & 0776000) == 0264000 ||	/* JSR, JSP */
+		(apr.ir & 0700000) == 0300000 && (apr.ir & 0060000); /* MEMAC */
+	if(fac_inh)
+		return ft5;		// 5-4
+	return ft1;			// 5-4
 }
 
 /*
@@ -284,7 +419,7 @@ pulse(at5){
 	apr.af0 = 1;			// 5-3
 	apr.ma = apr.mb & RT;		// 7-3
 	apr.ir &= ~037;			// 5-7
-	mc_rst1_ret = at0;
+	apr.mc_rst1_ret = at0;
 	return mc_rd_rq_pulse;
 }
 
@@ -311,7 +446,7 @@ pulse(at3){
 	apr.af3 = 0;			// 5-3
 	apr.ma = 0;			// 7-3
 	apr.af3a = 1;			// 5-3
-	art3_ret = at3a;
+	apr.art3_ret = at3a;
 	return ar_ast1;
 }
 
@@ -320,7 +455,7 @@ pulse(at2){
 	apr.a_long = 1;			// nowhere to be found :(
 	apr.ma = apr.ir & 017;		// 7-3
 	apr.af3 = 1;			// 5-3
-	mc_rst1_ret = at3;
+	apr.mc_rst1_ret = at3;
 	return mc_rd_rq_pulse;
 }
 
@@ -337,6 +472,7 @@ pulse(at0){
 	apr.ar &= ~RT;			// 6-8
 	apr.ar |= apr.mb & RT;		// 6-8
 	apr.ir |= apr.mb>>18 & 037;	// 5-7
+	decodeir();
 	apr.ma = 0;			// 7-3
 	apr.af0 = 0;			// 5-3
 	return pi_sync;			// 8-4
@@ -376,7 +512,7 @@ pulse(it1){
 	if(apr.pi_ov)
 		apr.ma = (apr.ma+1)&RT;	// 7-3
 	apr.if1a = 1;
-	mc_rst1_ret = it1a;
+	apr.mc_rst1_ret = it1a;
 	return mc_rd_rq_pulse;
 }
 
@@ -397,7 +533,7 @@ pulse(mc_rs_t1){
 	set_mc_rd(0);
 	if(apr.key_ex_next || apr.key_dep_next)
 		apr.mi = apr.mb;	// 7-7
-	return mc_rst1_ret;
+	return apr.mc_rst1_ret;
 }
 
 pulse(mc_rs_t0){
@@ -464,7 +600,7 @@ pulse(mc_rq_pulse){
 	printf("MC RQ PULSE\n");
 	apr.mc_stop = 0;		// 7-9
 	/* catch non-existent memory */
-	extpulse |= 4;
+	apr.extpulse |= 4;
 	if(calcaddr() == 0 && !apr.ex_inh_rel)
 		return mc_illeg_address;
 	set_mc_rq(1);
@@ -530,7 +666,7 @@ pulse(key_rd_wr_ret){
 pulse(key_rd){
 	printf("KEY RD\n");
 	apr.key_rd_wr = 1;	// 5-2
-	mc_rst1_ret = key_rd_wr_ret;
+	apr.mc_rst1_ret = key_rd_wr_ret;
 	return mc_rd_rq_pulse;
 }
 
@@ -538,7 +674,7 @@ pulse(key_wr){
 	printf("KEY WR\n");
 	apr.key_rd_wr = 1;	// 5-2
 	apr.mb = apr.ar;	// 6-3
-	mc_rst1_ret = key_rd_wr_ret;
+	apr.mc_rst1_ret = key_rd_wr_ret;
 	return mc_wr_rq_pulse;
 }
 
@@ -619,7 +755,7 @@ pulse(kt12){
 	if(KEY_MANUAL && apr.mc_stop && apr.mc_stop_sync && !apr.key_mem_cont){
 		/* Finish rd/wr which should stop the processor.
 		 * Set flag to continue at KT3 */
-		extpulse |= 2;
+		apr.extpulse |= 2;
 		return mc_wr_rs;
 	}
 	return kt3;	// 5-2
@@ -666,29 +802,29 @@ aprmain(void *p)
 {
 	mr_pwr_clr();
 	while(apr.sw_power){
-		if(extpulse & 1){
-			if(nextpulse)
+		if(apr.extpulse & 1){
+			if(apr.nextpulse)
 				printf("whaa: cpu wasn't idle\n");
-			extpulse &= ~1;
-			nextpulse = key_manual;
+			apr.extpulse &= ~1;
+			apr.nextpulse = key_manual;
 		}
-		if(nextpulse)
-			nextpulse = nextpulse();
+		if(apr.nextpulse)
+			apr.nextpulse = apr.nextpulse();
 		else if(membus0 & MEMBUS_MAI_ADDR_ACK){
 			membus0 &= ~MEMBUS_MAI_ADDR_ACK;
-			extpulse &= ~4;
-			nextpulse = mai_addr_ack;
+			apr.extpulse &= ~4;
+			apr.nextpulse = mai_addr_ack;
 		}else if(membus0 & MEMBUS_MAI_RD_RS){
 			membus0 &= ~MEMBUS_MAI_RD_RS;
-			nextpulse = mai_rd_rs;
-		}else if(extpulse & 2){
+			apr.nextpulse = mai_rd_rs;
+		}else if(apr.extpulse & 2){
 			/* continue at KT3 after finishing rd/wr from a stop */
-			extpulse &= ~2;
-			nextpulse = kt3;
-		}else if(extpulse & 4){
-			extpulse &= ~4;
+			apr.extpulse &= ~2;
+			apr.nextpulse = kt3;
+		}else if(apr.extpulse & 4){
+			apr.extpulse &= ~4;
 			if(apr.mc_rq && !apr.mc_stop)
-				nextpulse = mc_non_exist_mem;
+				apr.nextpulse = mc_non_exist_mem;
 		}
 	}
 	printf("power off\n");

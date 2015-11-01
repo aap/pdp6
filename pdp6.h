@@ -16,6 +16,9 @@ enum {
 	LT = 0777777000000,
 };
 
+typedef void *Pulse(void);
+#define pulse(p) void *p(void)
+
 typedef struct Apr Apr;
 struct Apr {
 	hword ir;
@@ -69,14 +72,24 @@ struct Apr {
 	/* sbr flip-flops */
 	bool if1a;
 	bool af0, af3, af3a;
-	bool chf7;
+	bool f1a, f4a, f6a;
+	bool chf5, chf7;
 
 	/* temporaries */
 	bool ex_inh_rel;
+	/* decoded instructions */
+	bool ch_inc, ch_inc_op, ch_n_inc_op, ch_load, ch_dep;
+	bool ex_ir_uuo, ir_iot, ir_jrst;
+	bool fwt;
+	bool fac2, fc_c_acrt, fc_c_aclt;
+
+	/* needed for the emulation */
+	int extpulse;
+	Pulse *nextpulse;
+	Pulse *mc_rst1_ret, *art3_ret;
 };
 extern Apr apr;
 void *aprmain(void *p);
-extern int extpulse;
 
 void initmem(void);
 void wakemem(void);

@@ -358,6 +358,10 @@ Light ind_lights[] = {
 	{ lampsurf, {  99,  59, 14, 22 }, 0 },
 	{ lampsurf, {  99,  76, 14, 22 }, 0 },
 	{ lampsurf, {  99,  93, 14, 22 }, 0 },
+	{ lampsurf, {  99, 110, 14, 22 }, 0 },
+	{ lampsurf, {  99, 127, 14, 22 }, 0 },
+	{ lampsurf, {  99, 144, 14, 22 }, 0 },
+	{ lampsurf, {  99, 161, 14, 22 }, 0 },
 };
 
 Light extra_lights[] = {
@@ -598,7 +602,7 @@ mouse(int button, int state, int x, int y)
 			case 4:	/* deposit */
 			case 5:	/* examine */
 				if(keys[i].state && apr.sw_power)
-					extpulse |= 1;
+					apr.extpulse |= 1;
 				break;
 			case 2:	/* stop */
 			case 6:	/* on off reader */
@@ -742,6 +746,8 @@ error:
 
 	initmem();
 	memset(&apr, 0xff, sizeof apr);
+	apr.extpulse = 0;
+	apr.nextpulse = apr.mc_rst1_ret = apr.art3_ret = NULL;
 
 	for(;;){
 		while(SDL_PollEvent(&ev))
@@ -844,6 +850,10 @@ error:
 		ff_lght[41].state = apr.af0;
 		ff_lght[42].state = apr.af3;
 		ff_lght[43].state = apr.af3a;
+		ff_lght[44].state = 0;
+		ff_lght[45].state = apr.f1a;
+		ff_lght[46].state = apr.f4a;
+		ff_lght[47].state = apr.f6a;
 
 		setlights(membus0, membus_lght, 36);
 		setlights(apr.pr, pr_lght, 8);
