@@ -77,11 +77,16 @@ struct Apr {
 
 	/* temporaries */
 	bool ex_inh_rel;
+
 	/* decoded instructions */
 	bool ch_inc, ch_inc_op, ch_n_inc_op, ch_load, ch_dep;
 	bool ex_ir_uuo, ir_iot, ir_jrst;
 	bool fwt;
 	bool fac2, fc_c_acrt, fc_c_aclt;
+	bool boole_as_00, boole_as_01, boole_as_10, boole_as_11;
+	bool fwt_00, fwt_01, fwt_10, fwt_11;
+	bool hwt_00, hwt_01, hwt_10, hwt_11;
+	bool ir_memac, ir_memac_mem;
 
 	/* needed for the emulation */
 	int extpulse;
