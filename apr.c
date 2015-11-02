@@ -106,6 +106,19 @@ swap(word *a, word *b)
 }
 
 void
+ar_add(word w)
+{
+	int a, b, s;
+	a = apr.ar>>35 & 1;
+	b = w>>35 & 1;
+	apr.ar += w;
+	s = apr.ar>>35 & 3;
+	apr.ar &= FW;
+	apr.ar_cry0 = !!(s & 2);
+	apr.ar_cry1 = s-a-b;
+}
+
+void
 set_ex_mode_sync(bool value)
 {
 	apr.ex_mode_sync = value;
@@ -341,7 +354,7 @@ pulse(art3){
 
 pulse(ar_pm1_t1){
 	printf("AR AR+-1 T1\n");
-	apr.ar = apr.ar+1 & FW;
+	ar_add(1);
 	return apr.art3_ret;
 }
 
@@ -354,7 +367,7 @@ pulse(ar_negate_t0){
 pulse(ar_ast1){
 	printf("AR AST1,2\n");
 	// TODO
-	apr.ar += apr.mb;
+	ar_add(apr.mb);
 	return art3;
 }
 
@@ -391,6 +404,8 @@ pulse(et10){
 
 	if(apr.hwt_10 || apr.hwt_11 || apr.fwt_10 || apr.fwt_11)
 		apr.mb = apr.ar;
+	if(apr.fwt && !apr.ar_cry0 && apr.ar_cry1)
+		apr.ar_ov_flag = 1;		// 6-10
 	return NULL;
 }
 
@@ -414,7 +429,7 @@ pulse(et4){
 
 	hwt_lt = apr.hwt && !(apr.inst & 040);
 	hwt_rt = apr.hwt && apr.inst & 040;
-	if(hwt_rt && apr.inst & 020 && (!(apr.inst & 010) || apr.mb & SGN))
+	if(hwt_rt && apr.inst & 020 && (!(apr.inst & 010) || apr.mb & RSGN))
 		apr.ar = apr.ar & ~LT | ~apr.ar & LT;
 	if(hwt_lt && apr.inst & 020 && (!(apr.inst & 010) || apr.mb & SGN))
 		apr.ar = apr.ar & ~RT | ~apr.ar & RT;
@@ -500,7 +515,7 @@ pulse(et0a){
 	if(apr.fwt_00 || apr.fwt_11 || apr.hwt_11)
 		apr.ar = apr.mb;	// 6-8
 	if(apr.fwt_01 || apr.fwt_10)
-		apr.mb = apr.ar;
+		apr.mb = apr.ar;	// 6-3
 	if(apr.inst == 0250 ||		/* EXCH */
 	   apr.hwt_10)
 		swap(&apr.mb, &apr.ar);	// 6-3
