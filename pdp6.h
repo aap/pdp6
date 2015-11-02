@@ -12,8 +12,10 @@ typedef uint8_t  u8;
 typedef char bool;
 
 enum {
-	RT = 0000000777777,
-	LT = 0777777000000,
+	FW  = 0777777777777,
+	RT  = 0000000777777,
+	LT  = 0777777000000,
+	SGN = 0400000000000,
 };
 
 typedef void *Pulse(void);
@@ -48,11 +50,12 @@ struct Apr {
 	/* PI */
 	u8 pio, pir, pih, pi_req;
 	bool pi_active;
-	bool pi_ov, pi_cyc, pi_rq;
+	bool pi_ov, pi_cyc;
 
 	/* flip-flops */
 	bool ex_mode_sync, ex_uuo_sync, ex_pi_sync, ex_ill_op, ex_user;
 	bool pc_chg_flag, ar_ov_flag, ar_cry0_flag, ar_cry1_flag;
+	bool ar_cry0, ar_cry1;
 
 	bool key_ex_st, key_ex_sync;
 	bool key_dep_st, key_dep_sync;
@@ -64,7 +67,7 @@ struct Apr {
 	     cpa_clock_en, cpa_clock_flag, cpa_pc_chg_en, cpa_pdl_ov,
 	     cpa_arov_en, cpa_pia33, cpa_pia34, cpa_pia35;
 
-	bool cry0_cry1, ar_cry0, ar_cry1;
+	bool cry0_cry1;
 	/* ?? */
 	bool mq36;
 	bool iot_go, a_long, uuo_f1;
@@ -73,20 +76,25 @@ struct Apr {
 	bool if1a;
 	bool af0, af3, af3a;
 	bool f1a, f4a, f6a;
+	bool et4_ar_pse;
 	bool chf5, chf7;
 
 	/* temporaries */
 	bool ex_inh_rel;
+	bool pi_hold;
+	int inst;
 
 	/* decoded instructions */
 	bool ch_inc, ch_inc_op, ch_n_inc_op, ch_load, ch_dep;
 	bool ex_ir_uuo, ir_iot, ir_jrst;
-	bool fwt;
 	bool fac2, fc_c_acrt, fc_c_aclt;
 	bool boole_as_00, boole_as_01, boole_as_10, boole_as_11;
+	bool fwt, fwt_swap;
 	bool fwt_00, fwt_01, fwt_10, fwt_11;
+	bool hwt;
 	bool hwt_00, hwt_01, hwt_10, hwt_11;
 	bool ir_memac, ir_memac_mem;
+	bool iot_blk, iot_dataio;
 
 	/* needed for the emulation */
 	int extpulse;

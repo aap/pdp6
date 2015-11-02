@@ -29,63 +29,62 @@ decode_ch(void)
 void
 decode_2xx(void)
 {
-	int inst;
-	inst = apr.ir>>9 & 0777;
-	apr.fwt = (inst & 0760) == 0200;
+	apr.fwt = (apr.inst & 0760) == 0200;
+	apr.fwt_swap = 0;
+	apr.fwt_00 = apr.fwt_01 = apr.fwt_10 = apr.fwt_11 = 0;
 	if(apr.fwt){
-		apr.fwt_00 = (inst & 03) == 0;
-		apr.fwt_01 = (inst & 03) == 1;
-		apr.fwt_10 = (inst & 03) == 2;
-		apr.fwt_11 = (inst & 03) == 3;
+		apr.fwt_swap = (apr.inst & 0774) == 0204;
+		apr.fwt_00 = (apr.inst & 03) == 0;
+		apr.fwt_01 = (apr.inst & 03) == 1;
+		apr.fwt_10 = (apr.inst & 03) == 2;
+		apr.fwt_11 = (apr.inst & 03) == 3;
 	}
-	if(inst >= 0244 && inst <= 0246 ||
-	   (inst & 0774) == 0234)
+	if(apr.inst >= 0244 && apr.inst <= 0246 ||
+	   (apr.inst & 0774) == 0234)
 		apr.fac2 = 1;
-	apr.fc_c_acrt = (inst & 0776) == 0262;
-	apr.fc_c_aclt = inst == 0251 || inst == 0267;
+	apr.fc_c_acrt = (apr.inst & 0776) == 0262;
+	apr.fc_c_aclt = apr.inst == 0251 || apr.inst == 0267;
 }
 
 void
 decodeir(void)
 {
-	int inst;
 	bool iot_a, jrst_a, uuo_a;
 
+	apr.inst = apr.ir>>9 & 0777;
 	apr.fac2 = 0;
 	apr.boole_as_00 = apr.boole_as_01 = 0;
 	apr.boole_as_10 = apr.boole_as_11 = 0;
-	apr.fwt_00 = apr.fwt_01 = apr.fwt_10 = apr.fwt_11 = 0;
 	apr.hwt_00 = apr.hwt_01 = apr.hwt_10 = apr.hwt_11 = 0;
 	apr.ir_memac = apr.ir_memac_mem = 0;
 
 	decode_ch();
 	decode_2xx();
 
-	inst = apr.ir>>9 & 0777;
-
 	/* ACCP v MEMAC */
-	if((inst & 0700) == 0300){
-		apr.ir_memac = inst & 0060;
-		apr.ir_memac_mem = apr.ir_memac && inst & 0010;
+	if((apr.inst & 0700) == 0300){
+		apr.ir_memac = apr.inst & 0060;
+		apr.ir_memac_mem = apr.ir_memac && apr.inst & 0010;
 	}
 
 	/* HWT */
-	if((inst & 0700) == 0500){
-		apr.hwt_00 = (inst & 03) == 0;
-		apr.hwt_01 = (inst & 03) == 1;
-		apr.hwt_10 = (inst & 03) == 2;
-		apr.hwt_11 = (inst & 03) == 3;
+	apr.hwt = (apr.inst & 0700) == 0500;
+	if(apr.hwt){
+		apr.hwt_00 = (apr.inst & 03) == 0;
+		apr.hwt_01 = (apr.inst & 03) == 1;
+		apr.hwt_10 = (apr.inst & 03) == 2;
+		apr.hwt_11 = (apr.inst & 03) == 3;
 	}
 
-	if((inst & 0700) == 0600 || (inst & 770) == 0270){
-		apr.boole_as_00 = (inst & 03) == 0;
-		apr.boole_as_01 = (inst & 03) == 1;
-		apr.boole_as_10 = (inst & 03) == 2;
-		apr.boole_as_11 = (inst & 03) == 3;
+	if((apr.inst & 0700) == 0600 || (apr.inst & 770) == 0270){
+		apr.boole_as_00 = (apr.inst & 03) == 0;
+		apr.boole_as_01 = (apr.inst & 03) == 1;
+		apr.boole_as_10 = (apr.inst & 03) == 2;
+		apr.boole_as_11 = (apr.inst & 03) == 3;
 	}
-	uuo_a = (inst & 0700) == 0;
-	iot_a = (inst & 0700) == 0700;
-	jrst_a = inst == 0254;
+	uuo_a = (apr.inst & 0700) == 0;
+	iot_a = (apr.inst & 0700) == 0700;
+	jrst_a = apr.inst == 0254;
 	// 5-13
 	apr.ex_ir_uuo =
 		uuo_a && apr.ex_uuo_sync ||
@@ -93,6 +92,17 @@ decodeir(void)
 		jrst_a && (apr.ir & 0000600) && apr.ex_user;
 	apr.ir_jrst = !apr.ex_ir_uuo && jrst_a;
 	apr.ir_iot = !apr.ex_ir_uuo && iot_a;
+	apr.iot_blk = apr.ir_iot && (apr.ir & 0000240) == 0;
+	apr.iot_dataio = apr.ir_iot && (apr.ir & 0000240) == 0040;
+}
+
+void
+swap(word *a, word *b)
+{
+	word tmp;
+	tmp = *a;
+	*a = *b;
+	*b = tmp;
 }
 
 void
@@ -112,12 +122,11 @@ set_pi_cyc(bool value)
 }
 
 void
-set_pir(u8 value)
+recalc_pi_req(void)
 {
 	int chan;
 	u8 req;
 	// 8-3
-	apr.pir = value;
 	apr.pi_req = 0;
 	if(apr.pi_active){
 		req = apr.pir & ~apr.pih;
@@ -127,7 +136,6 @@ set_pir(u8 value)
 				break;
 			}
 	}
-	apr.pi_rq = !!apr.pi_req;	// 8-4
 }
 
 void
@@ -217,7 +225,8 @@ pulse(pi_reset){
 	printf("PI RESET\n");
 	apr.pi_active = 0;	// 8-4
 	apr.pih = 0;		// 8-4
-	set_pir(0);		// 8-4
+	apr.pir = 0;		// 8-4
+	recalc_pi_req();	// 8-4
 	apr.pio = 0;		// 8-3
 	return NULL;
 }
@@ -269,6 +278,7 @@ pulse(mr_clr){
 	apr.f1a = 0;		// 5-4
 	apr.f4a = 0;		// 5-4
 	apr.f6a = 0;		// 5-4
+	apr.et4_ar_pse = 0;	// 5-5
 	apr.mc_rst1_ret = NULL;
 	apr.art3_ret = NULL;
 	return NULL;
@@ -329,6 +339,18 @@ pulse(art3){
 	return apr.art3_ret;
 }
 
+pulse(ar_pm1_t1){
+	printf("AR AR+-1 T1\n");
+	apr.ar = apr.ar+1 & FW;
+	return apr.art3_ret;
+}
+
+pulse(ar_negate_t0){
+	printf("AR NEGATE T0\n");
+	apr.ar = ~apr.ar & FW;
+	return ar_pm1_t1;
+}
+
 pulse(ar_ast1){
 	printf("AR AST1,2\n");
 	// TODO
@@ -342,7 +364,8 @@ pulse(ar_ast1){
 
 pulse(pir_stb){
 	printf("PIR STB\n");
-	set_pir(apr.pir | apr.pio & iobus1);	// 8-3
+	apr.pir |= apr.pio & iobus1;
+	recalc_pi_req();			// 8-3
 	return NULL;
 }
 
@@ -351,7 +374,7 @@ pulse(pi_sync){
 	if(!apr.pi_cyc)
 		pir_stb();
 	// 5-3
-	if(apr.pi_rq && !apr.pi_cyc)
+	if(apr.pi_req && !apr.pi_cyc)
 		return iat0;
 	// TODO: IA INH/AT INH
 	if(apr.if1a)
@@ -363,8 +386,124 @@ pulse(pi_sync){
  * Execute
  */
 
+pulse(et10){
+	printf("ET10\n");
+
+	if(apr.hwt_10 || apr.hwt_11 || apr.fwt_10 || apr.fwt_11)
+		apr.mb = apr.ar;
+	return NULL;
+}
+
+pulse(et6){
+	printf("ET6\n");
+	return NULL;
+}
+
+pulse(et5){
+	printf("ET5\n");
+//	if(apr.e_long)
+//		return et6;
+	return et10;
+}
+
+pulse(et4){
+	bool hwt_lt, hwt_rt;
+
+	printf("ET4\n");
+	apr.et4_ar_pse = 0;		// 5-5
+
+	hwt_lt = apr.hwt && !(apr.inst & 040);
+	hwt_rt = apr.hwt && apr.inst & 040;
+	if(hwt_rt && apr.inst & 020 && (!(apr.inst & 010) || apr.mb & SGN))
+		apr.ar = apr.ar & ~LT | ~apr.ar & LT;
+	if(hwt_lt && apr.inst & 020 && (!(apr.inst & 010) || apr.mb & SGN))
+		apr.ar = apr.ar & ~RT | ~apr.ar & RT;
+	if(hwt_lt)
+		apr.ar = apr.ar & ~LT | apr.mb & LT;
+	if(hwt_rt)
+		apr.ar = apr.ar & ~RT | apr.mb & RT;
+
+	if(apr.fwt_swap)
+		swap(&apr.mb, &apr.ar);	// 6-3
+	return et5;
+}
+
+pulse(et3){
+	printf("ET3\n");
+
+	// 5-9
+	if(apr.fwt && ((apr.inst & 0774) == 0210 ||
+	               (apr.inst & 0774) == 0214 && apr.ar & SGN)){
+		apr.et4_ar_pse = 1;		// 5-5
+		apr.art3_ret = et4;
+		return ar_negate_t0;
+	}
+	return et4;
+};
+
+pulse(et1){
+	printf("ET1\n");
+
+	if(apr.ex_ir_uuo)
+		apr.ex_ill_op = 1;		// 5-13
+	if(apr.ir_jrst && apr.ir & 0000040)
+		apr.ex_mode_sync = 1;		// 5-13
+	if(apr.ir_jrst && apr.ir & 0000400 ||
+	   apr.iot_dataio && !apr.pi_ov && apr.pi_cyc)
+		if(apr.pi_active){
+			// TODO: check if this correct
+			apr.pih &= apr.pi_req-1;	// 8-3
+			recalc_pi_req();
+		}
+
+	if(apr.fwt_swap ||
+	   apr.hwt && apr.inst & 0004)
+		apr.mb = apr.mb<<18 & LT | apr.mb>>18 & RT;	// 6-3
+	if(apr.hwt && apr.inst & 0030)
+		apr.ar = 0;			// 6-8
+	return et3;
+}
+
 pulse(et0){
 	printf("ET0\n");
+
+	if(!(apr.ch_inc_op && apr.inst != 0133 ||
+	     apr.ch_n_inc_op && apr.inst != 0133 ||
+	     apr.ex_ir_uuo || apr.iot_blk || apr.inst == 0256 ||
+	     apr.key_execute && !apr.run || apr.pi_cyc))
+		apr.pc = apr.pc+1 & RT;
+	apr.ar_cry0 = 0;	// 6-10
+	apr.ar_cry1 = 0;	// 6-10
+	// TODO: subroutines
+	return et1;
+}
+
+pulse(et0a){
+	printf("ET0A\n");
+
+	// 8-4
+	apr.pi_hold = (!apr.ir_iot || !apr.pi_ov && apr.iot_dataio) &&
+	              apr.pi_cyc;
+	if(apr.pi_hold){
+		apr.pih |= apr.pi_req;	// 8-3
+		recalc_pi_req();
+	}
+	// 5-1
+	if(apr.key_ex_sync)
+		apr.key_ex_st = 1;
+	if(apr.key_dep_sync)
+		apr.key_dep_st = 1;
+	if(apr.key_inst_stop ||
+	   apr.ir_jrst && (apr.ir & 0000200) && !apr.ex_user)
+		apr.run = 0;
+
+	if(apr.fwt_00 || apr.fwt_11 || apr.hwt_11)
+		apr.ar = apr.mb;	// 6-8
+	if(apr.fwt_01 || apr.fwt_10)
+		apr.mb = apr.ar;
+	if(apr.inst == 0250 ||		/* EXCH */
+	   apr.hwt_10)
+		swap(&apr.mb, &apr.ar);	// 6-3
 	return NULL;
 }
 
@@ -375,6 +514,7 @@ pulse(et0){
 pulse(ft6a){
 	printf("FT6A\n");
 	apr.f6a = 0;			// 5-4
+	et0a();				// 5-5
 	return et0;			// 5-5
 }
 
@@ -382,6 +522,8 @@ pulse(ft7){
 	printf("FT7\n");
 	apr.f6a = 1;			// 5-4
 	apr.mc_rst1_ret = ft6a;
+	if(apr.mc_split_cyc_sync)
+		return mc_rd_rq_pulse;
 	return mc_rdwr_rq_pulse;
 }
 
@@ -394,27 +536,26 @@ pulse(ft6){
 
 pulse(ft5){
 	bool fc_e, fc_e_pse;
-	int inst;
 
 	printf("FT5\n");
 	apr.ma = apr.mb & RT;		// 7-3
 
-	inst = apr.ir>>9 & 0777;
 	// 5-4
-	fc_e = (inst & 0710) == 0610 ||		/* ACBM DIR */
-		(inst & 0770) == 0310 ||	/* ACCP DIR */
+	fc_e = (apr.inst & 0710) == 0610 ||		/* ACBM DIR */
+		(apr.inst & 0770) == 0310 ||	/* ACCP DIR */
 		apr.boole_as_00 || apr.ch_n_inc_op || apr.ch_load ||
 		apr.fwt_00 || apr.hwt_00 ||
-		apr.ir_iot && (apr.ir & 000034) == 000014 ||	/* DATAO */
-		(inst & 0740) == 0140 ||	/* IR FP */
-		(inst & 0760) == 0220 && (inst & 0003) != 1 ||	/* MD FC(E) */
-		inst == 0256 ||			/* XCT */
-		(inst & 0776) == 0260;		/* PUSH */
+		apr.iot_dataio && (apr.ir & 0100) ||	/* DATAO */
+		(apr.inst & 0740) == 0140 ||	/* IR FP */
+		(apr.inst & 0760) == 0220 &&
+		 (apr.inst & 0003) != 1 ||	/* MD FC(E) */
+		apr.inst == 0256 ||			/* XCT */
+		(apr.inst & 0776) == 0260;		/* PUSH */
 	fc_e_pse = apr.boole_as_10 || apr.boole_as_11 ||
 		apr.ch_dep || apr.ch_inc_op ||
 		apr.fwt_11 || apr.hwt_10 || apr.hwt_11 ||
-		apr.ir_iot && (apr.ir & 000024) == 0 ||	/* IOT BLK */
-		inst == 0250 ||	/* EXCH */
+		apr.iot_blk ||
+		apr.inst == 0250 ||	/* EXCH */
 		apr.ir_memac_mem;
 	if(fc_e)
 		return ft6;
@@ -424,14 +565,11 @@ pulse(ft5){
 }
 
 pulse(ft4a){
-	word tmp;
-
 	printf("FT4A\n");
 	apr.f4a = 0;			// 5-4
 	apr.ma = 0;			// 7-3
-	tmp = apr.mb;
-	apr.mb = apr.mq;		// 6-3
-	apr.mq = tmp;			// 6-13
+
+	swap(&apr.mb, &apr.mq);		// 6-3, 6-13
 	return ft5;			// 5-4
 }
 
@@ -444,30 +582,21 @@ pulse(ft4){
 }
 
 pulse(ft3){
-	word tmp;
-
 	printf("FT3\n");
 	apr.ma = apr.mb & RT;		// 7-3
-	tmp = apr.mb;			// 6-3
-	apr.mb = apr.ar;
-	apr.ar = tmp;
+	swap(&apr.mb, &apr.ar);		// 6-3
 	return ft4;			// 5-4
 }
 
 pulse(ft1a){
-	word tmp;
-
 	printf("FT1A\n");
 	apr.f1a = 0;			// 5-4
 	if(apr.fac2)
 		apr.ma = apr.ma+1 & 017;	// 7-1, 7-5
 	else
 		apr.ma = 0;		// 7-3
-	if(!(apr.fc_c_aclt || apr.fc_c_acrt)){
-		tmp = apr.mb;		// 6-3
-		apr.mb = apr.ar;
-		apr.ar = tmp;
-	}
+	if(!(apr.fc_c_aclt || apr.fc_c_acrt))
+		swap(&apr.mb, &apr.ar);	// 6-3
 	if(apr.fc_c_aclt)
 		apr.mb = apr.mb<<18 & LT | apr.mb>>18 & RT;	// 6-3
 	if(apr.fac2)
@@ -487,16 +616,15 @@ pulse(ft1){
 
 pulse(ft0){
 	bool fac_inh;
-	int inst;
 
 	printf("FT0\n");
 	// 5-4
-	inst = apr.ir>>9 & 0777;
 	fac_inh = apr.ch_inc_op || apr.ch_n_inc_op || apr.ch_load ||
-		apr.ex_ir_uuo || apr.fwt_10 ||
-		(inst & 0703) == 0503 || apr.ir_iot ||
-		(inst & 0774) == 0254 ||	/* 254-257 */
-		(inst & 0776) == 0264 ||	/* JSR, JSP */
+		apr.ex_ir_uuo ||
+		apr.fwt_00 || apr.fwt_01 || apr.fwt_11 || apr.hwt_11 ||
+		(apr.inst & 0703) == 0503 || apr.ir_iot ||
+		(apr.inst & 0774) == 0254 ||	/* 254-257 */
+		(apr.inst & 0776) == 0264 ||	/* JSR, JSP */
 		apr.ir_memac_mem;
 	if(fac_inh)
 		return ft5;		// 5-4

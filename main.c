@@ -840,7 +840,7 @@ error:
 		ff_lght[31].state = apr.cpa_pia35;
 		ff_lght[32].state = apr.pi_ov;
 		ff_lght[33].state = apr.pi_cyc;
-		ff_lght[34].state = apr.pi_rq;
+		ff_lght[34].state = !!apr.pi_req;
 		ff_lght[35].state = apr.iot_go;
 		ff_lght[36].state = apr.a_long;
 		ff_lght[37].state = apr.ma == apr.mas;
@@ -850,7 +850,7 @@ error:
 		ff_lght[41].state = apr.af0;
 		ff_lght[42].state = apr.af3;
 		ff_lght[43].state = apr.af3a;
-		ff_lght[44].state = 0;
+		ff_lght[44].state = apr.et4_ar_pse;
 		ff_lght[45].state = apr.f1a;
 		ff_lght[46].state = apr.f4a;
 		ff_lght[47].state = apr.f6a;
