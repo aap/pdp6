@@ -89,10 +89,12 @@ struct Apr {
 	bool ch_inc, ch_inc_op, ch_n_inc_op, ch_load, ch_dep;
 	bool ex_ir_uuo, ir_iot, ir_jrst;
 	bool fac2, fc_c_acrt, fc_c_aclt;
+	bool ir_boole;
+	int ir_boole_op;
 	bool boole_as_00, boole_as_01, boole_as_10, boole_as_11;
-	bool fwt, fwt_swap;
+	bool ir_fwt, ir_fwt_swap;
 	bool fwt_00, fwt_01, fwt_10, fwt_11;
-	bool hwt;
+	bool ir_hwt;
 	bool hwt_00, hwt_01, hwt_10, hwt_11;
 	bool ir_memac, ir_memac_mem;
 	bool iot_blk, iot_dataio;

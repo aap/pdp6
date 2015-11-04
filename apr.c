@@ -29,11 +29,11 @@ decode_ch(void)
 void
 decode_2xx(void)
 {
-	apr.fwt = (apr.inst & 0760) == 0200;
-	apr.fwt_swap = 0;
+	apr.ir_fwt = (apr.inst & 0760) == 0200;
+	apr.ir_fwt_swap = 0;
 	apr.fwt_00 = apr.fwt_01 = apr.fwt_10 = apr.fwt_11 = 0;
-	if(apr.fwt){
-		apr.fwt_swap = (apr.inst & 0774) == 0204;
+	if(apr.ir_fwt){
+		apr.ir_fwt_swap = (apr.inst & 0774) == 0204;
 		apr.fwt_00 = (apr.inst & 03) == 0;
 		apr.fwt_01 = (apr.inst & 03) == 1;
 		apr.fwt_10 = (apr.inst & 03) == 2;
@@ -67,21 +67,27 @@ decodeir(void)
 		apr.ir_memac_mem = apr.ir_memac && apr.inst & 0010;
 	}
 
+	/* BOOLE */
+	apr.ir_boole = (apr.inst & 0700) == 0400;
+	if(apr.ir_boole)
+		apr.ir_boole_op = apr.inst>>2 & 017;
+
 	/* HWT */
-	apr.hwt = (apr.inst & 0700) == 0500;
-	if(apr.hwt){
+	apr.ir_hwt = (apr.inst & 0700) == 0500;
+	if(apr.ir_hwt){
 		apr.hwt_00 = (apr.inst & 03) == 0;
 		apr.hwt_01 = (apr.inst & 03) == 1;
 		apr.hwt_10 = (apr.inst & 03) == 2;
 		apr.hwt_11 = (apr.inst & 03) == 3;
 	}
 
-	if((apr.inst & 0700) == 0600 || (apr.inst & 770) == 0270){
+	if(apr.ir_boole || (apr.inst & 770) == 0270){
 		apr.boole_as_00 = (apr.inst & 03) == 0;
 		apr.boole_as_01 = (apr.inst & 03) == 1;
 		apr.boole_as_10 = (apr.inst & 03) == 2;
 		apr.boole_as_11 = (apr.inst & 03) == 3;
 	}
+
 	uuo_a = (apr.inst & 0700) == 0;
 	iot_a = (apr.inst & 0700) == 0700;
 	jrst_a = apr.inst == 0254;
@@ -404,7 +410,7 @@ pulse(et10){
 
 	if(apr.hwt_10 || apr.hwt_11 || apr.fwt_10 || apr.fwt_11)
 		apr.mb = apr.ar;
-	if(apr.fwt && !apr.ar_cry0 && apr.ar_cry1)
+	if(apr.ir_fwt && !apr.ar_cry0 && apr.ar_cry1)
 		apr.ar_ov_flag = 1;		// 6-10
 	return NULL;
 }
@@ -427,8 +433,17 @@ pulse(et4){
 	printf("ET4\n");
 	apr.et4_ar_pse = 0;		// 5-5
 
-	hwt_lt = apr.hwt && !(apr.inst & 040);
-	hwt_rt = apr.hwt && apr.inst & 040;
+	if(apr.ir_boole && (apr.ir_boole_op == 04 ||
+	                    apr.ir_boole_op == 010 ||
+	                    apr.ir_boole_op == 011 ||
+	                    apr.ir_boole_op == 014 ||
+	                    apr.ir_boole_op == 015 ||
+	                    apr.ir_boole_op == 016 ||
+	                    apr.ir_boole_op == 017))
+		apr.ar = ~apr.ar & FW;	// 6-8
+
+	hwt_lt = apr.ir_hwt && !(apr.inst & 040);
+	hwt_rt = apr.ir_hwt && apr.inst & 040;
 	if(hwt_rt && apr.inst & 020 && (!(apr.inst & 010) || apr.mb & RSGN))
 		apr.ar = apr.ar & ~LT | ~apr.ar & LT;
 	if(hwt_lt && apr.inst & 020 && (!(apr.inst & 010) || apr.mb & SGN))
@@ -438,7 +453,7 @@ pulse(et4){
 	if(hwt_rt)
 		apr.ar = apr.ar & ~RT | apr.mb & RT;
 
-	if(apr.fwt_swap)
+	if(apr.ir_fwt_swap)
 		swap(&apr.mb, &apr.ar);	// 6-3
 	return et5;
 }
@@ -447,7 +462,7 @@ pulse(et3){
 	printf("ET3\n");
 
 	// 5-9
-	if(apr.fwt && ((apr.inst & 0774) == 0210 ||
+	if(apr.ir_fwt && ((apr.inst & 0774) == 0210 ||
 	               (apr.inst & 0774) == 0214 && apr.ar & SGN)){
 		apr.et4_ar_pse = 1;		// 5-5
 		apr.art3_ret = et4;
@@ -471,10 +486,25 @@ pulse(et1){
 			recalc_pi_req();
 		}
 
-	if(apr.fwt_swap ||
-	   apr.hwt && apr.inst & 0004)
+	if(apr.ir_boole && (apr.ir_boole_op == 06 ||
+	                    apr.ir_boole_op == 011 ||
+	                    apr.ir_boole_op == 014))
+		apr.ar ^= apr.mb;		// 6-8
+	if(apr.ir_boole && (apr.ir_boole_op == 01 ||
+	                    apr.ir_boole_op == 02 ||
+	                    apr.ir_boole_op == 015 ||
+	                    apr.ir_boole_op == 016))
+		apr.ar &= apr.mb;		// 6-8
+	if(apr.ir_boole && (apr.ir_boole_op == 03 ||
+	                    apr.ir_boole_op == 04 ||
+	                    apr.ir_boole_op == 07 ||
+	                    apr.ir_boole_op == 010 ||
+	                    apr.ir_boole_op == 013))
+		apr.ar |= apr.mb;		// 6-8
+	if(apr.ir_fwt_swap ||
+	   apr.ir_hwt && apr.inst & 0004)
 		apr.mb = apr.mb<<18 & LT | apr.mb>>18 & RT;	// 6-3
-	if(apr.hwt && apr.inst & 0030)
+	if(apr.ir_hwt && apr.inst & 0030)
 		apr.ar = 0;			// 6-8
 	return et3;
 }
@@ -512,6 +542,17 @@ pulse(et0a){
 	   apr.ir_jrst && (apr.ir & 0000200) && !apr.ex_user)
 		apr.run = 0;
 
+	if(apr.ir_boole && (apr.ir_boole_op == 00 ||
+	                    apr.ir_boole_op == 03 ||
+	                    apr.ir_boole_op == 014 ||
+	                    apr.ir_boole_op == 017))
+		apr.ar = 0;		// 6-8
+	if(apr.ir_boole && (apr.ir_boole_op == 02 ||
+	                    apr.ir_boole_op == 04 ||
+	                    apr.ir_boole_op == 012 ||
+	                    apr.ir_boole_op == 013 ||
+	                    apr.ir_boole_op == 015))
+		apr.ar = ~apr.ar & FW;	// 6-8
 	if(apr.fwt_00 || apr.fwt_11 || apr.hwt_11)
 		apr.ar = apr.mb;	// 6-8
 	if(apr.fwt_01 || apr.fwt_10)
