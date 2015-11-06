@@ -1,11 +1,5 @@
 #include "pdp6.h"
 
-/* external pulses:
- * KEY MANUAL
- * MAI-CMC ADDR ACK
- * MAI RD RS
- */
-
 Apr apr;
 
 void
@@ -44,6 +38,9 @@ decode_2xx(void)
 		apr.fac2 = 1;
 	apr.fc_c_acrt = (apr.inst & 0776) == 0262;
 	apr.fc_c_aclt = apr.inst == 0251 || apr.inst == 0267;
+
+	apr.ir_jp = (apr.inst & 0770) == 0260;
+	apr.ir_as = (apr.inst & 0770) == 0270;
 }
 
 void
@@ -81,7 +78,7 @@ decodeir(void)
 		apr.hwt_11 = (apr.inst & 03) == 3;
 	}
 
-	if(apr.ir_boole || (apr.inst & 770) == 0270){
+	if(apr.ir_boole || apr.ir_as){
 		apr.boole_as_00 = (apr.inst & 03) == 0;
 		apr.boole_as_01 = (apr.inst & 03) == 1;
 		apr.boole_as_10 = (apr.inst & 03) == 2;
@@ -112,6 +109,27 @@ swap(word *a, word *b)
 }
 
 void
+ar_cry(void)
+{
+	apr.ar_cry0_xor_cry1 = apr.ar_cry0 != apr.ar_cry1 &&
+	                       !((apr.inst & 0700) == 0300 &&
+	                         (apr.inst & 0060) != 0020);
+}
+
+void
+ar_cry_in(word c)
+{
+	word a;
+	a = (apr.ar & 0377777777777) + c;
+	apr.ar += c;
+	apr.ar_cry0 = !!(apr.ar & 01000000000000);
+	apr.ar_cry1 = !!(a      &  0400000000000);
+	apr.ar &= FW;
+	ar_cry();
+}
+
+/*
+void
 ar_add(word w)
 {
 	int a, b, s;
@@ -123,6 +141,7 @@ ar_add(word w)
 	apr.ar_cry0 = !!(s & 2);
 	apr.ar_cry1 = s-a-b;
 }
+*/
 
 void
 set_ex_mode_sync(bool value)
@@ -256,6 +275,7 @@ pulse(ar_flag_clr){
 	apr.ar_ov_flag = 0;	// 6-10
 	apr.ar_cry0_flag = 0;	// 6-10
 	apr.ar_cry1_flag = 0;	// 6-10
+	ar_cry();
 	apr.chf7 = 0;		// 6-19
 	return NULL;
 }
@@ -285,6 +305,7 @@ pulse(mr_clr){
 	apr.ex_pi_sync = 0;	// 5-13
 
 	apr.a_long = 0;		// nowhere to be found :(
+	apr.ar_com_cont = 0;	// 6-9
 	mp_clr();
 	// TODO: DS CLR
 
@@ -348,33 +369,64 @@ pulse(st7){
 }
 
 /*
- * AR 
+ * AR subroutines
  */
 
-// very temporary
-
 pulse(art3){
-//	apr.ar_com_cont = 0;
+	printf("ART3\n");
+	apr.ar_com_cont = 0;	// 6-9
 	return apr.art3_ret;
+}
+
+pulse(ar_cry_comp){
+	printf("AR CRY COMP\n");
+	apr.ar = ~apr.ar & FW;	// 6-8
+	return art3;		// 6-9
 }
 
 pulse(ar_pm1_t1){
 	printf("AR AR+-1 T1\n");
-	ar_add(1);
-	return apr.art3_ret;
+	ar_cry_in(1);
+	if(apr.iot_blk || apr.inst == 0252 || apr.inst == 0253 ||
+	   apr.ir_jp && !(apr.inst & 0004))
+		ar_cry_in(01000000);
+	if(apr.ar_com_cont)
+		return ar_cry_comp;
+	return art3;
+}
+
+pulse(ar_pm1_t0){
+	printf("AR AR+-1 T0\n");
+	apr.ar = ~apr.ar & FW;	// 6-8
+	apr.ar_com_cont = 1;	// 6-9
+	return ar_pm1_t1;
 }
 
 pulse(ar_negate_t0){
 	printf("AR NEGATE T0\n");
-	apr.ar = ~apr.ar & FW;
+	apr.ar = ~apr.ar & FW;	// 6-8
 	return ar_pm1_t1;
 }
 
-pulse(ar_ast1){
-	printf("AR AST1,2\n");
-	// TODO
-	ar_add(apr.mb);
+pulse(ar_ast2){
+	printf("AR AST1\n");
+	ar_cry_in((~apr.ar & apr.mb) << 1);
+	if(apr.ar_com_cont)
+		return ar_cry_comp;
 	return art3;
+}
+
+pulse(ar_ast1){
+	printf("AR AST1\n");
+	apr.ar ^= apr.mb;
+	return ar_ast2;
+}
+
+pulse(ar_ast0){
+	printf("AR AST0\n");
+	apr.ar = ~apr.ar & FW;	// 6-8
+	apr.ar_com_cont = 1;	// 6-9
+	return ar_ast1;
 }
 
 /*
@@ -408,10 +460,23 @@ pulse(pi_sync){
 pulse(et10){
 	printf("ET10\n");
 
+	if(apr.pi_hold){
+		apr.pi_ov = 0;
+		apr.pi_cyc = 0;
+	}
+
 	if(apr.hwt_10 || apr.hwt_11 || apr.fwt_10 || apr.fwt_11)
 		apr.mb = apr.ar;
-	if(apr.ir_fwt && !apr.ar_cry0 && apr.ar_cry1)
-		apr.ar_ov_flag = 1;		// 6-10
+	if(apr.ir_fwt && !apr.ar_cry0 && apr.ar_cry1 ||
+	   (apr.ir_memac || apr.ir_as) && apr.ar_cry0 != apr.ar_cry1){
+		apr.ar_ov_flag = 1;			// 6-10
+		if(apr.cpa_arov_en)
+			;
+	}
+	if(apr.ir_memac || apr.ir_as){
+		apr.ar_cry0_flag = apr.ar_cry0;
+		apr.ar_cry1_flag = apr.ar_cry1;
+	}
 	return NULL;
 }
 
@@ -463,10 +528,19 @@ pulse(et3){
 
 	// 5-9
 	if(apr.ir_fwt && ((apr.inst & 0774) == 0210 ||
-	               (apr.inst & 0774) == 0214 && apr.ar & SGN)){
+	                  (apr.inst & 0774) == 0214 && apr.ar & SGN)){
 		apr.et4_ar_pse = 1;		// 5-5
 		apr.art3_ret = et4;
 		return ar_negate_t0;
+	}
+
+	if(apr.ir_as){
+		apr.et4_ar_pse = 1;		// 5-5
+		apr.art3_ret = et4;
+		if(apr.inst & 4)
+			return ar_ast0;
+		else
+			return ar_ast1;
 	}
 	return et4;
 };
@@ -519,6 +593,7 @@ pulse(et0){
 		apr.pc = apr.pc+1 & RT;
 	apr.ar_cry0 = 0;	// 6-10
 	apr.ar_cry1 = 0;	// 6-10
+	ar_cry();
 	// TODO: subroutines
 	return et1;
 }

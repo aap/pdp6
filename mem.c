@@ -36,6 +36,7 @@ wakemem(void)
 
 		membus0 |= MEMBUS_MAI_ADDR_ACK;
 		hold = membus0 & MEMBUS_MA_FMC_SEL1 ? &fmem[a] : &memory[a];
+//		printf(" ACK: %o\n", a);
 		if(membus0 & MEMBUS_RD_RQ){
 			membus1 = *hold;
 			membus0 |= MEMBUS_MAI_RD_RS;

@@ -823,7 +823,7 @@ error:
 		ff_lght[14].state = apr.ex_pi_sync;
 		ff_lght[15].state = apr.mq36;
 		ff_lght[16].state = apr.key_rim_sbr;
-		ff_lght[17].state = apr.cry0_cry1;
+		ff_lght[17].state = apr.ar_cry0_xor_cry1;
 		ff_lght[18].state = apr.ar_cry0;
 		ff_lght[19].state = apr.ar_cry1;
 		ff_lght[20].state = apr.ar_ov_flag;
