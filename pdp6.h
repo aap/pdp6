@@ -55,7 +55,7 @@ struct Apr {
 
 	/* flip-flops */
 	bool ex_mode_sync, ex_uuo_sync, ex_pi_sync, ex_ill_op, ex_user;
-	bool pc_chg_flag, ar_ov_flag, ar_cry0_flag, ar_cry1_flag;
+	bool ar_pc_chg_flag, ar_ov_flag, ar_cry0_flag, ar_cry1_flag;
 	bool ar_cry0, ar_cry1, ar_com_cont;
 	bool ar_cry0_xor_cry1;
 
@@ -83,23 +83,27 @@ struct Apr {
 	/* temporaries */
 	bool ex_inh_rel;
 	bool pi_hold;
-	int inst;
 
 	/* decoded instructions */
-	bool ir_jp, ir_as;
-	bool ir_boole;
-	int ir_boole_op;
-	bool boole_as_00, boole_as_01, boole_as_10, boole_as_11;
+	int inst;
+	bool ir_fp;
+	bool ch_inc, ch_inc_op, ch_n_inc_op, ch_load, ch_dep;
 	bool ir_fwt, ir_fwt_swap;
 	bool fwt_00, fwt_01, fwt_10, fwt_11;
+	bool ir_md, ir_jp, ir_as;
+	bool ir_accp, ir_memac, ir_memac_mem, ir_memac_ac;
+	bool ir_boole;
+	bool boole_as_00, boole_as_01, boole_as_10, boole_as_11;
+	int ir_boole_op;
 	bool ir_hwt;
 	bool hwt_00, hwt_01, hwt_10, hwt_11;
-	bool ir_memac, ir_memac_mem;
 	bool iot_blk, iot_dataio;
-
-	bool ch_inc, ch_inc_op, ch_n_inc_op, ch_load, ch_dep;
+	bool ir_acbm;
 	bool ex_ir_uuo, ir_iot, ir_jrst;
+
 	bool fac2, fc_c_acrt, fc_c_aclt;
+	bool fac_inh, fc_e, fc_e_pse;
+	bool e_long, mb_pc_sto, pc_set, pc_inc;
 
 	/* needed for the emulation */
 	int extpulse;

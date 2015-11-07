@@ -829,7 +829,7 @@ error:
 		ff_lght[20].state = apr.ar_ov_flag;
 		ff_lght[21].state = apr.ar_cry0_flag;
 		ff_lght[22].state = apr.ar_cry1_flag;
-		ff_lght[23].state = apr.pc_chg_flag;
+		ff_lght[23].state = apr.ar_pc_chg_flag;
 		ff_lght[24].state = apr.cpa_non_exist_mem;
 		ff_lght[25].state = apr.cpa_clock_en;
 		ff_lght[26].state = apr.cpa_clock_flag;
