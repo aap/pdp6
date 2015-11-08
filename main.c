@@ -362,6 +362,9 @@ Light ind_lights[] = {
 	{ lampsurf, {  99, 127, 14, 22 }, 0 },
 	{ lampsurf, {  99, 144, 14, 22 }, 0 },
 	{ lampsurf, {  99, 161, 14, 22 }, 0 },
+	{ lampsurf, { 143,  42, 14, 22 }, 0 },
+	{ lampsurf, { 143,  59, 14, 22 }, 0 },
+	{ lampsurf, { 143,  76, 14, 22 }, 0 },
 };
 
 Light extra_lights[] = {
@@ -854,6 +857,9 @@ error:
 		ff_lght[45].state = apr.f1a;
 		ff_lght[46].state = apr.f4a;
 		ff_lght[47].state = apr.f6a;
+		ff_lght[48].state = apr.sf3;
+		ff_lght[49].state = apr.sf5a;
+		ff_lght[50].state = apr.sf7;
 
 		setlights(membus0, membus_lght, 36);
 		setlights(apr.pr, pr_lght, 8);

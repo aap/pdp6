@@ -23,6 +23,8 @@ decode_ch(void)
 		apr.fc_e = 1;
 	if(apr.ch_dep || apr.ch_inc_op)
 		apr.fc_e_pse = 1;
+	if(apr.ch_dep)
+		apr.sac_inh = 1;
 }
 
 void
@@ -43,15 +45,29 @@ decode_2xx(void)
 			apr.fc_e = 1;
 		if(apr.fwt_11)
 			apr.fc_e_pse = 1;
+		if(apr.fwt_10)
+			apr.sac_inh = apr.sc_e = 1;
 	}
-	apr.fac2 = apr.inst >= 0244 && apr.inst <= 0246 ||
-	           (apr.inst & 0774) == 0234;
 	apr.fc_c_acrt = (apr.inst & 0776) == 0262;
 	apr.fc_c_aclt = apr.inst == 0251 || apr.inst == 0267;
-	
+
 	apr.ir_md = (apr.inst & 0760) == 0220;
-	if(apr.ir_md && (apr.inst & 03) != 1)
-		apr.fc_e = 1;
+	if(apr.ir_md){
+		if((apr.inst & 03) != 1)
+			apr.fc_e = 1;
+		if((apr.inst & 03) == 2)
+			apr.sac_inh = 1;
+		if(apr.inst & 02)
+			apr.sc_e = 1;
+		if((apr.inst & 0774) == 0224)
+			apr.fac2 = 1;
+		if(((apr.inst & 0774) == 0224 || (apr.inst & 0770) == 0230) &&
+		   !apr.sac_inh)
+			apr.sac2 = 1;
+	}
+
+	if(apr.inst >= 0244 && apr.inst <= 0246)
+		apr.fac2 = apr.sac2 = 1;
 
 	if(apr.inst == 0250)	/* EXCH */
 		apr.fc_e_pse = 1;
@@ -61,14 +77,17 @@ decode_2xx(void)
 		apr.fac_inh = apr.fc_e = 1;
 
 	apr.ir_jp = (apr.inst & 0770) == 0260;
-	if(apr.ir_jp)
+	if(apr.ir_jp){
 		apr.e_long = 1;
-	if(apr.inst == 0260)	/* PUSHJ */
-		apr.mb_pc_sto = 1;
-	if(apr.inst == 0261)	/* PUSH */
-		apr.fc_e = 1;
-	if((apr.inst & 0776) == 0264)	/* JSR, JSP */
-		apr.mb_pc_sto = apr.fac_inh = 1;
+		if(apr.inst == 0260)	/* PUSHJ */
+			apr.sc_e = apr.mb_pc_sto = 1;
+		if(apr.inst == 0261)	/* PUSH */
+			apr.sc_e = apr.fc_e = 1;
+		if((apr.inst & 0776) == 0264)	/* JSR, JSP */
+			apr.mb_pc_sto = apr.fac_inh = 1;
+		if(apr.inst == 0262 || apr.inst == 0264 || apr.inst == 266)
+			apr.sc_e = 1;
+	}
 
 	apr.ir_as = (apr.inst & 0770) == 0270;
 }
@@ -83,12 +102,23 @@ decodeir(void)
 	apr.fc_e = 0;
 	apr.fc_e_pse = 0;
 	apr.e_long = 0;
+	apr.mb_pc_sto = 0;
+	apr.sc_e = 0;
+	apr.sac_inh = 0;
+	apr.sac2 = 0;
 
 	decode_ch();
 
 	apr.ir_fp = (apr.inst & 0740) == 0140;
-	if(apr.ir_fp)
+	if(apr.ir_fp){
 		apr.fc_e = 1;
+		if(apr.inst & 02)	/* M, B */
+			apr.sc_e = 1;
+		if((apr.inst & 03) == 2)
+			apr.sac_inh = 1;
+		if((apr.inst & 03) == 1)
+			apr.sac2 = 1;
+	}
 
 	decode_2xx();
 
@@ -104,6 +134,8 @@ decodeir(void)
 		if(apr.ir_accp && apr.inst & 010)
 			apr.fc_e = 1;
 		apr.e_long = 1;
+		if(apr.ir_accp)
+			apr.sac_inh = 1;
 	}
 
 	/* BOOLE */
@@ -127,6 +159,8 @@ decodeir(void)
 			apr.fac_inh = 1;
 		if(apr.hwt_10 || apr.hwt_11)
 			apr.fc_e_pse = 1;
+		if(apr.hwt_10)
+			apr.sac_inh = 1;
 	}
 
 	if(apr.ir_boole || apr.ir_as){
@@ -138,6 +172,8 @@ decodeir(void)
 			apr.fc_e = 1;
 		if(apr.boole_as_10 || apr.boole_as_11)
 			apr.fc_e_pse = 1;
+		if(apr.boole_as_10)
+			apr.sac_inh = 1;
 	}
 
 	/* ACBM */
@@ -146,7 +182,12 @@ decodeir(void)
 		if(apr.inst & 010)
 			apr.fc_e = 1;
 		apr.e_long = 1;
-	} 
+		if(!(apr.inst & 60))
+			apr.sac_inh = 1;
+	}
+
+	if(!(apr.ir & 0740) && (apr.fwt_11 || apr.hwt_11 || apr.ir_memac_mem))
+		apr.sac_inh = 1;
 
 	uuo_a = (apr.inst & 0700) == 0;
 	iot_a = (apr.inst & 0700) == 0700;
@@ -170,11 +211,13 @@ decodeir(void)
 		apr.fc_e_pse = 1;
 	if(apr.iot_dataio && apr.ir & 0100)		/* DATAO */
 		apr.fc_e = 1;
+	/* No need to check PC +1 for E LONG, it's already implied.
+	 * We have to wait until ET5 for PC SET */
 	if(apr.ir_iot && (apr.inst & 0300) == 0300 ||	/* CONSZ, CONSO */
 	   apr.mb_pc_sto)
 		apr.e_long = 1;
-	/* No need to check PC +1 for E LONG, it's already implied.
-	 * We have to wait until ET5 for PC SET */
+	if(apr.ir_iot && (apr.ir & 0140) == 040)	/* DATAI, CONI */
+		apr.sc_e = 1;
 }
 
 void
@@ -357,6 +400,7 @@ pulse(mc_wr_rs);
 pulse(mc_rd_rq_pulse);
 pulse(mc_wr_rq_pulse);
 pulse(mc_rdwr_rq_pulse);
+pulse(mc_rd_wr_rs_pulse);
 
 // TODO: find A LONG
 
@@ -555,6 +599,30 @@ pulse(pi_sync){
 }
 
 /*
+ * Store
+ */
+
+pulse(st3){
+	printf("ST3\n");
+	apr.sf3 = 0;
+	return NULL;
+}
+
+pulse(st2){
+	printf("ST2\n");
+	apr.sf3 = 1;
+	apr.mc_rst1_ret = st3;
+	return mc_rd_wr_rs_pulse;
+}
+
+pulse(st1){
+	printf("ST1\n");
+	apr.sf3 = 1;
+	apr.mc_rst1_ret = st3;
+	return mc_wr_rq_pulse;
+}
+
+/*
  * Execute
  */
 
@@ -575,7 +643,8 @@ pulse(et10){
 		apr.ar_cry1_flag = apr.ar_cry1;
 	}
 
-	if(apr.hwt_10 || apr.hwt_11 || apr.fwt_10 || apr.fwt_11)
+	if(apr.hwt_10 || apr.hwt_11 || apr.fwt_10 || apr.fwt_11 ||
+	   apr.ir_memac_mem)
 		apr.mb = apr.ar;
 	if(apr.ir_fwt && !apr.ar_cry0 && apr.ar_cry1 ||
 	   (apr.ir_memac || apr.ir_as) && apr.ar_cry0 != apr.ar_cry1){
@@ -587,7 +656,11 @@ pulse(et10){
 		apr.cpa_pdl_ov = 1;
 		;
 	}
-	return NULL;
+	if(apr.sc_e)
+		return st1;
+	if(apr.fc_e_pse)
+		return st2;
+	return st3;
 }
 
 pulse(et9){
@@ -732,6 +805,11 @@ pulse(et3){
 		if((apr.inst & 070) == 060)	// -1
 			return ar_pm1_t0;
 	}
+	if(apr.inst == 0252 || apr.inst == 0253){	/* AOBJ[PN] */
+		apr.et4_ar_pse = 1;		// 5-5
+		apr.art3_ret = et4;
+		return ar_pm1_t1;
+	}
 	return et4;
 };
 
@@ -766,9 +844,9 @@ pulse(et1){
 	                    apr.ir_boole_op == 013))
 		apr.ar |= apr.mb;		// 6-8
 	if(apr.ir_fwt_swap ||
-	   apr.ir_hwt && apr.inst & 0004)
+	   apr.ir_hwt && apr.inst & 04)
 		apr.mb = apr.mb<<18 & LT | apr.mb>>18 & RT;	// 6-3
-	if(apr.ir_hwt && apr.inst & 0030)
+	if(apr.ir_hwt && apr.inst & 030)
 		apr.ar = 0;			// 6-8
 
 	if(apr.ir_acbm){
@@ -826,7 +904,7 @@ pulse(et0a){
 	                    apr.ir_boole_op == 013 ||
 	                    apr.ir_boole_op == 015))
 		apr.ar = ~apr.ar & FW;	// 6-8
-	if(apr.fwt_00 || apr.fwt_11 || apr.hwt_11)
+	if(apr.fwt_00 || apr.fwt_11 || apr.hwt_11 || apr.ir_memac_mem)
 		apr.ar = apr.mb;	// 6-8
 	if(apr.fwt_01 || apr.fwt_10)
 		apr.mb = apr.ar;	// 6-3

@@ -79,6 +79,7 @@ struct Apr {
 	bool f1a, f4a, f6a;
 	bool et4_ar_pse;
 	bool chf5, chf7;
+	bool sf3, sf5a, sf7;
 
 	/* temporaries */
 	bool ex_inh_rel;
@@ -103,7 +104,8 @@ struct Apr {
 
 	bool fac2, fc_c_acrt, fc_c_aclt;
 	bool fac_inh, fc_e, fc_e_pse;
-	bool e_long, mb_pc_sto, pc_set, pc_inc;
+	bool e_long, mb_pc_sto, pc_set;
+	bool sc_e, sac_inh, sac2;
 
 	/* needed for the emulation */
 	int extpulse;
