@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdarg.h>
 
 #define nelem(a) (sizeof(a)/sizeof(a[0]))
 
@@ -17,6 +18,25 @@ enum {
 	LT   = 0777777000000,
 	SGN  = 0400000000000,
 	RSGN = 0000000400000,
+};
+
+enum {
+	IBP    = 0133,
+	EXCH   = 0250,
+	BLT    = 0251,
+	AOBJP  = 0252,
+	AOBJN  = 0253,
+	JRST   = 0254,
+	JFCL   = 0255,
+	XCT    = 0256,
+	PUSHJ  = 0260,
+	PUSH   = 0261,
+	POP    = 0262,
+	POPJ   = 0263,
+	JSR    = 0264,
+	JSP    = 0265,
+	JSA    = 0266,
+	JRA    = 0267,
 };
 
 typedef void *Pulse(void);
