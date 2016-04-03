@@ -78,26 +78,28 @@ decode_2xx(void)
 			apr.sac2 = 1;
 	}
 
-	if(apr.inst >= 0244 && apr.inst <= 0246)
+	apr.shift_op = (apr.inst & 0770) == 0240 &&
+	               (apr.inst & 03) != 3;
+	if(apr.shift_op && apr.inst & 04)
 		apr.fac2 = apr.sac2 = 1;
 
-	if(apr.inst == 0250)	/* EXCH */
+	if(apr.inst == EXCH)
 		apr.fc_e_pse = 1;
 	if((apr.inst & 0774) == 0254)
 		apr.fac_inh = 1;
-	if(apr.inst == 0256)	/* XCT */
+	if(apr.inst == XCT)
 		apr.fac_inh = apr.fc_e = 1;
 
 	apr.ir_jp = (apr.inst & 0770) == 0260;
 	if(apr.ir_jp){
 		apr.e_long = 1;
-		if(apr.inst == 0260)	/* PUSHJ */
+		if(apr.inst == PUSHJ)
 			apr.sc_e = apr.mb_pc_sto = 1;
-		if(apr.inst == 0261)	/* PUSH */
+		if(apr.inst == PUSH)
 			apr.sc_e = apr.fc_e = 1;
 		if((apr.inst & 0776) == 0264)	/* JSR, JSP */
 			apr.mb_pc_sto = apr.fac_inh = 1;
-		if(apr.inst == 0262 || apr.inst == 0264 || apr.inst == 266)
+		if(apr.inst == POP || apr.inst == JSR || apr.inst == JSA)
 			apr.sc_e = 1;
 	}
 
@@ -245,6 +247,7 @@ bool
 accp_et_al_test(void)
 {
 	bool lt, cond;
+	// 5-9
 	lt = !!(apr.ar & SGN) != apr.ar_cry0_xor_cry1;
 	cond = (apr.inst & 2) && apr.ar == 0 ||
                (apr.ir_accp || apr.ir_memac) && (apr.inst & 1) && lt;
@@ -254,6 +257,7 @@ accp_et_al_test(void)
 bool
 selected_flag(void)
 {
+	// 5-12
 	return apr.ir & 0400 && apr.ar_ov_flag ||
 	       apr.ir & 0200 && apr.ar_cry0_flag ||
 	       apr.ir & 0100 && apr.ar_cry1_flag ||
@@ -263,6 +267,7 @@ selected_flag(void)
 void
 selected_flags_clr(void)
 {
+	// 6-10
 	if(apr.ir & 0400) apr.ar_ov_flag = 0;
 	if(apr.ir & 0200) apr.ar_cry0_flag = 0;
 	if(apr.ir & 0100) apr.ar_cry1_flag = 0;
@@ -282,6 +287,7 @@ pc_set_enable(void)
 bool
 pc_inc_enable(void)
 {
+	// 5-12
 	return (apr.ir_accp || apr.ir_acbm || apr.ir_memac_mem) && accp_et_al_test() ||
 	       apr.ir_iot && ((apr.inst & 0340) == 0300 && apr.ar == 0 ||
 	                      (apr.inst & 0340) == 0340 && apr.ar != 0);
@@ -417,6 +423,7 @@ pulse(it1);
 pulse(at1);
 pulse(at0);
 pulse(iat0);
+pulse(et10);
 pulse(mc_wr_rs);
 pulse(mc_rd_rq_pulse);
 pulse(mc_wr_rq_pulse);
@@ -437,10 +444,10 @@ pulse(pi_reset){
 
 pulse(ar_flag_clr){
 	trace("AR FLAG CLR\n");
-	apr.ar_pc_chg_flag = 0;	// 6-10
 	apr.ar_ov_flag = 0;	// 6-10
 	apr.ar_cry0_flag = 0;	// 6-10
 	apr.ar_cry1_flag = 0;	// 6-10
+	apr.ar_pc_chg_flag = 0;	// 6-10
 	ar_cry();
 	apr.chf7 = 0;		// 6-19
 	return NULL;
@@ -448,18 +455,21 @@ pulse(ar_flag_clr){
 
 pulse(ar_flag_set){
 	trace("AR FLAG SET\n");
-	apr.ar_pc_chg_flag = !!(apr.mb & 0040000000000); // 6-10
 	apr.ar_ov_flag     = !!(apr.mb & 0400000000000); // 6-10
 	apr.ar_cry0_flag   = !!(apr.mb & 0200000000000); // 6-10
 	apr.ar_cry1_flag   = !!(apr.mb & 0100000000000); // 6-10
+	apr.ar_pc_chg_flag = !!(apr.mb & 0040000000000); // 6-10
 	ar_cry();
-	// TODO: what else?
+	apr.chf7           = !!(apr.mb & 0020000000000); // 6-19
+	if(apr.mb & 0010000000000)
+		set_ex_mode_sync(1);	// 5-13
 	return NULL;
 }
 
 // TODO
 pulse(mp_clr){
 	apr.chf5 = 0;		// 6-19
+	apr.shf1 = 0;		// 6-20
 	return NULL;
 }
 
@@ -501,6 +511,7 @@ pulse(mr_clr){
 	apr.sf7 = 0;		// 5-6
 	apr.mc_rst1_ret = NULL;
 	apr.art3_ret = NULL;
+	apr.sct2_ret = NULL;
 	return NULL;
 }
 
@@ -541,6 +552,76 @@ pulse(mr_pwr_clr){
 
 pulse(st7){
 	trace("ST7\n");
+	return NULL;
+}
+
+/*
+ * Shift subroutines
+ */
+
+pulse(ar_sh_lt){
+	return NULL;
+}
+
+pulse(mq_sh_lt){
+	return NULL;
+}
+
+pulse(ar_sh_rt){
+	return NULL;
+}
+
+pulse(mq_sh_rt){
+	return NULL;
+}
+
+pulse(sct2){
+	trace("SCT2\n");
+	return apr.sct2_ret;
+}
+
+pulse(sct1){
+	trace("SCT1\n");
+	apr.sc = apr.sc+1 & 0777;	// 6-16
+	// TODO: implement shifts
+	if(apr.shift_op && !(apr.mb & RSGN)){
+		ar_sh_lt();
+		mq_sh_lt();
+	}
+	if(apr.shift_op && (apr.mb & RSGN)){
+		ar_sh_rt();
+		mq_sh_rt();
+	}
+	if(apr.sc == 0777)
+		return sct2;
+	return sct1;
+}
+
+pulse(sct0){
+	trace("SCT0\n");
+	if(apr.sc == 0777)
+		return sct2;
+	return sct1;
+}
+
+pulse(sht1a){
+	trace("SHT1A\n");
+	apr.shf1 = 0;			// 6-20
+	return et10;
+}
+
+pulse(sht1){
+	trace("SHT1\n");
+	if(apr.mb & 0400000)
+		apr.sc = ~apr.sc & 0777;
+	apr.shf1 = 1;			// 6-20
+	apr.sct2_ret = sht1a;
+	return sct0;
+}
+
+pulse(sht0){
+	trace("SHT0\n");
+	apr.sc = apr.sc+1 & 0777;	// 6-16
 	return NULL;
 }
 
@@ -859,6 +940,8 @@ pulse(et3){
 		apr.art3_ret = et4;
 		return ar_pm1_t0;
 	}
+	if(apr.shift_op)
+		return sht1;
 	return et4;
 };
 
@@ -901,6 +984,8 @@ pulse(et1){
 		apr.ar = 0;			// 6-8
 	if(apr.inst == POPJ)
 		apr.ma = 0;
+	if(apr.shift_op && apr.mb & 0400000)
+		sht0();				// 6-20
 
 	if(apr.ir_acbm){
 		apr.mb &= apr.ar;
@@ -915,11 +1000,11 @@ pulse(et1){
 pulse(et0){
 	trace("ET0\n");
 
-	if(!(apr.ch_inc_op && apr.inst != IBP ||
-	     apr.ch_n_inc_op && apr.inst != IBP ||
-	     apr.ex_ir_uuo || apr.iot_blk || apr.inst == XCT ||
-	     apr.key_execute && !apr.run || apr.pi_cyc))
-		apr.pc = apr.pc+1 & RT;
+	if(!((apr.ch_inc_op || apr.ch_n_inc_op) && apr.inst != IBP ||
+	     apr.ex_ir_uuo || apr.iot_blk || apr.inst == BLT || apr.inst == XCT ||
+	     apr.key_execute && !apr.run ||
+	     apr.pi_cyc))
+		apr.pc = apr.pc+1 & RT;	// 5-12
 	apr.ar_cry0 = 0;	// 6-10
 	apr.ar_cry1 = 0;	// 6-10
 	ar_cry();
@@ -967,7 +1052,9 @@ pulse(et0a){
 	   apr.hwt_10)
 		swap(&apr.mb, &apr.ar);	// 6-3
 	if(apr.inst == POP || apr.inst == POPJ || apr.inst == JRA)
-		apr.mb = apr.mq;
+		apr.mb = apr.mq;	// 6-3
+	if(apr.inst == FSC || apr.shift_op)
+		apr.sc |= ~apr.mb & 0377 | ~apr.mb>>9 & 0400;	// 6-15
 
 	if(apr.ir_acbm && apr.inst & 1 ||
 	   apr.inst == JSA)

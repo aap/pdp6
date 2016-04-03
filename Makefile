@@ -6,3 +6,7 @@ CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses\
 
 pdp6: $(SRC) pdp6.h
 	$(CC) $(CFLAGS) $(SRC) -o pdp6
+
+as: test.s
+	as10 <test.s
+	rim2mem <a.rim >mem

@@ -21,6 +21,7 @@ enum {
 };
 
 enum {
+	FSC    = 0132,
 	IBP    = 0133,
 	EXCH   = 0250,
 	BLT    = 0251,
@@ -100,6 +101,7 @@ struct Apr {
 	bool et4_ar_pse;
 	bool chf5, chf7;
 	bool sf3, sf5a, sf7;
+	bool shf1;
 
 	/* temporaries */
 	bool ex_inh_rel;
@@ -111,7 +113,7 @@ struct Apr {
 	bool ch_inc, ch_inc_op, ch_n_inc_op, ch_load, ch_dep;
 	bool ir_fwt, ir_fwt_swap;
 	bool fwt_00, fwt_01, fwt_10, fwt_11;
-	bool ir_md, ir_jp, ir_as;
+	bool shift_op, ir_md, ir_jp, ir_as;
 	bool ir_accp, ir_memac, ir_memac_mem, ir_memac_ac;
 	bool ir_boole;
 	bool boole_as_00, boole_as_01, boole_as_10, boole_as_11;
@@ -130,7 +132,7 @@ struct Apr {
 	/* needed for the emulation */
 	int extpulse;
 	Pulse *nextpulse;
-	Pulse *mc_rst1_ret, *art3_ret;
+	Pulse *mc_rst1_ret, *art3_ret, *sct2_ret;
 };
 extern Apr apr;
 void *aprmain(void *p);

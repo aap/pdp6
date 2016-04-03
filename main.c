@@ -366,6 +366,8 @@ Light ind_lights[] = {
 	{ lampsurf, { 143,  59, 14, 22 }, 0 },
 	{ lampsurf, { 143,  76, 14, 22 }, 0 },
 	{ lampsurf, { 143,  93, 14, 22 }, 0 },
+	{ lampsurf, { 319, 144, 14, 22 }, 0 },
+	{ lampsurf, { 319, 161, 14, 22 }, 0 },
 };
 
 Light extra_lights[] = {
@@ -862,6 +864,8 @@ error:
 		ff_lght[49].state = apr.sf5a;
 		ff_lght[50].state = apr.sf7;
 		ff_lght[51].state = apr.ar_com_cont;
+		ff_lght[52].state = apr.shf1;
+		ff_lght[53].state = apr.sc == 0777;
 
 		setlights(membus0, membus_lght, 36);
 		setlights(apr.pr, pr_lght, 8);

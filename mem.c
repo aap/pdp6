@@ -8,6 +8,19 @@ word membus0, membus1;
 word *hold;
 
 void
+initfmem(void)
+{
+	FILE *f;
+	word w;
+	hword a;
+	if(f = fopen("fmem", "r"), f == NULL)
+		return;
+	for(a = 0; a < 16 && fscanf(f, "%lo", &w) != EOF; a++)
+		fmem[a] = w;
+	fclose(f);
+}
+
+void
 initmem(void)
 {
 	FILE *f;
@@ -18,6 +31,7 @@ initmem(void)
 	for(a = 0; a < maxmem && fscanf(f, "%lo", &w) != EOF; a++)
 		memory[a] = w;
 	fclose(f);
+	initfmem();
 }
 
 void
