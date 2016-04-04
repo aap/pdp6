@@ -535,7 +535,7 @@ poweron(void)
 {
 	pthread_t apr_thread;
 	apr.sw_power = 1;
-	pthread_create(&apr_thread, NULL, aprmain, NULL);
+	pthread_create(&apr_thread, NULL, aprmain, &apr);
 }
 
 void
@@ -753,7 +753,7 @@ error:
 	initmem();
 	memset(&apr, 0xff, sizeof apr);
 	apr.extpulse = 0;
-	apr.nextpulse = apr.mc_rst1_ret = apr.art3_ret = NULL;
+	apr.art3_ret = NULL;
 
 	for(;;){
 		while(SDL_PollEvent(&ev))
@@ -797,11 +797,11 @@ error:
 		apr.key_inst_stop = keys[2].state == 1;
 		apr.key_mem_stop  = keys[2].state == 2;
 		apr.key_io_reset  = keys[3].state == 1;
-		apr.key_execute   = keys[3].state == 2;
+		apr.key_exec      = keys[3].state == 2;
 		apr.key_dep       = keys[4].state == 1;
-		apr.key_dep_next  = keys[4].state == 2;
+		apr.key_dep_nxt   = keys[4].state == 2;
 		apr.key_ex        = keys[5].state == 1;
-		apr.key_ex_next   = keys[5].state == 2;
+		apr.key_ex_nxt    = keys[5].state == 2;
 		apr.key_rd_off    = keys[6].state == 1;
 		apr.key_rd_on     = keys[6].state == 2;
 		apr.key_pt_rd     = keys[7].state == 1;

@@ -12,7 +12,7 @@ typedef uint16_t u16;
 typedef uint8_t  u8;
 typedef char bool;
 
-enum {
+enum Mask {
 	FW   = 0777777777777,
 	RT   = 0000000777777,
 	LT   = 0777777000000,
@@ -20,7 +20,7 @@ enum {
 	RSGN = 0000000400000,
 };
 
-enum {
+enum Opcode {
 	FSC    = 0132,
 	IBP    = 0133,
 	EXCH   = 0250,
@@ -40,10 +40,15 @@ enum {
 	JRA    = 0267,
 };
 
-typedef void *Pulse(void);
-#define pulse(p) void *p(void)
+enum {
+	MAXPULSE = 5
+};
 
 typedef struct Apr Apr;
+
+typedef void Pulse(Apr *apr);
+#define pulse(p) void p(Apr *apr)
+
 struct Apr {
 	hword ir;
 	word mi;
@@ -63,9 +68,9 @@ struct Apr {
 	bool key_start, key_readin;
 	bool key_mem_cont, key_inst_cont;
 	bool key_mem_stop, key_inst_stop;
-	bool key_io_reset, key_execute;
-	bool key_dep, key_dep_next;
-	bool key_ex, key_ex_next;
+	bool key_io_reset, key_exec;
+	bool key_dep, key_dep_nxt;
+	bool key_ex, key_ex_nxt;
 	bool key_rd_off, key_rd_on;
 	bool key_pt_rd, key_pt_wr;
 
@@ -131,10 +136,15 @@ struct Apr {
 
 	/* needed for the emulation */
 	int extpulse;
-	Pulse *nextpulse;
-	Pulse *mc_rst1_ret, *art3_ret, *sct2_ret;
+	// want to get rid of these
+	Pulse *art3_ret, *sct2_ret;
+
+	Pulse *pulses1[MAXPULSE], *pulses2[MAXPULSE];
+	Pulse **clist, **nlist;
+	int ncurpulses, nnextpulses;
 };
 extern Apr apr;
+void nextpulse(Apr *apr, Pulse *p);
 void *aprmain(void *p);
 
 void initmem(void);

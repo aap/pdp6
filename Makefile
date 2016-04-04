@@ -1,6 +1,9 @@
 SRC=main.c apr.c mem.c io.c
-CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses\
-        -Wno-bitwise-op-parentheses\
+# clang
+#CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses \
+#        -Wno-bitwise-op-parentheses
+CFLAGS=  \
+	-fno-diagnostics-show-caret \
         -L/usr/local/lib -I/usr/local/include -lSDL -lSDL_image -lpthread
 
 
