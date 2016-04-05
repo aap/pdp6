@@ -366,7 +366,7 @@ set_mc_wr(Apr *apr, bool value)
 		membus0 |= MEMBUS_WR_RQ;
 	else
 		membus0 &= ~MEMBUS_WR_RQ;
-	set_mc_rq(apr, apr->mc_rq);
+	set_mc_rq(apr, apr->mc_rq);	// 7-9
 }
 
 void
@@ -377,7 +377,7 @@ set_mc_rd(Apr *apr, bool value)
 		membus0 |= MEMBUS_RD_RQ;
 	else
 		membus0 &= ~MEMBUS_RD_RQ;
-	set_mc_rq(apr, apr->mc_rq);
+	set_mc_rq(apr, apr->mc_rq);	// 7-9
 }
 
 void
@@ -387,25 +387,28 @@ set_key_rim_sbr(Apr *apr, bool value)
 	apr->key_rim_sbr = value | apr->sw_rim_maint;	// 5-2
 }
 
+/* Relocation
+ * MA is divided into 8:10 bits, the upper 8 bits (18-25) are relocated in RLA
+ * by adding RLR. If MA18-25 is above PR we have a relocation error. */
 bool
-calcaddr(Apr *apr)
+relocate(Apr *apr)
 {
 	u8 ma18_25;
 	bool ma_ok, ma_fmc_select;
 
-	// 5-13
-	apr->ex_inh_rel = !apr->ex_user || apr->ex_pi_sync ||
-	                 (apr->ma & 0777760) == 0 || apr->ex_ill_op;
-	// 7-4
 	ma18_25 = apr->ma>>10 & 0377;
-	ma_ok = ma18_25 <= apr->pr;
-	// 7-2
-	ma_fmc_select = !apr->key_rim_sbr && (apr->ma & 0777760) == 0;
+	apr->ex_inh_rel = !apr->ex_user ||	// 5-13
+	                   apr->ex_pi_sync ||
+	                  (apr->ma & 0777760) == 0 ||
+                           apr->ex_ill_op;
+	ma_ok = ma18_25 <= apr->pr;	// 7-4, PR18 OK
+	ma_fmc_select = !apr->key_rim_sbr && (apr->ma & 0777760) == 0;	// 7-2
 	// 7-5
 	apr->rla = ma18_25;
 	if(!apr->ex_inh_rel)
 		apr->rla += apr->rlr;
 
+	// 7-2 7-10
 	membus0 &= ~0007777777761;
 	membus0 |= ma_fmc_select ? MEMBUS_MA_FMC_SEL1 : MEMBUS_MA_FMC_SEL0;
 	membus0 |= (apr->ma&01777) << 4;
@@ -419,6 +422,8 @@ calcaddr(Apr *apr)
 }
 
 pulse(kt4);
+pulse(mc_rs_t0);
+pulse(mc_addr_ack);
 pulse(key_rd_wr_ret);
 pulse(it1);
 pulse(at1);
@@ -1233,11 +1238,26 @@ pulse(it0){
  * Memory Control
  */
 
+pulse(mai_addr_ack){
+	trace("MAI ADDR ACK\n");
+	nextpulse(apr, mc_addr_ack);	// 7-8
+}
+
+pulse(mai_rd_rs){
+	trace("MAI RD RS\n");
+	/* we do this here instead of whenever MC RD is set; 7-6, 7-9 */
+	apr->mb = membus1;
+	if(apr->ma == apr->mas)
+		apr->mi = apr->mb;		// 7-7
+	if(!apr->mc_stop)
+		nextpulse(apr, mc_rs_t0);	// 7-8
+}
+
 pulse(mc_rs_t1){
 	trace("MC RS T1\n");
-	set_mc_rd(apr, 0);
+	set_mc_rd(apr, 0);			// 7-9
 	if(apr->key_ex_nxt || apr->key_dep_nxt)
-		apr->mi = apr->mb;	// 7-7
+		apr->mi = apr->mb;		// 7-7
 
 	if(apr->key_rd_wr) nextpulse(apr, key_rd_wr_ret);	// 5-2
 	if(apr->sf3) nextpulse(apr, st3);
@@ -1251,111 +1271,116 @@ pulse(mc_rs_t1){
 
 pulse(mc_rs_t0){
 	trace("MC RS T0\n");
-	apr->mc_stop = 0;
-	nextpulse(apr, mc_rs_t1);
+//	apr->mc_stop = 0;		// ?? not found on 7-9
+	nextpulse(apr, mc_rs_t1);	// 7-8
 }
 
 pulse(mc_wr_rs){
 	trace("MC WR RS\n");
 	if(apr->ma == apr->mas)
 		apr->mi = apr->mb;	// 7-7
-	membus1 = apr->mb;
-	membus0 |= MEMBUS_MAI_WR_RS;
+	membus1 = apr->mb;		// 7-8
+	membus0 |= MEMBUS_MAI_WR_RS;	// 7-8
 	wakemem();
 	if(!apr->mc_stop)
-		nextpulse(apr, mc_rs_t0);
+		nextpulse(apr, mc_rs_t0);	// 7-8
 }
 
 pulse(mc_addr_ack){
 	trace("MC ADDR ACK\n");
-	set_mc_rq(apr, 0);
+	set_mc_rq(apr, 0);			// 7-9
 	if(!apr->mc_rd && apr->mc_wr)
-		nextpulse(apr, mc_wr_rs);
+		nextpulse(apr, mc_wr_rs);	// 7-8
 }
 
 pulse(mc_non_exist_rd){
 	trace("MC NON EXIST RD\n");
 	if(!apr->mc_stop)
-		nextpulse(apr, mc_rs_t0);
+		nextpulse(apr, mc_rs_t0);		// 7-8
 }
 
 pulse(mc_non_exist_mem_rst){
 	trace("MC NON EXIST MEM RST\n");
-	nextpulse(apr, mc_addr_ack);
+	nextpulse(apr, mc_addr_ack);			// 7-8
 	if(apr->mc_rd)
-		nextpulse(apr, mc_non_exist_rd);
+		nextpulse(apr, mc_non_exist_rd);	// 7-9
 }
 
 pulse(mc_non_exist_mem){
 	trace("MC NON EXIST MEM\n");
-	apr->cpa_non_exist_mem = 1;
+	apr->cpa_non_exist_mem = 1;			// 8-5
 	// TODO: IOB PI REQ CPA PIA
 	if(!apr->sw_mem_disable)
-		nextpulse(apr, mc_non_exist_mem_rst);
+		nextpulse(apr, mc_non_exist_mem_rst);	// 7-9
 }
 
 pulse(mc_illeg_address){
 	trace("MC ILLEG ADDRESS\n");
-	apr->cpa_illeg_op = 1;
+	apr->cpa_illeg_op = 1;				// 8-5
 	// TODO: IOB PI REQ CPA PIA
-	nextpulse(apr, st7);
+	nextpulse(apr, st7);				// 5-6
+}
+
+pulse(mc_stop_1){
+	trace("MC STOP <- (1)\n");
+	apr->mc_stop = 1;		// 7-9
+	if(apr->key_mem_cont)
+		nextpulse(apr, kt4);	// 5-2
 }
 
 pulse(mc_rq_pulse){
+	bool ma_ok;
 	trace("MC RQ PULSE\n");
+	/* have to call this to set flags, do relocation and set address */
+	ma_ok = relocate(apr);
 	apr->mc_stop = 0;		// 7-9
-	/* catch non-existent memory */
+	/* hack to catch non-existent memory */
 	apr->extpulse |= 4;
-	if(calcaddr(apr) == 0 && !apr->ex_inh_rel){
-		nextpulse(apr, mc_illeg_address);
-		return;
-	}
-	set_mc_rq(apr, 1);
-	if(apr->key_mem_stop || apr->ma == apr->mas && apr->sw_addr_stop){
-		apr->mc_stop = 1;	// 7-9
-		// TODO: what is this? does it make any sense?
-		if(apr->key_mem_cont)
-			nextpulse(apr, kt4);
-	}
+	if(ma_ok || apr->ex_inh_rel)
+		set_mc_rq(apr, 1);	// 7-9
+	else
+		nextpulse(apr, mc_illeg_address);	// 7-9
+	if(apr->key_mem_stop || apr->ma == apr->mas && apr->sw_addr_stop)
+		nextpulse(apr, mc_stop_1);	// 7-9
 }
 
 pulse(mc_rdwr_rq_pulse){
 	trace("MC RD/RW RQ PULSE\n");
 	set_mc_rd(apr, 1);		// 7-9
 	set_mc_wr(apr, 1);		// 7-9
-	apr->mb = 0;
+	apr->mb = 0;			// 7-8
 	apr->mc_stop_sync = 1;		// 7-9
-	nextpulse(apr, mc_rq_pulse);
+	nextpulse(apr, mc_rq_pulse);	// 7-8
 }
 
 pulse(mc_rd_rq_pulse){
 	trace("MC RD RQ PULSE\n");
 	set_mc_rd(apr, 1);		// 7-9
 	set_mc_wr(apr, 0);		// 7-9
-	apr->mb = 0;
-	nextpulse(apr, mc_rq_pulse);
+	apr->mb = 0;			// 7-8
+	nextpulse(apr, mc_rq_pulse);	// 7-8
 }
 
 pulse(mc_split_rd_rq){
 	trace("MC SPLIT RD RQ\n");
-	nextpulse(apr, mc_rd_rq_pulse);
+	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
 }
 
 pulse(mc_wr_rq_pulse){
 	trace("MC WR RQ PULSE\n");
 	set_mc_rd(apr, 0);		// 7-9
 	set_mc_wr(apr, 1);		// 7-9
-	nextpulse(apr, mc_rq_pulse);
+	nextpulse(apr, mc_rq_pulse);	// 7-8
 }
 
 pulse(mc_split_wr_rq){
 	trace("MC SPLIT WR RQ\n");
-	nextpulse(apr, mc_wr_rq_pulse);
+	nextpulse(apr, mc_wr_rq_pulse);	// 7-8
 }
 
 pulse(mc_rd_wr_rs_pulse){
 	trace("MC RD/WR RS PULSE\n");
-	nextpulse(apr, apr->mc_split_cyc_sync ? mc_split_wr_rq : mc_wr_rs);
+	nextpulse(apr, apr->mc_split_cyc_sync ? mc_split_wr_rq : mc_wr_rs);	// 7-8
 }
 
 /*
@@ -1384,15 +1409,15 @@ pulse(key_rd_wr_ret){
 
 pulse(key_rd){
 	trace("KEY RD\n");
-	apr->key_rd_wr = 1;	// 5-2
-	nextpulse(apr, mc_rd_rq_pulse);
+	apr->key_rd_wr = 1;		// 5-2
+	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
 }
 
 pulse(key_wr){
 	trace("KEY WR\n");
-	apr->key_rd_wr = 1;	// 5-2
-	apr->mb = apr->ar;	// 6-3
-	nextpulse(apr, mc_wr_rq_pulse);
+	apr->key_rd_wr = 1;		// 5-2
+	apr->mb = apr->ar;		// 6-3
+	nextpulse(apr, mc_wr_rq_pulse);	// 7-8
 }
 
 pulse(key_go){
@@ -1485,20 +1510,6 @@ pulse(key_manual){
 	nextpulse(apr, kt0);		// 5-2
 }
 
-pulse(mai_addr_ack){
-	trace("MAI ADDR ACK\n");
-	nextpulse(apr, mc_addr_ack);
-}
-
-pulse(mai_rd_rs){
-	trace("MAI RD RS\n");
-	apr->mb = membus1;
-	if(apr->ma == apr->mas)
-		apr->mi = apr->mb;	// 7-7
-	if(!apr->mc_stop)
-		nextpulse(apr, mc_rs_t0);
-}
-
 void
 nextpulse(Apr *apr, Pulse *p)
 {
@@ -1547,7 +1558,7 @@ aprmain(void *p)
 		if(apr->extpulse & 4){
 			apr->extpulse &= ~4;
 			if(apr->mc_rq && !apr->mc_stop)
-				nextpulse(apr, mc_non_exist_mem);
+				nextpulse(apr, mc_non_exist_mem);	// 7-9
 		}
 	}
 	printf("power off\n");

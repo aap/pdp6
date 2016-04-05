@@ -34,6 +34,10 @@ initmem(void)
 	initfmem();
 }
 
+/* When a cycle is requested we acknowledge the address
+ * by pulsing the processor through the bus.
+ * A read is completed immediately and signalled by a second pulse.
+ * A write is completed on a second call. */
 void
 wakemem(void)
 {
@@ -50,7 +54,6 @@ wakemem(void)
 
 		membus0 |= MEMBUS_MAI_ADDR_ACK;
 		hold = membus0 & MEMBUS_MA_FMC_SEL1 ? &fmem[a] : &memory[a];
-//		printf(" ACK: %o\n", a);
 		if(membus0 & MEMBUS_RD_RQ){
 			membus1 = *hold;
 			membus0 |= MEMBUS_MAI_RD_RS;
