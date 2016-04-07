@@ -326,10 +326,11 @@ void
 set_pi_cyc(Apr *apr, bool value)
 {
 	apr->pi_cyc = value;
-	if(!apr->pi_cyc)
+	if(apr->pi_cyc)
 		apr->ex_pi_sync = 1;	// 5-13
 }
 
+// PI REQ depends on PIR, PIH, PI_ACTIVE
 void
 recalc_pi_req(Apr *apr)
 {
@@ -682,23 +683,24 @@ pulse(ar_ast0){
  * Priority Interrupt
  */
 
+#define IA_NOT_INT ((!apr->pi_req || apr->pi_cyc) && apr->ia_inh)
+
 pulse(pir_stb){
 	trace("PIR STB\n");
-	apr->pir |= apr->pio & iobus1;
+	apr->pir |= apr->pio & iobus1;		// 8-3
 	recalc_pi_req(apr);			// 8-3
 }
 
 pulse(pi_sync){
 	trace("PI SYNC\n");
 	if(!apr->pi_cyc)
-		pir_stb(apr);
-	// 5-3
-	if(apr->pi_req && !apr->pi_cyc){
-		nextpulse(apr, iat0);
-		return;
-	}
-	// TODO: IA INH/AT INH
-	nextpulse(apr, apr->if1a ? it1 : at1);
+		pir_stb(apr);			// 8-4
+	if(apr->pi_req && !apr->pi_cyc)
+		nextpulse(apr, iat0);		// 5-3
+	if(IA_NOT_INT)
+		nextpulse(apr, apr->if1a ? it1 : at1);	// 5-3
+	// no longer needed
+	apr->ia_inh = 0;
 }
 
 /*
@@ -1193,43 +1195,44 @@ pulse(at0){
  * Instruction
  */
 
-pulse(iat0){
-	trace("IAT0\n");
-	mr_clr(apr);
-	set_pi_cyc(apr, 1);
-	nextpulse(apr, it1);
-}
-
 pulse(it1a){
 	trace("IT1A\n");
-	apr->if1a = 0;
+	apr->if1a = 0;				// 5-3
 	apr->ir |= apr->mb>>18 & 0777740;	// 5-7
 	if(apr->ma & 0777760)
 		set_key_rim_sbr(apr, 0);	// 5-2
-	nextpulse(apr, at0);
+	nextpulse(apr, at0);			// 5-3
 }
 
 pulse(it1){
 	trace("IT1\n");
-	hword n;
-	u8 r;
 	if(apr->pi_cyc){
-		// 7-3
-		r = apr->pi_req;
-		for(n = 7; !(r & 1); n--, r >>= 1);
-		apr->ma = 040 | n<<1;
+		// 7-3, 8-4
+		apr->ma |= 040;
+		if(apr->pi_req & 0017) apr->ma |= 010;
+		if(apr->pi_req & 0063) apr->ma |= 004;
+		if(apr->pi_req & 0125) apr->ma |= 002;
 	}else
-		apr->ma = apr->pc;	// 7-3
+		apr->ma |= apr->pc;		// 7-3
 	if(apr->pi_ov)
 		apr->ma = (apr->ma+1)&RT;	// 7-3
-	apr->if1a = 1;
-	nextpulse(apr, mc_rd_rq_pulse);
+	apr->if1a = 1;				// 5-3
+	nextpulse(apr, mc_rd_rq_pulse);		// 7-8
+}
+
+pulse(iat0){
+	trace("IAT0\n");
+	// have to call directly because PI CYC sets EX PI SYNC
+	mr_clr(apr);			// 5-2
+	set_pi_cyc(apr, 1);		// 8-4
+	nextpulse(apr, it1);		// 5-3
 }
 
 pulse(it0){
 	trace("IT0\n");
-	apr->ma = 0;
-	mr_clr(apr);
+	apr->ma = 0;			// 7-3
+	// have to call directly because IF1A is set with a delay
+	mr_clr(apr);			// 5-2
 	apr->if1a = 1;			// 5-3
 	nextpulse(apr, pi_sync);	// 8-4
 }
@@ -1266,7 +1269,7 @@ pulse(mc_rs_t1){
 	if(apr->f1a) nextpulse(apr, ft1a);
 	if(apr->af0) nextpulse(apr, at0);
 	if(apr->af3) nextpulse(apr, at3);
-	if(apr->if1a) nextpulse(apr, it1a);
+	if(apr->if1a) nextpulse(apr, it1a);			// 5-3
 }
 
 pulse(mc_rs_t0){
@@ -1532,6 +1535,7 @@ aprmain(void *p)
 	apr->nlist = apr->pulses2;
 	apr->ncurpulses = 0;
 	apr->nnextpulses = 0;
+	apr->ia_inh = 0;
 
 	nextpulse(apr, mr_pwr_clr);
 	while(apr->sw_power){
@@ -1542,9 +1546,17 @@ aprmain(void *p)
 		for(i = 0; i < apr->ncurpulses; i++)
 			apr->clist[i](apr);
 
+		/* KEY MANUAL */
 		if(apr->extpulse & 1){
 			apr->extpulse &= ~1;
 			nextpulse(apr, key_manual);
+		}
+		/* KEY INST STOP */
+		if(apr->extpulse & 2){
+			apr->extpulse &= ~2;
+			apr->run = 0;
+			// cleared after PI SYNC
+			apr->ia_inh = 1;
 		}
 		if(membus0 & MEMBUS_MAI_ADDR_ACK){
 			membus0 &= ~MEMBUS_MAI_ADDR_ACK;

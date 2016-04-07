@@ -611,6 +611,9 @@ mouse(int button, int state, int x, int y)
 					apr.extpulse |= 1;
 				break;
 			case 2:	/* stop */
+				if(keys[i].state == 1)	// inst
+					apr.extpulse |= 2;
+				break;
 			case 6:	/* on off reader */
 			case 7: /* punch */
 				break;
