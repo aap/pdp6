@@ -427,9 +427,11 @@ pulse(mc_rs_t0);
 pulse(mc_addr_ack);
 pulse(key_rd_wr_ret);
 pulse(it1);
-pulse(at1);
 pulse(at0);
+pulse(at1);
+pulse(at3a);
 pulse(iat0);
+pulse(et4);
 pulse(et10);
 pulse(mc_wr_rs);
 pulse(mc_rd_rq_pulse);
@@ -494,7 +496,7 @@ pulse(mr_clr){
 	apr->ex_uuo_sync = 0;	// 5-13
 	apr->ex_pi_sync = 0;	// 5-13
 
-	apr->a_long = 0;		// nowhere to be found :(
+	apr->a_long = 0;	// ?? nowhere to be found
 	apr->ar_com_cont = 0;	// 6-9
 	mp_clr(apr);
 	// TODO: DS CLR
@@ -512,7 +514,6 @@ pulse(mr_clr){
 	apr->sf3 = 0;		// 5-6
 	apr->sf5a = 0;		// 5-6
 	apr->sf7 = 0;		// 5-6
-	apr->art3_ret = NULL;
 	apr->sct2_ret = NULL;
 }
 
@@ -628,55 +629,64 @@ pulse(sht0){
 
 pulse(art3){
 	trace("ART3\n");
-	apr->ar_com_cont = 0;	// 6-9
-	nextpulse(apr, apr->art3_ret);
+	apr->ar_com_cont = 0;		// 6-9
+
+	if(apr->af3a) nextpulse(apr, at3a);		// 5-3
+	if(apr->et4_ar_pse) nextpulse(apr, et4);
 }
 
 pulse(ar_cry_comp){
 	trace("AR CRY COMP\n");
-	apr->ar = ~apr->ar & FW;	// 6-8
-	nextpulse(apr, art3);		// 6-9
+	if(apr->ar_com_cont){
+		apr->ar = ~apr->ar & FW;	// 6-8
+		nextpulse(apr, art3);		// 6-9
+	}
 }
 
 pulse(ar_pm1_t1){
 	trace("AR AR+-1 T1\n");
-	ar_cry_in(apr, 1);
-	if(apr->iot_blk || apr->inst == 0252 || apr->inst == 0253 ||
+	ar_cry_in(apr, 1);			// 6-6
+	if(apr->inst == BLT ||
+	   apr->iot_blk || apr->inst == AOBJP || apr->inst == AOBJN ||
 	   apr->ir_jp && !(apr->inst & 0004))
-		ar_cry_in(apr, 01000000);
-	nextpulse(apr, apr->ar_com_cont ? ar_cry_comp : art3);
+		ar_cry_in(apr, 01000000);	// 6-9
+	if(!apr->ar_com_cont)
+		nextpulse(apr, art3);			// 6-9
+	nextpulse(apr, ar_cry_comp);			// 6-9
 }
 
 pulse(ar_pm1_t0){
 	trace("AR AR+-1 T0\n");
 	apr->ar = ~apr->ar & FW;	// 6-8
-	apr->ar_com_cont = 1;	// 6-9
-	nextpulse(apr, ar_pm1_t1);
+	apr->ar_com_cont = 1;		// 6-9
+	nextpulse(apr, ar_pm1_t1);	// 6-9
 }
 
 pulse(ar_negate_t0){
 	trace("AR NEGATE T0\n");
 	apr->ar = ~apr->ar & FW;	// 6-8
-	nextpulse(apr, ar_pm1_t1);
+	nextpulse(apr, ar_pm1_t1);	// 6-9
 }
 
 pulse(ar_ast2){
 	trace("AR2\n");
-	ar_cry_in(apr, (~apr->ar & apr->mb) << 1);
-	nextpulse(apr, apr->ar_com_cont ? ar_cry_comp : art3);
+	ar_cry_in(apr, (~apr->ar & apr->mb) << 1);	// 6-8
+	if(!apr->ar_com_cont)
+		nextpulse(apr, art3);			// 6-9
+	nextpulse(apr, ar_cry_comp);			// 6-9
 }
 
 pulse(ar_ast1){
 	trace("AR AST1\n");
-	apr->ar ^= apr->mb;
-	nextpulse(apr, ar_ast2);
+	apr->ar ^= apr->mb;		// 6-8
+	nextpulse(apr, ar_ast2);	// 6-9
 }
 
 pulse(ar_ast0){
 	trace("AR AST0\n");
 	apr->ar = ~apr->ar & FW;	// 6-8
-	apr->ar_com_cont = 1;	// 6-9
-	nextpulse(apr, ar_ast1);
+	apr->ar_com_cont = 1;		// 6-9
+	nextpulse(apr, ar_ast1);	// 6-9
 }
 
 /*
@@ -888,27 +898,23 @@ pulse(et3){
 	if(apr->ir_fwt && ((apr->inst & 0774) == 0210 ||
 	                  (apr->inst & 0774) == 0214 && apr->ar & SGN)){
 		apr->et4_ar_pse = 1;		// 5-5
-		apr->art3_ret = et4;
 		nextpulse(apr, ar_negate_t0);
 		return;
 	}
 
 	if(apr->ir_as){
 		apr->et4_ar_pse = 1;		// 5-5
-		apr->art3_ret = et4;
 		nextpulse(apr, apr->inst & 4 ? ar_ast0 : ar_ast1);
 		return;
 	}
 
 	if(apr->ir_accp){
 		apr->et4_ar_pse = 1;		// 5-5
-		apr->art3_ret = et4;
 		nextpulse(apr, ar_ast0);
 		return;
 	}
 	if(apr->ir_memac){
 		apr->et4_ar_pse = 1;		// 5-5
-		apr->art3_ret = et4;
 		nextpulse(apr, (apr->inst & 070) == 040 ? ar_pm1_t1 : // +1
                                (apr->inst & 070) == 060 ? ar_pm1_t0 : // -1
                                                           et4);
@@ -917,13 +923,11 @@ pulse(et3){
 	if(apr->inst == AOBJP || apr->inst == AOBJN ||
 	   apr->inst == PUSHJ || apr->inst == PUSH){
 		apr->et4_ar_pse = 1;		// 5-5
-		apr->art3_ret = et4;
 		nextpulse(apr, ar_pm1_t1);
 		return;
 	}
 	if(apr->inst == POP || apr->inst == POPJ){
 		apr->et4_ar_pse = 1;		// 5-5
-		apr->art3_ret = et4;
 		nextpulse(apr, ar_pm1_t0);
 		return;
 	}
@@ -1134,17 +1138,17 @@ pulse(ft0){
 
 pulse(at5){
 	trace("AT5\n");
-	apr->a_long = 1;			// nowhere to be found :(
+//	apr->a_long = 1;		// ?? nowhere to be found
 	apr->af0 = 1;			// 5-3
 	apr->ma = apr->mb & RT;		// 7-3
-	apr->ir &= ~037;			// 5-7
-	nextpulse(apr, mc_rd_rq_pulse);
+	apr->ir &= ~037;		// 5-7
+	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
 }
 
 pulse(at4){
 	trace("AT4\n");
 	apr->ar &= ~LT;			// 6-8
-	// TODO: what is MC DR SPLIT?
+	// TODO: what is MC DR SPLIT? what happens here anyway?
 	if(apr->sw_addr_stop || apr->key_mem_stop)
 		apr->mc_split_cyc_sync = 1;	// 7-9
 	nextpulse(apr, apr->ir & 020 ? at5 : ft0);	// 5-3, 5-4
@@ -1162,16 +1166,15 @@ pulse(at3){
 	apr->af3 = 0;			// 5-3
 	apr->ma = 0;			// 7-3
 	apr->af3a = 1;			// 5-3
-	apr->art3_ret = at3a;
-	nextpulse(apr, ar_ast1);
+	nextpulse(apr, ar_ast1);	// 6-9
 }
 
 pulse(at2){
 	trace("AT2\n");
-	apr->a_long = 1;			// nowhere to be found :(
-	apr->ma = apr->ir & 017;		// 7-3
+//	apr->a_long = 1;		// ?? nowhere to be found
+	apr->ma |= apr->ir & 017;	// 7-3
 	apr->af3 = 1;			// 5-3
-	nextpulse(apr, mc_rd_rq_pulse);
+	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
 }
 
 pulse(at1){
@@ -1183,7 +1186,7 @@ pulse(at1){
 pulse(at0){
 	trace("AT0\n");
 	apr->ar &= ~RT;			// 6-8
-	apr->ar |= apr->mb & RT;		// 6-8
+	apr->ar |= apr->mb & RT;	// 6-8
 	apr->ir |= apr->mb>>18 & 037;	// 5-7
 	decodeir(apr);
 	apr->ma = 0;			// 7-3
@@ -1267,8 +1270,8 @@ pulse(mc_rs_t1){
 	if(apr->f6a) nextpulse(apr, ft6a);
 	if(apr->f4a) nextpulse(apr, ft4a);
 	if(apr->f1a) nextpulse(apr, ft1a);
-	if(apr->af0) nextpulse(apr, at0);
-	if(apr->af3) nextpulse(apr, at3);
+	if(apr->af0) nextpulse(apr, at0);			// 5-3
+	if(apr->af3) nextpulse(apr, at3);			// 5-3
 	if(apr->if1a) nextpulse(apr, it1a);			// 5-3
 }
 

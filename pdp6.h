@@ -137,8 +137,8 @@ struct Apr {
 	/* needed for the emulation */
 	int extpulse;
 	bool ia_inh;	// this is asserted for some time
-	// want to get rid of these
-	Pulse *art3_ret, *sct2_ret;
+	// want to get rid of this
+	Pulse *sct2_ret;
 
 	Pulse *pulses1[MAXPULSE], *pulses2[MAXPULSE];
 	Pulse **clist, **nlist;

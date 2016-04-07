@@ -756,7 +756,6 @@ error:
 	initmem();
 	memset(&apr, 0xff, sizeof apr);
 	apr.extpulse = 0;
-	apr.art3_ret = NULL;
 
 	for(;;){
 		while(SDL_PollEvent(&ev))
