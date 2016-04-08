@@ -23,6 +23,14 @@ enum Mask {
 enum Opcode {
 	FSC    = 0132,
 	IBP    = 0133,
+	CAO    = 0133,
+	LDCI   = 0134,
+	LDC    = 0135,
+	DPCI   = 0136,
+	DPC    = 0137,
+	ASHC   = 0244,
+	ROTC   = 0245,
+	LSHC   = 0246,
 	EXCH   = 0250,
 	BLT    = 0251,
 	AOBJP  = 0252,
@@ -115,8 +123,7 @@ struct Apr {
 	/* decoded instructions */
 	int inst;
 	bool ir_fp;
-	bool ch_inc, ch_inc_op, ch_n_inc_op, ch_load, ch_dep;
-	bool ir_fwt, ir_fwt_swap;
+	bool ir_fwt;
 	bool fwt_00, fwt_01, fwt_10, fwt_11;
 	bool shift_op, ir_md, ir_jp, ir_as;
 	bool ir_accp, ir_memac, ir_memac_mem, ir_memac_ac;
@@ -129,7 +136,7 @@ struct Apr {
 	bool ir_acbm;
 	bool ex_ir_uuo, ir_iot, ir_jrst;
 
-	bool fac2, fc_c_acrt, fc_c_aclt;
+	bool fac2;
 	bool fac_inh, fc_e, fc_e_pse;
 	bool e_long, mb_pc_sto, pc_set;
 	bool sc_e, sac_inh, sac2;
