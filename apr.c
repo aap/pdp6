@@ -89,14 +89,14 @@ decode_2xx(Apr *apr)
 	apr->shift_op = (apr->inst & 0770) == 0240 &&
 	               (apr->inst & 03) != 3;		// 6-20
 	if(SH_AC2)
-		apr->fac2 = apr->sac2 = 1;
+		apr->fac2 = apr->sac2 = 1;		// 5-4
 
 	if(apr->inst == EXCH)
-		apr->fc_e_pse = 1;
-	if((apr->inst & 0774) == 0254)
-		apr->fac_inh = 1;
+		apr->fc_e_pse = 1;			// 5-4
+	if((apr->inst & 0774) == 254)
+		apr->fac_inh = 1;			// 5-4
 	if(apr->inst == XCT)
-		apr->fac_inh = apr->fc_e = 1;
+		apr->fac_inh = apr->fc_e = 1;		// 5-4
 
 	apr->ir_jp = (apr->inst & 0770) == 0260;
 	if(apr->ir_jp){
@@ -104,15 +104,25 @@ decode_2xx(Apr *apr)
 		if(apr->inst == PUSHJ)
 			apr->sc_e = apr->mb_pc_sto = 1;
 		if(apr->inst == PUSH)
-			apr->sc_e = apr->fc_e = 1;
-		if((apr->inst & 0776) == 0264)	/* JSR, JSP */
-			apr->mb_pc_sto = apr->fac_inh = 1;
+			apr->sc_e = apr->fc_e = 1;		// 5-4
+		if(apr->inst == JSP || apr->inst == JSR)
+			apr->mb_pc_sto = apr->fac_inh = 1;	// 5-4
 		if(apr->inst == POP || apr->inst == JSR || apr->inst == JSA)
 			apr->sc_e = 1;
 	}
 
 	apr->ir_as = (apr->inst & 0770) == 0270;
 }
+
+// 5-9
+#define ACCP ((apr->inst & 0760) == 0300)
+#define ACCP_DIR (ACCP && apr->inst & 010)
+#define MEMAC_TST ((apr->inst & 0760) == 0320)
+#define MEMAC_AC_P1 ((apr->inst & 0760) == 0340)
+#define MEMAC_AC_M1 ((apr->inst & 0760) == 0360)
+#define MEMAC (MEMAC_TST || MEMAC_AC_P1 || MEMAC_AC_M1)
+#define MEMAC_MEM (MEMAC && apr->inst & 010)
+#define MEMAC_AC (MEMAC && (apr->inst & 010) == 0)
 
 // 5-9
 #define HWT_LT (apr->hwt && (apr->inst & 040) == 0)
@@ -123,12 +133,25 @@ decode_2xx(Apr *apr)
                     ((apr->inst & 010) == 0 || apr->mb & RSGN))
 #define HWT_RT_SET (HWT_LT && apr->inst & 020 &&\
                     ((apr->inst & 010) == 0 || apr->mb & LSGN))
+
+// 5-9
+#define ACBM_DIR (apr->ir_acbm && apr->inst & 010)
+#define ACBM_SWAP (apr->ir_acbm && apr->inst & 01)
+#define ACBM_DN (apr->ir_acbm && (apr->inst & 060) == 0)
+#define ACBM_CL (apr->ir_acbm && (apr->inst & 060) == 1)
+#define ACBM_COM (apr->ir_acbm && (apr->inst & 060) == 2)
+#define ACBM_SET (apr->ir_acbm && (apr->inst & 060) == 3)
+
+// 5-8
+#define UUO_A ((apr->inst & 0700) == 0)
+#define IOT_A ((apr->inst & 0700) == 0700)
+#define JRST_A (apr->inst == JRST)
+
 void
 decodeir(Apr *apr)
 {
-	bool iot_a, jrst_a, uuo_a;
-
 	apr->inst = apr->ir>>9 & 0777;
+	apr->io_inst = apr->ir & 0700340;
 	apr->fac_inh = 0;
 	apr->fc_e = 0;
 	apr->fc_e_pse = 0;
@@ -151,7 +174,7 @@ decodeir(Apr *apr)
 
 	apr->ir_fp = (apr->inst & 0740) == 0140;
 	if(apr->ir_fp){
-		apr->fc_e = 1;
+		apr->fc_e = 1;		// 5-4
 		if(apr->inst & 02)	/* M, B */
 			apr->sc_e = 1;
 		if((apr->inst & 03) == 2)
@@ -163,26 +186,21 @@ decodeir(Apr *apr)
 	decode_2xx(apr);	// 5-8
 
 	/* ACCP v MEMAC */
-	apr->ir_accp = apr->ir_memac = apr->ir_memac_mem = apr->ir_memac_ac = 0;
 	if((apr->inst & 0700) == 0300){
-		apr->ir_memac = apr->inst & 060;
-		apr->ir_accp = !apr->ir_memac;
-		apr->ir_memac_mem = apr->ir_memac && apr->inst & 010;
-		apr->ir_memac_ac = apr->ir_memac && !apr->ir_memac_mem;
-		if(apr->ir_memac_mem)
-			apr->fac_inh = apr->fc_e_pse = 1;
-		if(apr->ir_accp && apr->inst & 010)
-			apr->fc_e = 1;
+		if(MEMAC_MEM)
+			apr->fac_inh = apr->fc_e_pse = 1;	// 5-4
+		if(ACCP_DIR)
+			apr->fc_e = 1;				// 5-4
 		apr->e_long = 1;
-		if(apr->ir_accp)
+		if(ACCP)
 			apr->sac_inh = 1;
 	}
 
 	/* BOOLE */
 	apr->boole_as_00 = apr->boole_as_01 = 0;
 	apr->boole_as_10 = apr->boole_as_11 = 0;
-	apr->ir_boole = (apr->inst & 0700) == 0400;
-	if(apr->ir_boole)
+	apr->ir_boole = (apr->inst & 0700) == 0400;		// 5-8
+	if(apr->ir_boole)	
 		apr->ir_boole_op = apr->inst>>2 & 017;
 
 	/* HWT */
@@ -210,48 +228,47 @@ decodeir(Apr *apr)
 		apr->boole_as_10 = (apr->inst & 03) == 2;
 		apr->boole_as_11 = (apr->inst & 03) == 3;
 		if(apr->boole_as_00)
-			apr->fc_e = 1;
+			apr->fc_e = 1;		// 5-4
 		if(apr->boole_as_10 || apr->boole_as_11)
-			apr->fc_e_pse = 1;
+			apr->fc_e_pse = 1;	// 5-4
 		if(apr->boole_as_10)
 			apr->sac_inh = 1;
 	}
 
 	/* ACBM */
-	apr->ir_acbm = (apr->inst & 0700) == 0600;
+	apr->ir_acbm = (apr->inst & 0700) == 0600;	// 5-8
 	if(apr->ir_acbm){
-		if(apr->inst & 010)
-			apr->fc_e = 1;
+		if(ACBM_DIR)
+			apr->fc_e = 1;		// 5-4
 		apr->e_long = 1;
 		if(!(apr->inst & 60))
 			apr->sac_inh = 1;
 	}
 
-	if(!(apr->ir & 0740) && (apr->fwt_11 || apr->hwt_11 || apr->ir_memac_mem))
+	if(!(apr->ir & 0740) && (apr->fwt_11 || apr->hwt_11 || MEMAC_MEM))
 		apr->sac_inh = 1;
 
-	uuo_a = (apr->inst & 0700) == 0;
-	iot_a = (apr->inst & 0700) == 0700;
-	jrst_a = apr->inst == 0254;
 	// 5-13
 	apr->ex_ir_uuo =
-		uuo_a && apr->ex_uuo_sync ||
-		iot_a && !apr->ex_pi_sync && apr->ex_user && !apr->cpa_iot_user ||
-		jrst_a && (apr->ir & 0000600) && apr->ex_user;
-	apr->ir_jrst = !apr->ex_ir_uuo && jrst_a;
-	apr->ir_iot = !apr->ex_ir_uuo && iot_a;
-	apr->iot_blk = apr->ir_iot && (apr->ir & 0240) == 0;
-	apr->iot_dataio = apr->ir_iot && (apr->ir & 0240) == 0040;
+		UUO_A && apr->ex_uuo_sync ||
+		IOT_A && !apr->ex_pi_sync && apr->ex_user && !apr->cpa_iot_user ||
+		JRST_A && (apr->ir & 0000600) && apr->ex_user;
+	apr->ir_jrst = !apr->ex_ir_uuo && JRST_A;		// 5-8
+	apr->ir_iot = !apr->ex_ir_uuo && IOT_A;			// 5-8
+	apr->iot_blk = apr->ir_iot &&				// 8-1
+	               (apr->io_inst == BLKI || apr->io_inst == BLKO);
+	apr->iot_dataio = apr->ir_iot &&			// 8-1
+	                  (apr->io_inst == DATAI || apr->io_inst == DATAO);
 
 	if(apr->ir_jrst)
 		apr->mb_pc_sto = 1;
 
 	if(apr->ex_ir_uuo || apr->ir_iot)
-		apr->fac_inh = 1;
+		apr->fac_inh = 1;			// 5-4
 	if(apr->iot_blk)
-		apr->fc_e_pse = 1;
-	if(apr->iot_dataio && apr->ir & 0100)		/* DATAO */
-		apr->fc_e = 1;
+		apr->fc_e_pse = 1;			// 5-4
+	if(apr->ir_iot && apr->io_inst == DATAO)	// 8-1
+		apr->fc_e = 1;				// 5-4
 	/* No need to check PC +1 for E LONG, it's already implied.
 	 * We have to wait until ET5 for PC SET */
 	if(apr->ir_iot && (apr->inst & 0300) == 0300 ||	/* CONSZ, CONSO */
@@ -278,7 +295,7 @@ accp_et_al_test(Apr *apr)
 	// 5-9
 	lt = !!(apr->ar & SGN) != apr->ar_cry0_xor_cry1;
 	cond = (apr->inst & 2) && apr->ar == 0 ||
-               (apr->ir_accp || apr->ir_memac) && (apr->inst & 1) && lt;
+               (ACCP || MEMAC) && (apr->inst & 1) && lt;
 	return cond != !!(apr->inst & 040);
 }
 
@@ -308,7 +325,7 @@ pc_set_enable(Apr *apr)
 	// 5-12
 	return apr->inst == AOBJP && !(apr->ar & SGN) ||
 	       apr->inst == AOBJN && apr->ar & SGN ||
-	       apr->ir_memac_ac && accp_et_al_test(apr) ||
+	       MEMAC_AC && accp_et_al_test(apr) ||
 	       apr->inst == JFCL && selected_flag(apr);
 }
 
@@ -316,7 +333,7 @@ bool
 pc_inc_enable(Apr *apr)
 {
 	// 5-12
-	return (apr->ir_accp || apr->ir_acbm || apr->ir_memac_mem) && accp_et_al_test(apr) ||
+	return (ACCP || apr->ir_acbm || MEMAC_MEM) && accp_et_al_test(apr) ||
 	        apr->ir_iot && ((apr->inst & 0340) == 0300 && apr->ar == 0 ||
 	                      (apr->inst & 0340) == 0340 && apr->ar != 0);
 }
@@ -781,16 +798,16 @@ pulse(et10){
 		apr->mb = apr->ar;
 	if(apr->ir_jp && !(apr->inst & 04))
 		swap(&apr->mb, &apr->ar);
-	if(apr->ir_memac || apr->ir_as){
+	if(MEMAC || apr->ir_as){
 		apr->ar_cry0_flag = apr->ar_cry0;
 		apr->ar_cry1_flag = apr->ar_cry1;
 	}
 
 	if(apr->hwt_10 || apr->hwt_11 || apr->fwt_10 || apr->fwt_11 ||
-	   apr->ir_memac_mem)
+	   MEMAC_MEM)
 		apr->mb = apr->ar;
 	if(apr->ir_fwt && !apr->ar_cry0 && apr->ar_cry1 ||
-	   (apr->ir_memac || apr->ir_as) && apr->ar_cry0 != apr->ar_cry1){
+	   (MEMAC || apr->ir_as) && apr->ar_cry0 != apr->ar_cry1){
 		apr->ar_ov_flag = 1;			// 6-10
 		if(apr->cpa_arov_en)
 			;
@@ -937,12 +954,12 @@ pulse(et3){
 		return;
 	}
 
-	if(apr->ir_accp){
+	if(ACCP){
 		apr->et4_ar_pse = 1;		// 5-5
 		nextpulse(apr, ar_ast0);
 		return;
 	}
-	if(apr->ir_memac){
+	if(MEMAC){
 		apr->et4_ar_pse = 1;		// 5-5
 		nextpulse(apr, (apr->inst & 070) == 040 ? ar_pm1_t1 : // +1
                                (apr->inst & 070) == 060 ? ar_pm1_t0 : // -1
@@ -1061,7 +1078,7 @@ pulse(et0a){
 	                    apr->ir_boole_op == 013 ||
 	                    apr->ir_boole_op == 015))
 		apr->ar = ~apr->ar & FW;	// 6-8
-	if(apr->fwt_00 || apr->fwt_11 || apr->hwt_11 || apr->ir_memac_mem)
+	if(apr->fwt_00 || apr->fwt_11 || apr->hwt_11 || MEMAC_MEM)
 		apr->ar = apr->mb;	// 6-8
 	if(apr->fwt_01 || apr->fwt_10)
 		apr->mb = apr->ar;	// 6-3

@@ -46,6 +46,16 @@ enum Opcode {
 	JSP    = 0265,
 	JSA    = 0266,
 	JRA    = 0267,
+
+	BLKI   = 0700000,
+	DATAI  = 0700040,
+	BLKO   = 0700100,
+	DATAO  = 0700140,
+	CONO   = 0700200,
+	CONI   = 0700240,
+	CONSZ  = 0700300,
+	CONSO  = 0700340
+
 };
 
 enum {
@@ -121,12 +131,11 @@ struct Apr {
 	bool pi_hold;
 
 	/* decoded instructions */
-	int inst;
+	int inst, io_inst;
 	bool ir_fp;
 	bool ir_fwt;
 	bool fwt_00, fwt_01, fwt_10, fwt_11;
 	bool shift_op, ir_md, ir_jp, ir_as;
-	bool ir_accp, ir_memac, ir_memac_mem, ir_memac_ac;
 	bool ir_boole;
 	bool boole_as_00, boole_as_01, boole_as_10, boole_as_11;
 	int ir_boole_op;
