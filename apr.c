@@ -20,6 +20,9 @@ trace(char *fmt, ...)
  * some are macros...or not even that.
  */
 
+// 5-8
+#define IR_FPCH ((apr->inst & 0700) == 0100)
+
 // 6-19
 #define CH_INC ((apr->inst == CAO || apr->inst == LDCI || DPCI) && !apr->chf5)
 #define CH_INC_OP (CH_INC && !apr->chf7)
@@ -29,13 +32,19 @@ trace(char *fmt, ...)
 #define CH_LOAD ((apr->inst == LDCI || apr->inst == LDC) && apr->chf5)
 #define CH_DEP ((apr->inst == DPCI || apr->inst == DPC) && apr->chf5)
 
+// 5-8
+#define IR_FP ((apr->inst & 0740) == 0140)
+#define IR_FAD ((apr->inst & 0770) == 0140)
+#define IR_FSB ((apr->inst & 0770) == 0150)
+#define IR_FMP ((apr->inst & 0770) == 0160)
+#define IR_FDV ((apr->inst & 0770) == 0170)
 
 // 5-8
 #define FWT_MOVS ((apr->inst & 0770) == 0200)
 #define FWT_MOVNM ((apr->inst & 0770) == 0210)
 // 5-9
 #define FWT_SWAP (apr->ir_fwt && (apr->inst & 014) == 004)
-#define FWT_NEGATE (FWT_MOVNM && ((apr->inst & 04) == 0 || apr->ar & LSGN))
+#define FWT_NEGATE (FWT_MOVNM && ((apr->inst & 04) == 0 || apr->ar & SGN))
 // 5-4
 #define FC_C_ACRT (apr->inst == POP || apr->inst == POPJ)
 #define FC_C_ACLT (apr->inst == JRA || apr->inst == BLT)
@@ -49,6 +58,10 @@ trace(char *fmt, ...)
 
 // 6-20
 #define SH_AC2 (apr->inst == ASHC || apr->inst == ROTC || apr->inst == LSHC)
+
+// 5-10
+#define AS_ADD (apr->ir_as && (apr->inst & 04) == 0)
+#define AS_SUB (apr->ir_as && apr->inst & 04)
 
 void
 decode_2xx(Apr *apr)
@@ -93,7 +106,7 @@ decode_2xx(Apr *apr)
 
 	if(apr->inst == EXCH)
 		apr->fc_e_pse = 1;			// 5-4
-	if((apr->inst & 0774) == 254)
+	if((apr->inst & 0774) == 0254)
 		apr->fac_inh = 1;			// 5-4
 	if(apr->inst == XCT)
 		apr->fac_inh = apr->fc_e = 1;		// 5-4
@@ -118,9 +131,9 @@ decode_2xx(Apr *apr)
 #define ACCP ((apr->inst & 0760) == 0300)
 #define ACCP_DIR (ACCP && apr->inst & 010)
 #define MEMAC_TST ((apr->inst & 0760) == 0320)
-#define MEMAC_AC_P1 ((apr->inst & 0760) == 0340)
-#define MEMAC_AC_M1 ((apr->inst & 0760) == 0360)
-#define MEMAC (MEMAC_TST || MEMAC_AC_P1 || MEMAC_AC_M1)
+#define MEMAC_P1 ((apr->inst & 0760) == 0340)
+#define MEMAC_M1 ((apr->inst & 0760) == 0360)
+#define MEMAC (MEMAC_TST || MEMAC_P1 || MEMAC_M1)
 #define MEMAC_MEM (MEMAC && apr->inst & 010)
 #define MEMAC_AC (MEMAC && (apr->inst & 010) == 0)
 
@@ -132,7 +145,7 @@ decode_2xx(Apr *apr)
 #define HWT_LT_SET (HWT_RT && apr->inst & 020 &&\
                     ((apr->inst & 010) == 0 || apr->mb & RSGN))
 #define HWT_RT_SET (HWT_LT && apr->inst & 020 &&\
-                    ((apr->inst & 010) == 0 || apr->mb & LSGN))
+                    ((apr->inst & 010) == 0 || apr->mb & SGN))
 
 // 5-9
 #define ACBM_DIR (apr->ir_acbm && apr->inst & 010)
@@ -241,7 +254,7 @@ decodeir(Apr *apr)
 		if(ACBM_DIR)
 			apr->fc_e = 1;		// 5-4
 		apr->e_long = 1;
-		if(!(apr->inst & 60))
+		if(!(apr->inst & 060))
 			apr->sac_inh = 1;
 	}
 
@@ -673,12 +686,22 @@ pulse(sht0){
  * AR subroutines
  */
 
+// 6-9
+#define AR_SUB (AS_SUB || ACCP)
+#define AR_ADD (AS_ADD)
+#define AR_P1 (MEMAC_P1 || apr->inst == PUSH || apr->inst == PUSHJ || \
+               apr->iot_blk || apr->inst == AOBJP || apr->inst == AOBJN)
+#define AR_M1 (MEMAC_M1 || apr->inst == POP || apr->inst == POPJ)
+#define AR_PM1_LTRT (apr->iot_blk || apr->inst == AOBJP || apr->inst == AOBJN || \
+	            apr->ir_jp && !(apr->inst & 0004))
+#define AR_SBR (FWT_NEGATE || AR_ADD || AR_SUB || AR_P1 || AR_M1 || IR_FSB)
+
 pulse(art3){
 	trace("ART3\n");
 	apr->ar_com_cont = 0;		// 6-9
 
 	if(apr->af3a) nextpulse(apr, at3a);		// 5-3
-	if(apr->et4_ar_pse) nextpulse(apr, et4);
+	if(apr->et4_ar_pse) nextpulse(apr, et4);	// 5-5
 }
 
 pulse(ar_cry_comp){
@@ -692,9 +715,7 @@ pulse(ar_cry_comp){
 pulse(ar_pm1_t1){
 	trace("AR AR+-1 T1\n");
 	ar_cry_in(apr, 1);			// 6-6
-	if(apr->inst == BLT ||
-	   apr->iot_blk || apr->inst == AOBJP || apr->inst == AOBJN ||
-	   apr->ir_jp && !(apr->inst & 0004))
+	if(apr->inst == BLT || AR_PM1_LTRT)
 		ar_cry_in(apr, 01000000);	// 6-9
 	if(!apr->ar_com_cont)
 		nextpulse(apr, art3);			// 6-9
@@ -783,6 +804,11 @@ pulse(st1){
 /*
  * Execute
  */
+
+// 5-5
+#define ET4_INH (apr->inst == BLT || apr->inst == XCT || apr->ex_ir_uuo || \
+                 apr->shift_op || AR_SBR || apr->ir_md || IR_FPCH)
+#define ET5_INH (apr->ir_iot || IR_FSB)
 
 pulse(et10){
 	trace("ET10\n");
@@ -940,44 +966,24 @@ pulse(et3){
 	if(apr->inst == POPJ || apr->inst == BLT)
 		apr->ma = apr->mb & RT;		// 7-3
 
-	// 5-9
-	if(apr->ir_fwt && ((apr->inst & 0774) == 0210 ||
-	                  (apr->inst & 0774) == 0214 && apr->ar & SGN)){
-		apr->et4_ar_pse = 1;		// 5-5
+	// AR SBR, 6-9
+	if(FWT_NEGATE || IR_FSB)
 		nextpulse(apr, ar_negate_t0);
-		return;
-	}
-
-	if(apr->ir_as){
-		apr->et4_ar_pse = 1;		// 5-5
-		nextpulse(apr, apr->inst & 4 ? ar_ast0 : ar_ast1);
-		return;
-	}
-
-	if(ACCP){
-		apr->et4_ar_pse = 1;		// 5-5
+	if(AR_SUB)
 		nextpulse(apr, ar_ast0);
-		return;
-	}
-	if(MEMAC){
-		apr->et4_ar_pse = 1;		// 5-5
-		nextpulse(apr, (apr->inst & 070) == 040 ? ar_pm1_t1 : // +1
-                               (apr->inst & 070) == 060 ? ar_pm1_t0 : // -1
-                                                          et4);
-		return;
-	}
-	if(apr->inst == AOBJP || apr->inst == AOBJN ||
-	   apr->inst == PUSHJ || apr->inst == PUSH){
-		apr->et4_ar_pse = 1;		// 5-5
-		nextpulse(apr, ar_pm1_t1);
-		return;
-	}
-	if(apr->inst == POP || apr->inst == POPJ){
-		apr->et4_ar_pse = 1;		// 5-5
+	if(AR_ADD)
+		nextpulse(apr, ar_ast1);
+	if(AR_M1)
 		nextpulse(apr, ar_pm1_t0);
-		return;
-	}
-	nextpulse(apr, apr->shift_op ? sht1 : et4);
+	if(AR_P1)
+		nextpulse(apr, ar_pm1_t1);
+
+	if(apr->shift_op)
+		nextpulse(apr, sht1);		// 6-20
+	if(AR_SBR)
+		apr->et4_ar_pse = 1;		// 5-5
+	if(!ET4_INH)
+		nextpulse(apr, et4);		// 5-5
 };
 
 pulse(et1){
@@ -1017,10 +1023,10 @@ pulse(et1){
 		apr->mb = apr->mb<<18 & LT | apr->mb>>18 & RT;	// 6-3
 	if(apr->ir_hwt && apr->inst & 030)
 		apr->ar = 0;			// 6-8
-	if(apr->inst == POPJ)
-		apr->ma = 0;
-	if(apr->shift_op && apr->mb & 0400000)
-		sht0(apr);			// 6-20
+	if(apr->inst == POPJ || apr->ex_ir_uuo || apr->inst == BLT)
+		apr->ma = 0;			// 7-3
+	if(apr->shift_op && apr->mb & RSGN)
+		nextpulse(apr, sht0);		// 6-20
 
 	if(apr->ir_acbm){
 		apr->mb &= apr->ar;
@@ -1060,9 +1066,9 @@ pulse(et0a){
 	}
 	// 5-1
 	if(apr->key_ex_sync)
-		apr->key_ex_st = 1;
+		apr->key_ex_st = 1;		// 5-1
 	if(apr->key_dep_sync)
-		apr->key_dep_st = 1;
+		apr->key_dep_st = 1;		// 5-1
 	if(apr->key_inst_stop ||
 	   apr->ir_jrst && apr->ir & 0200 && !apr->ex_user)
 		apr->run = 0;
