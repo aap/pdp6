@@ -128,7 +128,6 @@ struct Apr {
 
 	/* temporaries */
 	bool ex_inh_rel;
-	bool pi_hold;
 
 	/* decoded instructions */
 	int inst, io_inst;
@@ -141,7 +140,6 @@ struct Apr {
 	int ir_boole_op;
 	bool ir_hwt;
 	bool hwt_00, hwt_01, hwt_10, hwt_11;
-	bool iot_blk, iot_dataio;
 	bool ir_acbm;
 	bool ex_ir_uuo, ir_iot, ir_jrst;
 

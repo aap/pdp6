@@ -160,6 +160,22 @@ decode_2xx(Apr *apr)
 #define IOT_A ((apr->inst & 0700) == 0700)
 #define JRST_A (apr->inst == JRST)
 
+// 8-1
+#define IOT_BLKI (apr->ir_iot && apr->io_inst == BLKI)
+#define IOT_DATAI (apr->ir_iot && apr->io_inst == DATAI)
+#define IOT_BLKO (apr->ir_iot && apr->io_inst == BLKO)
+#define IOT_DATAO (apr->ir_iot && apr->io_inst == DATAO)
+#define IOT_CONO (apr->ir_iot && apr->io_inst == CONO)
+#define IOT_CONI (apr->ir_iot && apr->io_inst == CONI)
+#define IOT_CONSZ (apr->ir_iot && apr->io_inst == CONSZ)
+#define IOT_CONSO (apr->ir_iot && apr->io_inst == CONSO)
+#define IOT_CONI (apr->ir_iot && apr->io_inst == CONI)
+#define IOT_BLK (apr->ir_iot && (apr->io_inst == BLKI || apr->io_inst == BLKO))
+#define IOT_OUTGOING (apr->ir_iot && (apr->io_inst == DATAO || apr->io_inst == CONO))
+#define IOT_STATUS (apr->ir_iot && \
+	(apr->io_inst == CONI || apr->io_inst == CONSZ || apr->io_inst == CONSO))
+#define IOT_DATAIO (apr->ir_iot && (apr->io_inst == DATAI || apr->io_inst == DATAO))
+
 void
 decodeir(Apr *apr)
 {
@@ -268,19 +284,15 @@ decodeir(Apr *apr)
 		JRST_A && (apr->ir & 0000600) && apr->ex_user;
 	apr->ir_jrst = !apr->ex_ir_uuo && JRST_A;		// 5-8
 	apr->ir_iot = !apr->ex_ir_uuo && IOT_A;			// 5-8
-	apr->iot_blk = apr->ir_iot &&				// 8-1
-	               (apr->io_inst == BLKI || apr->io_inst == BLKO);
-	apr->iot_dataio = apr->ir_iot &&			// 8-1
-	                  (apr->io_inst == DATAI || apr->io_inst == DATAO);
 
 	if(apr->ir_jrst)
 		apr->mb_pc_sto = 1;
 
 	if(apr->ex_ir_uuo || apr->ir_iot)
 		apr->fac_inh = 1;			// 5-4
-	if(apr->iot_blk)
+	if(IOT_BLK)
 		apr->fc_e_pse = 1;			// 5-4
-	if(apr->ir_iot && apr->io_inst == DATAO)	// 8-1
+	if(IOT_DATAO)					// 8-1
 		apr->fc_e = 1;				// 5-4
 	/* No need to check PC +1 for E LONG, it's already implied.
 	 * We have to wait until ET5 for PC SET */
@@ -299,6 +311,12 @@ swap(word *a, word *b)
 	tmp = *a;
 	*a = *b;
 	*b = tmp;
+}
+
+void
+swapltrt(word *a)
+{
+	*a = *a<<18 & LT | *a>>18 & RT;
 }
 
 bool
@@ -351,13 +369,14 @@ pc_inc_enable(Apr *apr)
 	                      (apr->inst & 0340) == 0340 && apr->ar != 0);
 }
 
+// 6-10
+#define AR_OV_SET (apr->ar_cry0 != apr->ar_cry1)
+
 void
 ar_cry(Apr *apr)
 {
 	// 6-10
-	apr->ar_cry0_xor_cry1 = apr->ar_cry0 != apr->ar_cry1 &&
-	                       !((apr->inst & 0700) == 0300 &&
-	                         (apr->inst & 0060) != 0020);
+	apr->ar_cry0_xor_cry1 = AR_OV_SET && ~MEMAC;
 }
 
 void
@@ -367,7 +386,7 @@ ar_cry_in(Apr *apr, word c)
 	a = (apr->ar & 0377777777777) + c;
 	apr->ar += c;
 	apr->ar_cry0 = !!(apr->ar & 01000000000000);
-	apr->ar_cry1 = !!(a      &  0400000000000);
+	apr->ar_cry1 = !!(a       &  0400000000000);
 	apr->ar &= FW;
 	ar_cry(apr);
 }
@@ -388,22 +407,50 @@ set_pi_cyc(Apr *apr, bool value)
 		apr->ex_pi_sync = 1;	// 5-13
 }
 
-// PI REQ depends on PIR, PIH, PI_ACTIVE
-void
-recalc_pi_req(Apr *apr)
+/* get highest priority request above highest currently held */
+int
+get_pi_req(Apr *apr)
 {
-	int chan;
-	u8 req;
 	// 8-3
-	apr->pi_req = 0;
-	if(apr->pi_active){
-		req = apr->pir & ~apr->pih;
+	int chan;
+	if(apr->pi_active)
 		for(chan = 0100; chan; chan >>= 1)
-			if(req & chan){
-				apr->pi_req = chan;
-				break;
+			if(apr->pih & chan)
+				return 0;
+			else if(apr->pir & chan)
+				return chan;
+	return 0;
+}
+
+/* clear highest held break */
+void
+dismiss_break(Apr *apr)
+{
+	// 8-3
+	int chan;
+	if(apr->pi_active)
+		for(chan = 0100; chan; chan >>= 1)
+			if(apr->pih & chan){
+				apr->pih &= ~chan;
+				apr->pi_req = get_pi_req(apr);
+				return;
 			}
-	}
+}
+
+void
+set_pir(Apr *apr, int pir)
+{
+	/* held breaks aren't retriggered */
+	apr->pir = pir & ~apr->pih;
+	apr->pi_req = get_pi_req(apr);
+}
+
+void
+set_pih(Apr *apr, int pih)
+{
+	apr->pih = pih;
+	apr->pir &= ~apr->pih;
+	apr->pi_req = get_pi_req(apr);
 }
 
 void
@@ -505,18 +552,17 @@ pulse(pi_reset){
 	apr->pi_active = 0;	// 8-4
 	apr->pih = 0;		// 8-4
 	apr->pir = 0;		// 8-4
-	recalc_pi_req(apr);	// 8-4
+	apr->pi_req = get_pi_req(apr);
 	apr->pio = 0;		// 8-3
 }
 
 pulse(ar_flag_clr){
 	trace("AR FLAG CLR\n");
-	apr->ar_ov_flag = 0;	// 6-10
-	apr->ar_cry0_flag = 0;	// 6-10
-	apr->ar_cry1_flag = 0;	// 6-10
+	apr->ar_ov_flag = 0;		// 6-10
+	apr->ar_cry0_flag = 0;		// 6-10
+	apr->ar_cry1_flag = 0;		// 6-10
 	apr->ar_pc_chg_flag = 0;	// 6-10
-	ar_cry(apr);
-	apr->chf7 = 0;		// 6-19
+	apr->chf7 = 0;			// 6-19
 }
 
 pulse(ar_flag_set){
@@ -525,7 +571,6 @@ pulse(ar_flag_set){
 	apr->ar_cry0_flag   = !!(apr->mb & 0200000000000); // 6-10
 	apr->ar_cry1_flag   = !!(apr->mb & 0100000000000); // 6-10
 	apr->ar_pc_chg_flag = !!(apr->mb & 0040000000000); // 6-10
-	ar_cry(apr);
 	apr->chf7           = !!(apr->mb & 0020000000000); // 6-19
 	if(apr->mb & 0010000000000)
 		set_ex_mode_sync(apr, 1);	// 5-13
@@ -690,9 +735,9 @@ pulse(sht0){
 #define AR_SUB (AS_SUB || ACCP)
 #define AR_ADD (AS_ADD)
 #define AR_P1 (MEMAC_P1 || apr->inst == PUSH || apr->inst == PUSHJ || \
-               apr->iot_blk || apr->inst == AOBJP || apr->inst == AOBJN)
+               IOT_BLK || apr->inst == AOBJP || apr->inst == AOBJN)
 #define AR_M1 (MEMAC_M1 || apr->inst == POP || apr->inst == POPJ)
-#define AR_PM1_LTRT (apr->iot_blk || apr->inst == AOBJP || apr->inst == AOBJN || \
+#define AR_PM1_LTRT (IOT_BLK || apr->inst == AOBJP || apr->inst == AOBJN || \
 	            apr->ir_jp && !(apr->inst & 0004))
 #define AR_SBR (FWT_NEGATE || AR_ADD || AR_SUB || AR_P1 || AR_M1 || IR_FSB)
 
@@ -761,11 +806,14 @@ pulse(ar_ast0){
  */
 
 #define IA_NOT_INT ((!apr->pi_req || apr->pi_cyc) && apr->ia_inh)
+// 8-4
+#define PI_BLK_RST (!apr->pi_ov && IOT_DATAIO)
+#define PI_RST (apr->ir_jrst && apr->ir & 0400 || PI_BLK_RST && apr->pi_cyc)
+#define PI_HOLD ((!apr->ir_iot || PI_BLK_RST) && apr->pi_cyc)
 
 pulse(pir_stb){
 	trace("PIR STB\n");
-	apr->pir |= apr->pio & iobus1;		// 8-3
-	recalc_pi_req(apr);			// 8-3
+	set_pir(apr, apr->pir | apr->pio & iobus1);	// 8-3
 }
 
 pulse(pi_sync){
@@ -779,6 +827,19 @@ pulse(pi_sync){
 	// no longer needed
 	apr->ia_inh = 0;
 }
+
+// 5-1
+#define KEY_MANUAL (apr->key_readin || apr->key_start || apr->key_inst_cont ||\
+                    apr->key_mem_cont || apr->key_ex || apr->key_dep ||\
+                    apr->key_ex_nxt || apr->key_dep_nxt || apr->key_exec ||\
+                    apr->key_io_reset)
+#define KEY_MA_MAS (apr->key_readin || apr->key_start ||\
+                    apr->key_ex_sync || apr->key_dep_sync)
+#define KEY_CLR_RIM (!(apr->key_readin || apr->key_inst_cont || apr->key_mem_cont))
+#define KEY_EXECUTE (apr->key_exec && !apr->run)
+#define KEY_EX_EX_NXT (apr->key_ex_sync || apr->key_ex_nxt)
+#define KEY_DP_DP_NXT (apr->key_dep_sync || apr->key_dep_nxt)
+#define KEY_EXECUTE_DP_DPNXT (KEY_EXECUTE || KEY_DP_DP_NXT)
 
 /*
  * Store
@@ -809,11 +870,15 @@ pulse(st1){
 #define ET4_INH (apr->inst == BLT || apr->inst == XCT || apr->ex_ir_uuo || \
                  apr->shift_op || AR_SBR || apr->ir_md || IR_FPCH)
 #define ET5_INH (apr->ir_iot || IR_FSB)
+// 5-12
+#define PC_P1_INH (KEY_EXECUTE || (CH_INC_OP || CH_N_INC_OP) && apr->inst != CAO || \
+                   apr->inst == XCT || apr->ex_ir_uuo || apr->pi_cyc || \
+                   IOT_BLK || apr->inst == BLT)
 
 pulse(et10){
 	trace("ET10\n");
 
-	if(apr->pi_hold){
+	if(PI_HOLD){
 		apr->pi_ov = 0;
 		apr->pi_cyc = 0;
 	}
@@ -957,7 +1022,8 @@ pulse(et4){
 
 	if(apr->ir_acbm)
 		swap(&apr->mb, &apr->ar);
-	nextpulse(apr, et5);
+	if(!ET5_INH)
+		nextpulse(apr, et5);		// 5-5
 }
 
 pulse(et3){
@@ -994,14 +1060,9 @@ pulse(et1){
 	if(apr->ir_jrst && apr->ir & 040)
 		apr->ex_mode_sync = 1;		// 5-13
 	if(apr->ir_jrst && apr->ir & 0100)
-		ar_flag_set(apr);
-	if(apr->ir_jrst && apr->ir & 0400 ||
-	   apr->iot_dataio && !apr->pi_ov && apr->pi_cyc)
-		if(apr->pi_active){
-			// TODO: check if this correct
-			apr->pih &= apr->pi_req-1;	// 8-3
-			recalc_pi_req(apr);
-		}
+		ar_flag_set(apr);		// 6-10
+	if(PI_RST)
+		dismiss_break(apr);		// 8-4
 
 	if(apr->ir_boole && (apr->ir_boole_op == 06 ||
 	                    apr->ir_boole_op == 011 ||
@@ -1041,64 +1102,54 @@ pulse(et1){
 pulse(et0){
 	trace("ET0\n");
 
-	if(!((CH_INC_OP || CH_N_INC_OP) && apr->inst != IBP ||
-	     apr->ex_ir_uuo || apr->iot_blk || apr->inst == BLT || apr->inst == XCT ||
-	     apr->key_exec && !apr->run ||
-	     apr->pi_cyc))
+	if(!PC_P1_INH)
 		apr->pc = apr->pc+1 & RT;	// 5-12
 	apr->ar_cry0 = 0;	// 6-10
 	apr->ar_cry1 = 0;	// 6-10
 	ar_cry(apr);
 	if(apr->ir_jrst && apr->ir & 0100)
-		ar_flag_clr(apr);
+		ar_flag_clr(apr);		// 6-10
 	// TODO: subroutines
 }
 
 pulse(et0a){
 	trace("ET0A\n");
 
-	// 8-4
-	apr->pi_hold = (!apr->ir_iot || !apr->pi_ov && apr->iot_dataio) &&
-	              apr->pi_cyc;
-	if(apr->pi_hold){
-		apr->pih |= apr->pi_req;	// 8-3
-		recalc_pi_req(apr);
-	}
-	// 5-1
+	if(PI_HOLD)
+		set_pih(apr, apr->pih = apr->pi_req);	// 8-3, 8-4
 	if(apr->key_ex_sync)
 		apr->key_ex_st = 1;		// 5-1
 	if(apr->key_dep_sync)
 		apr->key_dep_st = 1;		// 5-1
 	if(apr->key_inst_stop ||
 	   apr->ir_jrst && apr->ir & 0200 && !apr->ex_user)
-		apr->run = 0;
+		apr->run = 0;			// 5-1
 
 	if(apr->ir_boole && (apr->ir_boole_op == 00 ||
-	                    apr->ir_boole_op == 03 ||
-	                    apr->ir_boole_op == 014 ||
-	                    apr->ir_boole_op == 017))
-		apr->ar = 0;		// 6-8
+	                     apr->ir_boole_op == 03 ||
+	                     apr->ir_boole_op == 014 ||
+	                     apr->ir_boole_op == 017))
+		apr->ar = 0;			// 6-8
 	if(apr->ir_boole && (apr->ir_boole_op == 02 ||
-	                    apr->ir_boole_op == 04 ||
-	                    apr->ir_boole_op == 012 ||
-	                    apr->ir_boole_op == 013 ||
-	                    apr->ir_boole_op == 015))
+	                     apr->ir_boole_op == 04 ||
+	                     apr->ir_boole_op == 012 ||
+	                     apr->ir_boole_op == 013 ||
+	                     apr->ir_boole_op == 015))
 		apr->ar = ~apr->ar & FW;	// 6-8
-	if(apr->fwt_00 || apr->fwt_11 || apr->hwt_11 || MEMAC_MEM)
-		apr->ar = apr->mb;	// 6-8
-	if(apr->fwt_01 || apr->fwt_10)
-		apr->mb = apr->ar;	// 6-3
-	if(apr->inst == EXCH || apr->inst == JSP ||
-	   apr->hwt_10)
+	if(apr->fwt_00 || apr->fwt_11 || apr->hwt_11 || MEMAC_MEM ||
+	   IOT_BLK || IOT_DATAO)
+		apr->ar = apr->mb;		// 6-8
+	if(apr->fwt_01 || apr->fwt_10 || IOT_STATUS)
+		apr->mb = apr->ar;		// 6-3
+	if(apr->hwt_10 || apr->inst == JSP || apr->inst == EXCH || 
+	   apr->inst == BLT || IR_FSB)
 		swap(&apr->mb, &apr->ar);	// 6-3
 	if(apr->inst == POP || apr->inst == POPJ || apr->inst == JRA)
-		apr->mb = apr->mq;	// 6-3
+		apr->mb = apr->mq;		// 6-3
+	if(ACBM_SWAP || IOT_CONO || apr->inst == JSA)
+		swapltrt(&apr->mb);		// 6-3
 	if(apr->inst == FSC || apr->shift_op)
 		apr->sc |= ~apr->mb & 0377 | ~apr->mb>>9 & 0400;	// 6-15
-
-	if(apr->ir_acbm && apr->inst & 1 ||
-	   apr->inst == JSA)
-		apr->mb = apr->mb<<18 & LT | apr->mb>>18 & RT;	// 6-3
 }
 
 /*
@@ -1450,19 +1501,6 @@ pulse(mc_rd_wr_rs_pulse){
 /*
  * Keys
  */
-
-// some helpers, all on 5-1
-#define KEY_MANUAL (apr->key_readin || apr->key_start || apr->key_inst_cont ||\
-                    apr->key_mem_cont || apr->key_ex || apr->key_dep ||\
-                    apr->key_ex_nxt || apr->key_dep_nxt || apr->key_exec ||\
-                    apr->key_io_reset)
-#define KEY_MA_MAS (apr->key_readin || apr->key_start ||\
-                    apr->key_ex_sync || apr->key_dep_sync)
-#define KEY_CLR_RIM (!(apr->key_readin || apr->key_inst_cont || apr->key_mem_cont))
-#define KEY_EXECUTE (apr->key_exec && !apr->run)
-#define KEY_EX_EX_NXT (apr->key_ex_sync || apr->key_ex_nxt)
-#define KEY_DP_DP_NXT (apr->key_dep_sync || apr->key_dep_nxt)
-#define KEY_EXECUTE_DP_DPNXT (KEY_EXECUTE || KEY_DP_DP_NXT)
 
 pulse(key_rd_wr_ret){
 	trace("KEY RD WR RET\n");
