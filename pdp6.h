@@ -20,6 +20,31 @@ enum Mask {
 	RSGN = 0000000400000,
 };
 
+enum HalfwordBits {
+	H0  = 0400000, H1  = 0200000, H2  = 0100000,
+	H3  = 0040000, H4  = 0020000, H5  = 0010000,
+	H6  = 0004000, H7  = 0002000, H8  = 0001000,
+	H9  = 0000400, H10 = 0000200, H11 = 0000100,
+	H12 = 0000040, H13 = 0000020, H14 = 0000010,
+	H15 = 0000004, H16 = 0000002, H17 = 0000001
+};
+
+enum FullwordBits {
+	FCRY = 01000000000000,
+	F0  = 0400000000000, F1  = 0200000000000, F2  = 0100000000000,
+	F3  = 0040000000000, F4  = 0020000000000, F5  = 0010000000000,
+	F6  = 0004000000000, F7  = 0002000000000, F8  = 0001000000000,
+	F9  = 0000400000000, F10 = 0000200000000, F11 = 0000100000000,
+	F12 = 0000040000000, F13 = 0000020000000, F14 = 0000010000000,
+	F15 = 0000004000000, F16 = 0000002000000, F17 = 0000001000000,
+	F18 = 0000000400000, F19 = 0000000200000, F20 = 0000000100000,
+	F21 = 0000000040000, F22 = 0000000020000, F23 = 0000000010000,
+	F24 = 0000000004000, F25 = 0000000002000, F26 = 0000000001000,
+	F27 = 0000000000400, F28 = 0000000000200, F29 = 0000000000100,
+	F30 = 0000000000040, F31 = 0000000000020, F32 = 0000000000010,
+	F33 = 0000000000004, F34 = 0000000000002, F35 = 0000000000001
+};
+
 enum Opcode {
 	FSC    = 0132,
 	IBP    = 0133,
@@ -110,12 +135,14 @@ struct Apr {
 	bool mc_rd, mc_wr, mc_rq, mc_stop, mc_stop_sync, mc_split_cyc_sync;
 
 	bool cpa_iot_user, cpa_illeg_op, cpa_non_exist_mem,
-	     cpa_clock_en, cpa_clock_flag, cpa_pc_chg_en, cpa_pdl_ov,
-	     cpa_arov_en, cpa_pia33, cpa_pia34, cpa_pia35;
+	     cpa_clock_enable, cpa_clock_flag, cpa_pc_chg_enable, cpa_pdl_ov,
+	     cpa_arov_enable, cpa_pia33, cpa_pia34, cpa_pia35;
+
+	bool iot_go;
 
 	/* ?? */
 	bool mq36;
-	bool iot_go, a_long, uuo_f1;
+	bool a_long, uuo_f1;
 
 	/* sbr flip-flops */
 	bool if1a;
@@ -145,7 +172,7 @@ struct Apr {
 
 	bool fac2;
 	bool fac_inh, fc_e, fc_e_pse;
-	bool e_long, mb_pc_sto, pc_set;
+	bool pc_set;
 	bool sc_e, sac_inh, sac2;
 
 	/* needed for the emulation */
