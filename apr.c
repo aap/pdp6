@@ -10,6 +10,7 @@ trace(char *fmt, ...)
 	if(!dotrace)
 		return;
 	va_start(ap, fmt);
+	printf("  ");
 	vfprintf(stdout, fmt, ap);
 	va_end(ap);
 }
@@ -54,6 +55,10 @@ swap(word *a, word *b)
 #define IR_FSB ((apr->inst & 0770) == 0150)
 #define IR_FMP ((apr->inst & 0770) == 0160)
 #define IR_FDV ((apr->inst & 0770) == 0170)
+#define IR_FP_DIR ((apr->inst & 0743) == 0140)
+#define IR_FP_REM ((apr->inst & 0743) == 0141)
+#define IR_FP_MEM ((apr->inst & 0743) == 0142)
+#define IR_FP_BOTH ((apr->inst & 0743) == 0143)
 
 // 5-8
 #define FWT_MOVS ((apr->inst & 0770) == 0200)
@@ -61,22 +66,28 @@ swap(word *a, word *b)
 // 5-9
 #define FWT_SWAP (apr->ir_fwt && (apr->inst & 014) == 004)
 #define FWT_NEGATE (FWT_MOVNM && ((apr->inst & 04) == 0 || apr->ar & SGN))
-// 5-4
-#define FC_C_ACRT (apr->inst == POP || apr->inst == POPJ)
-#define FC_C_ACLT (apr->inst == JRA || apr->inst == BLT)
 
 // 5-8
 #define IR_MUL ((apr->inst & 0770) == 0220)
 #define IR_DIV ((apr->inst & 0770) == 0230)
-#define MD_FC_E (apr->ir_md && (apr->inst & 03) != 1)
-#define MD_FAC2 (IR_DIV && (apr->inst & 04) == 04)
+#define IR_MD_FC_E (apr->ir_md && (apr->inst & 03) != 1)
+#define IR_MD_FAC2 (IR_DIV && apr->ir & H6)
+#define IR_MD_SC_E (apr->ir_md && apr->ir & H7)
+#define IR_MD_SAC_INH (apr->ir_md && (apr->ir & (H7|H8)) == H7)
+#define IR_MD_SAC2 ((IR_DIV || IR_MUL && apr->ir & H6) && !IR_MD_SAC_INH)
 
 // 6-20
 #define SH_AC2 (apr->inst == ASHC || apr->inst == ROTC || apr->inst == LSHC)
 
 // 5-10
-#define AS_ADD (apr->ir_as && (apr->inst & 04) == 0)
-#define AS_SUB (apr->ir_as && apr->inst & 04)
+#define AS_ADD (apr->ir_as && !(apr->ir & H6))
+#define AS_SUB (apr->ir_as && apr->ir & H6)
+
+// 5-8
+#define IR_254_7 ((apr->inst & 0774) == 0254)
+// 6-18
+#define BLT_DONE (apr->pi_req || !(apr->mq & F0))
+#define BLT_LAST (apr->inst == BLT && !(apr->mq & F0))
 
 // 5-10
 #define JP_JMP (apr->ir_jp && apr->inst != PUSH && apr->inst != POP)
@@ -84,69 +95,6 @@ swap(word *a, word *b)
 // 6-3
 #define MB_PC_STO (apr->inst == PUSHJ || apr->inst == JSR || \
                    apr->inst == JSP || apr->ir_jrst)
-
-void
-decode_2xx(Apr *apr)
-{
-	apr->ir_fwt = FWT_MOVS || FWT_MOVNM;
-	apr->fwt_00 = apr->fwt_01 = apr->fwt_10 = apr->fwt_11 = 0;
-	if(apr->ir_fwt){
-		// 5-9
-		apr->fwt_00 = (apr->inst & 03) == 0;
-		apr->fwt_01 = (apr->inst & 03) == 1;
-		apr->fwt_10 = (apr->inst & 03) == 2;
-		apr->fwt_11 = (apr->inst & 03) == 3;
-		if(apr->fwt_00 || apr->fwt_01 || apr->fwt_11)
-			apr->fac_inh = 1;	// 5-4
-		if(apr->fwt_00)
-			apr->fc_e = 1;		// 5-4
-		if(apr->fwt_11)
-			apr->fc_e_pse = 1;	// 5-4
-		if(apr->fwt_10)
-			apr->sac_inh = apr->sc_e = 1;
-	}
-
-	apr->ir_md = (apr->inst & 0760) == 0220;
-	if(apr->ir_md){
-		if(MD_FC_E)
-			apr->fc_e = 1;		// 5-4
-		if((apr->inst & 03) == 2)
-			apr->sac_inh = 1;
-		if(apr->inst & 02)
-			apr->sc_e = 1;
-		if(MD_FAC2)
-			apr->fac2 = 1;		// 5-4
-		if(((apr->inst & 0774) == 0224 || (apr->inst & 0770) == 0230) &&
-		   !apr->sac_inh)
-			apr->sac2 = 1;
-	}
-
-	apr->shift_op = (apr->inst & 0770) == 0240 &&
-	               (apr->inst & 03) != 3;		// 6-20
-	if(SH_AC2)
-		apr->fac2 = apr->sac2 = 1;		// 5-4
-
-	if(apr->inst == EXCH)
-		apr->fc_e_pse = 1;			// 5-4
-	if((apr->inst & 0774) == 0254)
-		apr->fac_inh = 1;			// 5-4
-	if(apr->inst == XCT)
-		apr->fac_inh = apr->fc_e = 1;		// 5-4
-
-	apr->ir_jp = (apr->inst & 0770) == 0260;
-	if(apr->ir_jp){
-		if(apr->inst == PUSHJ)
-			apr->sc_e = 1;
-		if(apr->inst == PUSH)
-			apr->sc_e = apr->fc_e = 1;		// 5-4
-		if(apr->inst == JSP || apr->inst == JSR)
-			apr->fac_inh = 1;	// 5-4
-		if(apr->inst == POP || apr->inst == JSR || apr->inst == JSA)
-			apr->sc_e = 1;
-	}
-
-	apr->ir_as = (apr->inst & 0770) == 0270;
-}
 
 // 5-9
 #define IR_ACCP_MEMAC ((apr->inst & 0700) == 0300)
@@ -206,46 +154,24 @@ decodeir(Apr *apr)
 {
 	apr->inst = apr->ir>>9 & 0777;
 	apr->io_inst = apr->ir & 0700340;
-	apr->fac_inh = 0;
-	apr->fc_e = 0;
-	apr->fc_e_pse = 0;
-	apr->sc_e = 0;
-	apr->sac_inh = 0;
-	apr->sac2 = 0;
-
-
-	if(CH_INC_OP || CH_N_INC_OP || CH_LOAD)
-		apr->fac_inh = 1;		// 5-4
-	if(CH_N_INC_OP || CH_LOAD)
-		apr->fc_e = 1;			// 5-4
-	if(CH_DEP || CH_INC_OP)
-		apr->fc_e_pse = 1;		// 5-4
-	if(CH_DEP)
-		apr->sac_inh = 1;
-
 
 	apr->ir_fp = (apr->inst & 0740) == 0140;
-	if(apr->ir_fp){
-		apr->fc_e = 1;		// 5-4
-		if(apr->inst & 02)	/* M, B */
-			apr->sc_e = 1;
-		if((apr->inst & 03) == 2)
-			apr->sac_inh = 1;
-		if((apr->inst & 03) == 1)
-			apr->sac2 = 1;
-	}
 
-	decode_2xx(apr);	// 5-8
-
-	/* ACCP v MEMAC */
-	if(IR_ACCP_MEMAC){
-		if(MEMAC_MEM)
-			apr->fac_inh = apr->fc_e_pse = 1;	// 5-4
-		if(ACCP_DIR)
-			apr->fc_e = 1;				// 5-4
-		if(ACCP)
-			apr->sac_inh = 1;
+	/* 2xx */
+	apr->ir_fwt = FWT_MOVS || FWT_MOVNM;
+	apr->fwt_00 = apr->fwt_01 = apr->fwt_10 = apr->fwt_11 = 0;
+	if(apr->ir_fwt){
+		// 5-9
+		apr->fwt_00 = (apr->inst & 03) == 0;
+		apr->fwt_01 = (apr->inst & 03) == 1;
+		apr->fwt_10 = (apr->inst & 03) == 2;
+		apr->fwt_11 = (apr->inst & 03) == 3;
 	}
+	apr->ir_md = (apr->inst & 0760) == 0220;
+	apr->shift_op = (apr->inst & 0770) == 0240 &&
+	               (apr->inst & 03) != 3;		// 6-20
+	apr->ir_jp = (apr->inst & 0770) == 0260;
+	apr->ir_as = (apr->inst & 0770) == 0270;
 
 	/* BOOLE */
 	apr->boole_as_00 = apr->boole_as_01 = 0;
@@ -263,14 +189,6 @@ decodeir(Apr *apr)
 		apr->hwt_01 = (apr->inst & 03) == 1;
 		apr->hwt_10 = (apr->inst & 03) == 2;
 		apr->hwt_11 = (apr->inst & 03) == 3;
-		if(apr->hwt_00)
-			apr->fc_e = 1;		// 5-4
-		if(apr->hwt_11)
-			apr->fac_inh = 1;	// 5-4
-		if(apr->hwt_10 || apr->hwt_11)
-			apr->fc_e_pse = 1;	// 5-4
-		if(apr->hwt_10)
-			apr->sac_inh = 1;
 	}
 
 	if(apr->ir_boole || apr->ir_as){
@@ -278,25 +196,10 @@ decodeir(Apr *apr)
 		apr->boole_as_01 = (apr->inst & 03) == 1;
 		apr->boole_as_10 = (apr->inst & 03) == 2;
 		apr->boole_as_11 = (apr->inst & 03) == 3;
-		if(apr->boole_as_00)
-			apr->fc_e = 1;		// 5-4
-		if(apr->boole_as_10 || apr->boole_as_11)
-			apr->fc_e_pse = 1;	// 5-4
-		if(apr->boole_as_10)
-			apr->sac_inh = 1;
 	}
 
 	/* ACBM */
 	apr->ir_acbm = (apr->inst & 0700) == 0600;	// 5-8
-	if(apr->ir_acbm){
-		if(ACBM_DIR)
-			apr->fc_e = 1;		// 5-4
-		if(!(apr->inst & 060))
-			apr->sac_inh = 1;
-	}
-
-	if(!(apr->ir & 0740) && (apr->fwt_11 || apr->hwt_11 || MEMAC_MEM))
-		apr->sac_inh = 1;
 
 	// 5-13
 	apr->ex_ir_uuo =
@@ -305,15 +208,6 @@ decodeir(Apr *apr)
 		JRST_A && (apr->ir & 0000600) && apr->ex_user;
 	apr->ir_jrst = !apr->ex_ir_uuo && JRST_A;		// 5-8
 	apr->ir_iot = !apr->ex_ir_uuo && IOT_A;			// 5-8
-
-	if(apr->ex_ir_uuo || apr->ir_iot)
-		apr->fac_inh = 1;			// 5-4
-	if(IOT_BLK)
-		apr->fc_e_pse = 1;			// 5-4
-	if(IOT_DATAO)					// 8-1
-		apr->fc_e = 1;				// 5-4
-	if(apr->ir_iot && (apr->ir & 0140) == 040)	/* DATAI, CONI */
-		apr->sc_e = 1;
 }
 
 void
@@ -483,10 +377,12 @@ relocate(Apr *apr)
 	return ma_ok;
 }
 
+pulse(kt1);
 pulse(kt4);
 pulse(mc_rs_t0);
 pulse(mc_addr_ack);
 pulse(key_rd_wr_ret);
+pulse(it0);
 pulse(it1);
 pulse(at0);
 pulse(at1);
@@ -770,7 +666,7 @@ pulse(ar_ast0){
 #define IA_NOT_INT ((!apr->pi_req || apr->pi_cyc) && !apr->ia_inh)
 // 8-4
 #define PI_BLK_RST (!apr->pi_ov && IOT_DATAIO)
-#define PI_RST (apr->ir_jrst && apr->ir & 0400 || PI_BLK_RST && apr->pi_cyc)
+#define PI_RST (apr->ir_jrst && apr->ir & H9 || PI_BLK_RST && apr->pi_cyc)
 #define PI_HOLD ((!apr->ir_iot || PI_BLK_RST) && apr->pi_cyc)
 
 pulse(pir_stb){
@@ -807,25 +703,82 @@ pulse(pi_sync){
  * Store
  */
 
+// 5-6
+#define SC_E (apr->inst == PUSHJ || apr->inst == PUSH || apr->inst == POP || \
+              apr->inst == JSR || apr->inst == JSA || IOT_DATAI || IOT_CONI || \
+              apr->fwt_10 || IR_MD_SC_E || IR_FP_MEM || IR_FP_BOTH)
+#define SAC0 ((apr->ir & 0740) == 0)
+#define SAC_INH_IF_AC_0 (SAC0 && (apr->fwt_11 || apr->hwt_11 || MEMAC_MEM))
+#define SAC_INH (apr->boole_as_10 || apr->hwt_10 || BLT_LAST || ACCP || \
+                 apr->inst == JSR || apr->fwt_10 || ACBM_DN || apr->ir_iot || \
+                 IR_MD_SAC_INH || CH_DEP || IR_FP_MEM || IR_254_7 || \
+                 SAC_INH_IF_AC_0)
+#define SAC2 (SH_AC2 || IR_FP_MEM || IR_MD_SAC2)
+
 pulse(st7){
 	trace("ST7\n");
+	apr->sf7 = 0;		// 5-6
+	if(apr->run)
+		nextpulse(apr, apr->key_ex_st || apr->key_dep_st ? kt1 : it0);	// 5-1, 5-3
+	if(apr->key_start || apr->key_readin || apr->key_inst_cont)
+		nextpulse(apr, kt4);	// 5-2
+}
+
+pulse(st6a){
+	trace("ST6A\n");
+	apr->sf7 = 1;		// 5-6
+}
+
+pulse(st6){
+	trace("ST6\n");
+	/* We know SAC2 is asserted
+	 * so clamp to fast memory addresses */
+	apr->ma = apr->ma+1 & 017;	// 7-3
+	apr->mb = apr->mq;		// 6-3
+	nextpulse(apr, st6a);		// 5-6
+	nextpulse(apr, mc_wr_rq_pulse);	// 7-8
+}
+
+pulse(st5a){
+	trace("ST5A\n");
+	apr->sf5a = 0;				// 5-6
+	nextpulse(apr, SAC2 ? st6 : st7);	// 5-6
+}
+
+pulse(st5){
+	trace("ST5\n");
+	apr->sf5a = 1;			// 5-6
+	apr->ma |= apr->ir>>5 & 017;	// 7-3
+	apr->mb = apr->ar;		// 6-3
+	nextpulse(apr, mc_wr_rq_pulse);	// 7-8
+}
+
+pulse(st3a){
+	trace("ST3A\n");
+	nextpulse(apr, st5);
 }
 
 pulse(st3){
 	trace("ST3\n");
-	apr->sf3 = 0;
+	apr->sf3 = 0;			// 5-6
+	if(SAC_INH)
+		nextpulse(apr, st7);	// 5-6
+	else{
+		apr->ma = 0;		// 7-3
+		nextpulse(apr, st3a);	// 5-6
+	}
 }
 
 pulse(st2){
 	trace("ST2\n");
-	apr->sf3 = 1;
-	nextpulse(apr, mc_rd_wr_rs_pulse);
+	apr->sf3 = 1;		// 5-6
+	nextpulse(apr, mc_rd_wr_rs_pulse);	// 7-8
 }
 
 pulse(st1){
 	trace("ST1\n");
-	apr->sf3 = 1;
-	nextpulse(apr, mc_wr_rq_pulse);
+	apr->sf3 = 1;		// 5-6
+	nextpulse(apr, mc_wr_rq_pulse);	// 7-8
 }
 
 /*
@@ -858,6 +811,7 @@ pulse(st1){
                 MB_PC_STO || PC_INC_ET9 || IOT_CONSO || IR_ACCP_MEMAC)
 
 pulse(et10){
+	bool sc_e = SC_E;
 	trace("ET10\n");
 
 	if(PI_HOLD){
@@ -867,7 +821,7 @@ pulse(et10){
 	}
 	if(apr->inst == PUSH || apr->inst == PUSHJ || apr->ir_jrst)
 		apr->ma |= apr->mb & RT;		// 7-3
-	if((apr->fc_e_pse || apr->sc_e) &&
+	if((apr->fc_e_pse || sc_e) &&
 	   !(apr->ir_jp || apr->inst == EXCH || CH_DEP))
 		apr->mb = apr->ar;			// 6-3
 	if(apr->ir_jp && !(apr->ir & H6))
@@ -890,9 +844,9 @@ pulse(et10){
 	}
 	if(apr->inst == JFCL)
 		ar_jfcl_clr(apr);			// 6-10
-	nextpulse(apr, apr->sc_e     ? st1 :
-                       apr->fc_e_pse ? st2 :
-                                       st3);
+	nextpulse(apr, sc_e          ? st1 :		// 5-6
+                       apr->fc_e_pse ? st2 :		// 5-6
+                                       st3);		// 5-6
 }
 
 pulse(et9){
@@ -901,7 +855,7 @@ pulse(et9){
 	trace("ET9\n");
 	pc_inc = PC_INC_ET9;
 	if(pc_inc)
-		apr->pc = apr->pc+1 & FW;	// 5-12
+		apr->pc = apr->pc+1 & RT;	// 5-12
 	if((apr->pc_set || pc_inc) && !(apr->ir_jrst && apr->ir & H11)){
 		apr->ar_pc_chg_flag = 1;	// 6-10
 		if(apr->cpa_pc_chg_enable)	// 8-1
@@ -1007,7 +961,7 @@ pulse(et3){
 	trace("ET3\n");
 
 	if(apr->ex_ir_uuo){
-		apr->mb = apr->ir & 0777740 | 037;	// 6-3, 6-1
+		apr->mb |= apr->ir & 0777740 << 18;	// 6-3, 6-1
 		apr->ma |= F30;				// 7-3
 	}
 
@@ -1041,9 +995,9 @@ pulse(et1){
 		apr->ex_ill_op = 1;		// 5-13
 		apr->mb &= RT;			// 6-3
 	}
-	if(apr->ir_jrst && apr->ir & 040)
+	if(apr->ir_jrst && apr->ir & H12)
 		apr->ex_mode_sync = 1;		// 5-13
-	if(apr->ir_jrst && apr->ir & 0100)
+	if(apr->ir_jrst && apr->ir & H11)
 		ar_flag_set(apr);		// 6-10
 	if(PI_RST)
 		clear_pih(apr);			// 8-4
@@ -1090,7 +1044,7 @@ pulse(et0){
 	apr->ar_cry0 = 0;	// 6-10
 	apr->ar_cry1 = 0;	// 6-10
 	ar_cry(apr);
-	if(apr->ir_jrst && apr->ir & 0100)
+	if(apr->ir_jrst && apr->ir & H11)
 		ar_flag_clr(apr);		// 6-10
 	// TODO: subroutines
 }
@@ -1099,13 +1053,13 @@ pulse(et0a){
 	trace("ET0A\n");
 
 	if(PI_HOLD)
-		set_pih(apr, apr->pih = apr->pi_req);	// 8-3, 8-4
+		set_pih(apr, apr->pi_req);	// 8-3, 8-4
 	if(apr->key_ex_sync)
 		apr->key_ex_st = 1;		// 5-1
 	if(apr->key_dep_sync)
 		apr->key_dep_st = 1;		// 5-1
 	if(apr->key_inst_stop ||
-	   apr->ir_jrst && apr->ir & 0200 && !apr->ex_user)
+	   apr->ir_jrst && apr->ir & H10 && !apr->ex_user)
 		apr->run = 0;			// 5-1
 
 	if(apr->ir_boole && (apr->ir_boole_op == 00 ||
@@ -1144,6 +1098,23 @@ pulse(et0a){
  * MB = [0?],E or (E)
  */
 
+// 5-4
+#define FAC_INH (apr->hwt_11 || apr->fwt_00 || apr->fwt_01 || apr->fwt_11 || \
+                 apr->inst == XCT || apr->ex_ir_uuo || \
+                 apr->inst == JSP || apr->inst == JSR || \
+                 apr->ir_iot || IR_254_7 || MEMAC_MEM || \
+                 CH_LOAD || CH_INC_OP || CH_N_INC_OP)
+#define FAC2 (SH_AC2 || IR_MD_FAC2)
+#define FC_C_ACRT (apr->inst == POP || apr->inst == POPJ)
+#define FC_C_ACLT (apr->inst == JRA || apr->inst == BLT)
+#define FC_E (apr->hwt_00 || apr->fwt_00 || apr->inst == XCT || \
+              apr->inst == PUSH || IOT_DATAO || apr->ir_fp || \
+              IR_MD_FC_E || CH_LOAD || CH_N_INC_OP || \
+              ACCP_DIR || ACBM_DIR || apr->boole_as_00)
+#define FC_E_PSE (apr->hwt_10 || apr->hwt_11 || apr->fwt_11 || \
+                  IOT_BLK || apr->inst == EXCH || CH_DEP || CH_INC_OP || \
+                  MEMAC_MEM || apr->boole_as_10 || apr->boole_as_11)
+
 pulse(ft7){
 	trace("FT7\n");
 	apr->f6a = 1;			// 5-4
@@ -1167,8 +1138,10 @@ pulse(ft6){
 
 pulse(ft5){
 	trace("FT5\n");
+	// cache this because we need it again in ET10
+	apr->fc_e_pse = FC_E_PSE;
 	apr->ma = apr->mb & RT;		// 7-3
-	nextpulse(apr, apr->fc_e ?     ft6 :	// 5-4
+	nextpulse(apr, FC_E          ? ft6 :	// 5-4
                        apr->fc_e_pse ? ft7 :	// 5-4
                                        ft6a);	// 5-4
 }
@@ -1198,8 +1171,9 @@ pulse(ft3){
 pulse(ft1a){
 	trace("FT1A\n");
 	bool acltrt = FC_C_ACLT || FC_C_ACRT;
+	bool fac2 = FAC2;
 	apr->f1a = 0;				// 5-4
-	if(apr->fac2)
+	if(fac2)
 		apr->ma = apr->ma+1 & 017;	// 7-1, 7-3
 	else
 		apr->ma = 0;			// 7-3
@@ -1207,21 +1181,21 @@ pulse(ft1a){
 		swap(&apr->mb, &apr->ar);	// 6-3
 	if(FC_C_ACLT)
 		SWAPLTRT(apr->mb);		// 6-3
-	nextpulse(apr, apr->fac2 ? ft4 :	// 5-4
-                       acltrt    ? ft3 :	// 5-4
-                                   ft5);	// 5-4
+	nextpulse(apr, fac2   ? ft4 :	// 5-4
+                       acltrt ? ft3 :	// 5-4
+                              ft5);	// 5-4
 }
 
 pulse(ft1){
 	trace("FT1\n");
-	apr->ma = apr->ir>>5 & 017;	// 7-3
+	apr->ma |= apr->ir>>5 & 017;	// 7-3
 	apr->f1a = 1;			// 5-4
 	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
 }
 
 pulse(ft0){
 	trace("FT0\n");
-	nextpulse(apr, apr->fac_inh ? ft5 : ft1);	// 5-4
+	nextpulse(apr, FAC_INH ? ft5 : ft1);	// 5-4
 }
 
 /*
@@ -1232,7 +1206,7 @@ pulse(at5){
 	trace("AT5\n");
 //	apr->a_long = 1;		// ?? nowhere to be found
 	apr->af0 = 1;			// 5-3
-	apr->ma = apr->mb & RT;		// 7-3
+	apr->ma |= apr->mb & RT;	// 7-3
 	apr->ir &= ~037;		// 5-7
 	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
 }
@@ -1358,7 +1332,9 @@ pulse(mc_rs_t1){
 		apr->mi = apr->mb;		// 7-7
 
 	if(apr->key_rd_wr) nextpulse(apr, key_rd_wr_ret);	// 5-2
-	if(apr->sf3) nextpulse(apr, st3);
+	if(apr->sf7) nextpulse(apr, st7);			// 5-6
+	if(apr->sf5a) nextpulse(apr, st5a);			// 5-6
+	if(apr->sf3) nextpulse(apr, st3);			// 5-6
 	if(apr->f6a) nextpulse(apr, ft6a);			// 5-4
 	if(apr->f4a) nextpulse(apr, ft4a);			// 5-4
 	if(apr->f1a) nextpulse(apr, ft1a);			// 5-4

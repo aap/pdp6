@@ -170,10 +170,8 @@ struct Apr {
 	bool ir_acbm;
 	bool ex_ir_uuo, ir_iot, ir_jrst;
 
-	bool fac2;
-	bool fac_inh, fc_e, fc_e_pse;
+	bool fc_e_pse;
 	bool pc_set;
-	bool sc_e, sac_inh, sac2;
 
 	/* needed for the emulation */
 	int extpulse;
