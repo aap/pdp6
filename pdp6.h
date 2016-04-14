@@ -4,6 +4,9 @@
 #include <stdarg.h>
 
 #define nelem(a) (sizeof(a)/sizeof(a[0]))
+#define nil NULL
+#define print printf
+#define fprint fprintf
 
 typedef uint64_t word;
 typedef uint32_t hword;
@@ -188,6 +191,7 @@ void nextpulse(Apr *apr, Pulse *p);
 void *aprmain(void *p);
 
 void initmem(void);
+void dumpmem(void);
 void wakemem(void);
 // 7-2, 7-10
 enum {

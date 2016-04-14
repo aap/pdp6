@@ -1,4 +1,5 @@
 #include "pdp6.h"
+#include <ctype.h>
 
 word memory[256*1024];
 //hword maxmem = 256*1024;
@@ -8,30 +9,48 @@ word membus0, membus1;
 word *hold;
 
 void
-initfmem(void)
+readmem(char *file, word *mem, word size)
 {
 	FILE *f;
-	word w;
+	char buf[100], *s;
 	hword a;
-	if(f = fopen("fmem", "r"), f == NULL)
+	if(f = fopen(file, "r"), f == nil)
 		return;
-	for(a = 0; a < 16 && fscanf(f, "%lo", &w) != EOF; a++)
-		fmem[a] = w;
+	a = 0;
+	while(s = fgets(buf, 100, f)){
+		while(*s){
+			if(*s == ':')
+				a = strtol(s+1, &s, 8);
+			else if('0' <= *s && *s <= '7' &&
+				a < size)
+				mem[a++] = strtol(s, &s, 8);
+			else
+				s++;
+		}
+	}
 	fclose(f);
 }
 
 void
 initmem(void)
 {
-	FILE *f;
-	word w;
+	readmem("mem", memory, maxmem);
+	readmem("fmem", fmem, 16);
+}
+
+void
+dumpmem(void)
+{
 	hword a;
-	if(f = fopen("mem", "r"), f == NULL)
+	FILE *f;
+
+	if(f = fopen("memdump", "w"), f == nil)
 		return;
-	for(a = 0; a < maxmem && fscanf(f, "%lo", &w) != EOF; a++)
-		memory[a] = w;
+	for(a = 0; a < 16; a++)
+		fprint(f, ":%02o %012llo\n", a, fmem[a]);
+	for(a = 0; a < maxmem; a++)
+		fprint(f, ":%06o %012llo\n", a, memory[a]);
 	fclose(f);
-	initfmem();
 }
 
 /* When a cycle is requested we acknowledge the address

@@ -775,6 +775,7 @@ error:
 				      mbev->x, mbev->y);
 				break;
 			case SDL_QUIT:
+				dumpmem();
 				SDL_Quit();
 				return 0;
 			}
