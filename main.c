@@ -636,6 +636,9 @@ main()
 	Light *l;
 	Switch *sw;
 
+//	void testinst(Apr*);
+//	testinst(&apr);
+
 	if(SDL_Init(SDL_INIT_VIDEO) < 0){
 error:
 		fprintf(stderr, "error: %s\n", SDL_GetError());

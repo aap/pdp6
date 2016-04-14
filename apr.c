@@ -41,7 +41,7 @@ swap(word *a, word *b)
 #define IR_FPCH ((apr->inst & 0700) == 0100)
 
 // 6-19
-#define CH_INC ((apr->inst == CAO || apr->inst == LDCI || DPCI) && !apr->chf5)
+#define CH_INC ((apr->inst == CAO || apr->inst == LDCI || apr->inst == DPCI) && !apr->chf5)
 #define CH_INC_OP (CH_INC && !apr->chf7)
 #define CH_N_INC_OP ((apr->inst == LDC || apr->inst == DPC) && !apr->chf5 ||\
               CH_INC && apr->chf7)
@@ -713,7 +713,7 @@ pulse(pi_sync){
                  apr->inst == JSR || apr->fwt_10 || ACBM_DN || apr->ir_iot || \
                  IR_MD_SAC_INH || CH_DEP || IR_FP_MEM || IR_254_7 || \
                  SAC_INH_IF_AC_0)
-#define SAC2 (SH_AC2 || IR_FP_MEM || IR_MD_SAC2)
+#define SAC2 (SH_AC2 || IR_FP_REM || IR_MD_SAC2)
 
 pulse(st7){
 	trace("ST7\n");
@@ -1633,4 +1633,44 @@ aprmain(void *p)
 	}
 	printf("power off\n");
 	return NULL;
+}
+
+
+#include "inst.h"
+
+
+void
+testinst(Apr *apr)
+{
+	int inst;
+
+	for(inst = 0; inst < 0700; inst++){
+//	for(inst = 0140; inst < 0141; inst++){
+		apr->ir = inst << 9 | 1 << 5;
+		decodeir(apr);
+		printf("%06o %6s ", apr->ir, names[inst]);
+/*
+		printf("%s ", FAC_INH ? "FAC_INH" : "       ");
+		printf("%s ", FAC2 ? "FAC2" : "    ");
+		printf("%s ", FC_C_ACRT ? "FC_C_ACRT" : "         ");
+		printf("%s ", FC_C_ACLT ? "FC_C_ACLT" : "         ");
+		printf("%s ", FC_E ? "FC_E" : "    ");
+*/
+		printf("%s ", FC_E_PSE ? "FC_E_PSE" : "        ");
+		printf("%s ", SC_E ? "SC_E" : "    ");
+		printf("%s ", SAC_INH ? "SAC_INH" : "       ");
+		printf("%s ", SAC2 ? "SAC2" : "    ");
+		printf("\n");
+// FC_E_PSE
+//printf("FC_E_PSE: %d %d %d %d %d %d %d %d %d %d\n", apr->hwt_10 , apr->hwt_11 , apr->fwt_11 , \
+//                  IOT_BLK , apr->inst == EXCH , CH_DEP , CH_INC_OP , \
+//                  MEMAC_MEM , apr->boole_as_10 , apr->boole_as_11);
+//printf("CH: %d %d %d %d %d\n", CH_INC, CH_INC_OP, CH_N_INC_OP, CH_LOAD, CH_DEP);
+//printf("FAC_INH: %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+//	apr->hwt_11 , apr->fwt_00 , apr->fwt_01 , apr->fwt_11 ,
+//	apr->inst == XCT , apr->ex_ir_uuo ,
+//	apr->inst == JSP , apr->inst == JSR ,
+//	apr->ir_iot , IR_254_7 , MEMAC_MEM ,
+//	CH_LOAD , CH_INC_OP , CH_N_INC_OP);
+	}
 }
