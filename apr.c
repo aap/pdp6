@@ -1,4 +1,6 @@
 #include "pdp6.h"
+#include "inst.h"
+
 
 int dotrace = 1;
 Apr apr;
@@ -10,7 +12,7 @@ trace(char *fmt, ...)
 	if(!dotrace)
 		return;
 	va_start(ap, fmt);
-	printf("  ");
+	print("  ");
 	vfprintf(stdout, fmt, ap);
 	va_end(ap);
 }
@@ -154,6 +156,16 @@ decodeir(Apr *apr)
 {
 	apr->inst = apr->ir>>9 & 0777;
 	apr->io_inst = apr->ir & 0700340;
+
+	// 5-7
+	iobus1 &= ~0377770;
+	iobus1 |= apr->ir & H3 ? IOBUS_IOS3_1 : IOBUS_IOS3_0;
+	iobus1 |= apr->ir & H4 ? IOBUS_IOS4_1 : IOBUS_IOS4_0;
+	iobus1 |= apr->ir & H5 ? IOBUS_IOS5_1 : IOBUS_IOS5_0;
+	iobus1 |= apr->ir & H6 ? IOBUS_IOS6_1 : IOBUS_IOS6_0;
+	iobus1 |= apr->ir & H7 ? IOBUS_IOS7_1 : IOBUS_IOS7_0;
+	iobus1 |= apr->ir & H8 ? IOBUS_IOS8_1 : IOBUS_IOS8_0;
+	iobus1 |= apr->ir & H9 ? IOBUS_IOS9_1 : IOBUS_IOS9_0;
 
 	apr->ir_fp = (apr->inst & 0740) == 0140;
 
@@ -389,6 +401,7 @@ pulse(at1);
 pulse(at3a);
 pulse(iat0);
 pulse(et4);
+pulse(et5);
 pulse(et10);
 pulse(mc_wr_rs);
 pulse(mc_rd_rq_pulse);
@@ -457,6 +470,8 @@ pulse(mr_clr){
 	mp_clr(apr);
 	// TODO: DS CLR
 
+	apr->iot_go = 0;	// 8-1
+
 	/* sbr flip-flops */
 	apr->key_rd_wr = 0;	// 5-2
 	apr->if1a = 0;		// 5-3
@@ -480,7 +495,9 @@ pulse(ex_clr){
 
 pulse(mr_start){
 	trace("MR START\n");
-	// IOB RESET
+
+	// 8-1
+	iobus1 |= IOBUS_IOB_RESET;
 
 	// 8-5
 	apr->cpa_iot_user = 0;
@@ -520,7 +537,44 @@ pulse(mr_pwr_clr){
  * IOT
  */
 
+pulse(iot_t3a){
+	trace("IOT T3A\n");
+	// TODO: figure out reset
+	iobus1 &= ~IOBUS_PULSES;
+	// we don't actually use T4
+}
+
+pulse(iot_t3){
+	trace("IOT T3\n");
+	// 8-1
+	if(IOT_DATAO)
+		iobus1 |= IOBUS_DATAO_SET;
+	if(IOT_CONO)
+		iobus1 |= IOBUS_CONO_SET;
+	nextpulse(apr, et5);		// 5-5
+}
+
+pulse(iot_t2){
+	trace("IOT T2\n");
+	// 8-1
+	apr->iot_go = 0;
+	if(IOT_OUTGOING)
+		iobus0 |= apr->ar;
+	if(IOT_DATAO)
+		iobus1 |= IOBUS_DATAO_CLEAR;
+	if(IOT_CONO)
+		iobus1 |= IOBUS_CONO_CLEAR;
+	if(IOT_STATUS)
+		iobus1 |= IOBUS_IOB_STATUS;
+	if(IOT_DATAI)
+		iobus1 |= IOBUS_IOB_DATAI;
+	/* order matters */
+	nextpulse(apr, iot_t3);
+	nextpulse(apr, iot_t3a);
+}
+
 pulse(iot_t0){
+	trace("IOT T0\n");
 }
 
 /*
@@ -717,6 +771,7 @@ pulse(pi_sync){
 
 pulse(st7){
 	trace("ST7\n");
+	trace("\n");
 	apr->sf7 = 0;		// 5-6
 	if(apr->run)
 		nextpulse(apr, apr->key_ex_st || apr->key_dep_st ? kt1 : it0);	// 5-1, 5-3
@@ -948,10 +1003,10 @@ pulse(et4){
 	if(FWT_SWAP || IOT_BLK || apr->ir_acbm)
 		swap(&apr->mb, &apr->ar);	// 6-3
 
-	if(apr->ir_iot && ~IOT_BLK)
-		apr->iot_go = 1;		// 8-1
 	if(IOT_BLK)
 		nextpulse(apr, iot_t0);		// 8-1
+	else if(apr->ir_iot)
+		apr->iot_go = 1;		// 8-1
 
 	if(!ET5_INH)
 		nextpulse(apr, et5);		// 5-5
@@ -1050,7 +1105,10 @@ pulse(et0){
 }
 
 pulse(et0a){
+	static int gen = 0;
 	trace("ET0A\n");
+	if((apr->inst & 0700) != 0700)
+		print("%d %s\n", gen++, names[apr->inst]);
 
 	if(PI_HOLD)
 		set_pih(apr, apr->pi_req);	// 8-3, 8-4
@@ -1575,7 +1633,7 @@ void
 nextpulse(Apr *apr, Pulse *p)
 {
 	if(apr->nnextpulses >= MAXPULSE){
-		fprintf(stderr, "error: too many next pulses\n");
+		fprint(stderr, "error: too many next pulses\n");
 		exit(1);
 	}
 	apr->nlist[apr->nnextpulses++] = p;
@@ -1607,6 +1665,7 @@ aprmain(void *p)
 		/* KEY MANUAL */
 		if(apr->extpulse & 1){
 			apr->extpulse &= ~1;
+print("KEY MANUAL\n");
 			nextpulse(apr, key_manual);
 		}
 		/* KEY INST STOP */
@@ -1616,6 +1675,26 @@ aprmain(void *p)
 			// cleared after PI SYNC
 			apr->ia_inh = 1;
 		}
+
+
+		/* This is simplified, we have no IOT RESET,
+		 * IOT INIT SET UP or IOT FINAL SETUP really */
+		if(apr->iot_go)
+			nextpulse(apr, iot_t2);
+		/* pulse through IO bus */
+		if(iobus1 & IOBUS_PULSES){
+			int dev = 0;
+			if(iobus1 & IOBUS_IOS3_1) dev |= 0100;
+			if(iobus1 & IOBUS_IOS4_1) dev |= 0040;
+			if(iobus1 & IOBUS_IOS5_1) dev |= 0020;
+			if(iobus1 & IOBUS_IOS6_1) dev |= 0010;
+			if(iobus1 & IOBUS_IOS7_1) dev |= 0004;
+			if(iobus1 & IOBUS_IOS8_1) dev |= 0002;
+			if(iobus1 & IOBUS_IOS9_1) dev |= 0001;
+			print("device %o\n", dev);
+		}
+
+
 		if(membus0 & MEMBUS_MAI_ADDR_ACK){
 			membus0 &= ~MEMBUS_MAI_ADDR_ACK;
 			apr->extpulse &= ~4;
@@ -1631,12 +1710,9 @@ aprmain(void *p)
 				nextpulse(apr, mc_non_exist_mem);	// 7-9
 		}
 	}
-	printf("power off\n");
+	print("power off\n");
 	return NULL;
 }
-
-
-#include "inst.h"
 
 
 void
@@ -1648,25 +1724,25 @@ testinst(Apr *apr)
 //	for(inst = 0140; inst < 0141; inst++){
 		apr->ir = inst << 9 | 1 << 5;
 		decodeir(apr);
-		printf("%06o %6s ", apr->ir, names[inst]);
+		print("%06o %6s ", apr->ir, names[inst]);
 /*
-		printf("%s ", FAC_INH ? "FAC_INH" : "       ");
-		printf("%s ", FAC2 ? "FAC2" : "    ");
-		printf("%s ", FC_C_ACRT ? "FC_C_ACRT" : "         ");
-		printf("%s ", FC_C_ACLT ? "FC_C_ACLT" : "         ");
-		printf("%s ", FC_E ? "FC_E" : "    ");
+		print("%s ", FAC_INH ? "FAC_INH" : "       ");
+		print("%s ", FAC2 ? "FAC2" : "    ");
+		print("%s ", FC_C_ACRT ? "FC_C_ACRT" : "         ");
+		print("%s ", FC_C_ACLT ? "FC_C_ACLT" : "         ");
+		print("%s ", FC_E ? "FC_E" : "    ");
 */
-		printf("%s ", FC_E_PSE ? "FC_E_PSE" : "        ");
-		printf("%s ", SC_E ? "SC_E" : "    ");
-		printf("%s ", SAC_INH ? "SAC_INH" : "       ");
-		printf("%s ", SAC2 ? "SAC2" : "    ");
-		printf("\n");
+		print("%s ", FC_E_PSE ? "FC_E_PSE" : "        ");
+		print("%s ", SC_E ? "SC_E" : "    ");
+		print("%s ", SAC_INH ? "SAC_INH" : "       ");
+		print("%s ", SAC2 ? "SAC2" : "    ");
+		print("\n");
 // FC_E_PSE
-//printf("FC_E_PSE: %d %d %d %d %d %d %d %d %d %d\n", apr->hwt_10 , apr->hwt_11 , apr->fwt_11 , \
+//print("FC_E_PSE: %d %d %d %d %d %d %d %d %d %d\n", apr->hwt_10 , apr->hwt_11 , apr->fwt_11 , \
 //                  IOT_BLK , apr->inst == EXCH , CH_DEP , CH_INC_OP , \
 //                  MEMAC_MEM , apr->boole_as_10 , apr->boole_as_11);
-//printf("CH: %d %d %d %d %d\n", CH_INC, CH_INC_OP, CH_N_INC_OP, CH_LOAD, CH_DEP);
-//printf("FAC_INH: %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+//print("CH: %d %d %d %d %d\n", CH_INC, CH_INC_OP, CH_N_INC_OP, CH_LOAD, CH_DEP);
+//print("FAC_INH: %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
 //	apr->hwt_11 , apr->fwt_00 , apr->fwt_01 , apr->fwt_11 ,
 //	apr->inst == XCT , apr->ex_ir_uuo ,
 //	apr->inst == JSP , apr->inst == JSR ,

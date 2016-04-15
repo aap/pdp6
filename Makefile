@@ -2,7 +2,7 @@ SRC=main.c apr.c mem.c io.c
 # clang
 #CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses \
 #        -Wno-bitwise-op-parentheses
-CFLAGS=  \
+CFLAGS=  -g -Os \
 	-fno-diagnostics-show-caret \
         -L/usr/local/lib -I/usr/local/include -lSDL -lSDL_image -lpthread
 

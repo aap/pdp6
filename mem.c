@@ -14,17 +14,22 @@ readmem(char *file, word *mem, word size)
 	FILE *f;
 	char buf[100], *s;
 	hword a;
+	word w;
 	if(f = fopen(file, "r"), f == nil)
 		return;
 	a = 0;
 	while(s = fgets(buf, 100, f)){
 		while(*s){
-			if(*s == ':')
-				a = strtol(s+1, &s, 8);
-			else if('0' <= *s && *s <= '7' &&
-				a < size)
-				mem[a++] = strtol(s, &s, 8);
-			else
+			if(*s == ';')
+				break;
+			else if('0' <= *s && *s <= '7'){
+				w = strtol(s, &s, 8);
+				if(*s == ':'){
+					a = w;
+					s++;
+				}else
+					mem[a++] = w;
+			}else
 				s++;
 		}
 	}
@@ -47,9 +52,13 @@ dumpmem(void)
 	if(f = fopen("memdump", "w"), f == nil)
 		return;
 	for(a = 0; a < 16; a++)
-		fprint(f, ":%02o %012llo\n", a, fmem[a]);
-	for(a = 0; a < maxmem; a++)
-		fprint(f, ":%06o %012llo\n", a, memory[a]);
+		fprint(f, "%02o: %012llo\n", a, fmem[a]);
+	for(a = 0; a < maxmem; a++){
+		if(memory[a]){
+			fprint(f, "%06o: ", a);
+			fprint(f, "%012llo\n", memory[a]);
+		}
+	}
 	fclose(f);
 }
 
@@ -74,13 +83,13 @@ wakemem(void)
 		membus0 |= MEMBUS_MAI_ADDR_ACK;
 		hold = membus0 & MEMBUS_MA_FMC_SEL1 ? &fmem[a] : &memory[a];
 		if(membus0 & MEMBUS_RD_RQ){
-			membus1 = *hold;
+			membus1 = *hold & FW;
 			membus0 |= MEMBUS_MAI_RD_RS;
 			hold = NULL;
 		}
 	}
 	if(membus0 & MEMBUS_MAI_WR_RS && hold){
-		*hold = membus1;
+		*hold = membus1 & FW;
 		membus0 &= ~MEMBUS_MAI_WR_RS;
 		hold = NULL;
 	}
