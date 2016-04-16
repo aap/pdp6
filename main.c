@@ -712,9 +712,9 @@ error:
 	mi_lght   = l; l += 36;
 	pc_lght   = l; l += 18;
 	ma_lght   = l; l += 18;
-	pio_lght  = l; l += 7;
-	pir_lght  = l; l += 7;
 	pih_lght  = l; l += 7;
+	pir_lght  = l; l += 7;
+	pio_lght  = l; l += 7;
 	rest_lght = l;
 	sw = switches;
 	data_sw      = sw; sw += 36;
@@ -783,9 +783,9 @@ error:
 		setlights(apr.mi, mi_lght, 36);
 		setlights(apr.pc, pc_lght, 18);
 		setlights(apr.ma, ma_lght, 18);
+		setlights(apr.pih, pih_lght, 7);
 		setlights(apr.pio, pio_lght, 7);
 		setlights(apr.pir, pir_lght, 7);
-		setlights(apr.pih, pih_lght, 7);
 		rest_lght[4].state = apr.run;
 		rest_lght[5].state = apr.mc_stop;
 		rest_lght[6].state = apr.pi_active;

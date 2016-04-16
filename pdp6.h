@@ -215,6 +215,7 @@ enum {
 	MEMBUS_MAI_RD_RS    = 0200000000000,
 	MEMBUS_MAI_ADDR_ACK = 0400000000000,
 };
+/* 0 is cable 1 & 2 (above bits); 1 is cable 3 & 4 (data) */
 extern word membus0, membus1;
 
 // 7-10
@@ -249,9 +250,12 @@ enum {
 	IOBUS_MC_DR_SPLIT = F3,
 	IOBUS_POWER_ON    = F1,
 	IOBUS_IOB_RESET   = F0,
-	IOBUS_PULSES = IOBUS_IOB_RESET |
-		IOBUS_IOB_STATUS | IOBUS_IOB_DATAI |
-		IOBUS_CONO_SET | IOBUS_CONO_CLEAR |
-		IOBUS_DATAO_SET | IOBUS_DATAO_CLEAR
+	IOBUS_PULSES = IOBUS_CONO_SET | IOBUS_CONO_CLEAR |
+	               IOBUS_DATAO_SET | IOBUS_DATAO_CLEAR
 };
+/* 0 is cable 1 & 2 (data); 1 is cable 3 & 4 (above bits) */
 extern word iobus0, iobus1;
+
+/* every entry is a function to wake up the device */
+/* TODO: how to handle multiple APRs? */
+void (*iobusmap[128])(void);

@@ -158,7 +158,7 @@ decodeir(Apr *apr)
 	apr->io_inst = apr->ir & 0700340;
 
 	// 5-7
-	iobus1 &= ~0377770;
+	iobus1 &= ~037777000000;
 	iobus1 |= apr->ir & H3 ? IOBUS_IOS3_1 : IOBUS_IOS3_0;
 	iobus1 |= apr->ir & H4 ? IOBUS_IOS4_1 : IOBUS_IOS4_0;
 	iobus1 |= apr->ir & H5 ? IOBUS_IOS5_1 : IOBUS_IOS5_0;
@@ -527,30 +527,41 @@ pulse(mr_start){
 pulse(mr_pwr_clr){
 	trace("MR PWR CLR\n");
 	apr->run = 0;	// 5-1
-	/* order matters because of EX PI SYNC */
+	/* order matters because of EX PI SYNC,
+	 * better call directly before external pulses can trigger stuff */
 	// TODO: is this correct then?
-	nextpulse(apr, mr_start);	// 5-2
-	nextpulse(apr, mr_clr);		// 5-2
+	mr_start(apr);	// 5-2
+	mr_clr(apr);	// 5-2
 }
 
 /*
  * IOT
+ * Here be dragons.
  */
+
+pulse(iot_t4){
+	trace("IOT T3A\n");
+	/* Clear what was set in IOT T2 */
+	iobus1 &= ~(IOBUS_IOB_STATUS | IOBUS_IOB_DATAI);
+	iobus0 = 0;
+}
 
 pulse(iot_t3a){
 	trace("IOT T3A\n");
-	// TODO: figure out reset
-	iobus1 &= ~IOBUS_PULSES;
-	// we don't actually use T4
+	/* delay before reset in IOT T4. Otherwise bus will be
+	 * reset before bus-pulses triggered by IOT T3 are executed. */
+	nextpulse(apr, iot_t4);
 }
 
 pulse(iot_t3){
 	trace("IOT T3\n");
 	// 8-1
+	/* Pulses, cleared in the main loop. */
 	if(IOT_DATAO)
 		iobus1 |= IOBUS_DATAO_SET;
 	if(IOT_CONO)
 		iobus1 |= IOBUS_CONO_SET;
+	apr->ar |= iobus0;		// 6-8
 	nextpulse(apr, et5);		// 5-5
 }
 
@@ -558,17 +569,19 @@ pulse(iot_t2){
 	trace("IOT T2\n");
 	// 8-1
 	apr->iot_go = 0;
+	/* These are asserted during INIT SETUP, IOT T2 and FINAL SETUP.
+	 * We clear them in IOT T3A which happens after FINAL SETUP */
 	if(IOT_OUTGOING)
 		iobus0 |= apr->ar;
-	if(IOT_DATAO)
-		iobus1 |= IOBUS_DATAO_CLEAR;
-	if(IOT_CONO)
-		iobus1 |= IOBUS_CONO_CLEAR;
 	if(IOT_STATUS)
 		iobus1 |= IOBUS_IOB_STATUS;
 	if(IOT_DATAI)
 		iobus1 |= IOBUS_IOB_DATAI;
-	/* order matters */
+	/* Pulses, cleared in the main loop. */
+	if(IOT_DATAO)
+		iobus1 |= IOBUS_DATAO_CLEAR;
+	if(IOT_CONO)
+		iobus1 |= IOBUS_CONO_CLEAR;
 	nextpulse(apr, iot_t3);
 	nextpulse(apr, iot_t3a);
 }
@@ -1630,6 +1643,75 @@ pulse(key_manual){
 }
 
 void
+wake_cpa(void)
+{
+	print("CPA woken\n");
+}
+
+void
+wake_pi(void)
+{
+	// 8-4, 8-5
+	if(iobus1 & IOBUS_IOB_STATUS){
+		trace("PI STATUS %llo\n", iobus0);
+		if(apr.pi_active) iobus0 |= F28;
+		iobus0 |= apr.pio;
+	}
+
+	// 8-4, 8-3
+	if(iobus1 & IOBUS_CONO_CLEAR){
+		trace("PI CONO CLEAR %llo\n", iobus0);
+		if(iobus0 & F23)
+			// can call directly
+			pi_reset(&apr);
+	}
+	if(iobus1 & IOBUS_CONO_SET){
+		trace("PI CONO SET %llo\n", iobus0);
+		if(iobus0 & F24)
+			set_pir(&apr, apr.pir | iobus0&0177);
+		if(iobus0 & F25)
+			apr.pio |= iobus0&0177;
+		if(iobus0 & F26)
+			apr.pio &= ~(iobus0&0177);
+		if(iobus0 & F27)
+			apr.pi_active = 0;
+		if(iobus0 & F28)
+			apr.pi_active = 1;
+	}
+}
+
+/*
+void
+handleio(void)
+{
+	if(iobus1 & IOBUS_IOB_STATUS)
+		print("IOB <- STATUS\n");
+	if(iobus1 & IOBUS_IOB_DATAI)
+		print("IOB <- DATAI\n");
+	if(iobus1 & IOBUS_CONO_SET){
+		print("CONO SET\n");
+		iobus1 &= ~IOBUS_CONO_SET;
+	}
+	if(iobus1 & IOBUS_CONO_CLEAR){
+		print("CONO CLEAR\n");
+		iobus1 &= ~IOBUS_CONO_CLEAR;
+	}
+	if(iobus1 & IOBUS_DATAO_SET){
+		print("DATAO SET\n");
+		iobus1 &= ~IOBUS_DATAO_SET;
+	}
+	if(iobus1 & IOBUS_DATAO_CLEAR){
+		print("DATAO CLEAR\n");
+		iobus1 &= ~IOBUS_DATAO_CLEAR;
+	}
+	if(iobus1 & IOBUS_IOB_RESET){
+		print("IOB RESET\n");
+		iobus1 &= ~IOBUS_IOB_RESET;
+	}
+}
+*/
+
+void
 nextpulse(Apr *apr, Pulse *p)
 {
 	if(apr->nnextpulses >= MAXPULSE){
@@ -1653,6 +1735,10 @@ aprmain(void *p)
 	apr->nnextpulses = 0;
 	apr->ia_inh = 0;
 
+	// TODO: move this somewhere else
+	iobusmap[0] = wake_cpa;
+	iobusmap[1] = wake_pi;
+
 	nextpulse(apr, mr_pwr_clr);
 	while(apr->sw_power){
 		apr->ncurpulses = apr->nnextpulses;
@@ -1665,7 +1751,8 @@ aprmain(void *p)
 		/* KEY MANUAL */
 		if(apr->extpulse & 1){
 			apr->extpulse &= ~1;
-print("KEY MANUAL\n");
+			// BUG: without a print somewhere the thing doesn't work :(
+			print("KEY MANUAL\n");
 			nextpulse(apr, key_manual);
 		}
 		/* KEY INST STOP */
@@ -1681,8 +1768,11 @@ print("KEY MANUAL\n");
 		 * IOT INIT SET UP or IOT FINAL SETUP really */
 		if(apr->iot_go)
 			nextpulse(apr, iot_t2);
-		/* pulse through IO bus */
-		if(iobus1 & IOBUS_PULSES){
+		/* pulse and signals through IO bus */
+		if(iobus1 & IOBUS_IOB_RESET){
+			iobus1 &= ~IOBUS_IOB_RESET;
+		}
+		if(iobus1 & (IOBUS_PULSES | IOBUS_IOB_STATUS | IOBUS_IOB_DATAI)){
 			int dev = 0;
 			if(iobus1 & IOBUS_IOS3_1) dev |= 0100;
 			if(iobus1 & IOBUS_IOS4_1) dev |= 0040;
@@ -1691,9 +1781,12 @@ print("KEY MANUAL\n");
 			if(iobus1 & IOBUS_IOS7_1) dev |= 0004;
 			if(iobus1 & IOBUS_IOS8_1) dev |= 0002;
 			if(iobus1 & IOBUS_IOS9_1) dev |= 0001;
-			print("device %o\n", dev);
+			print("bus active for %o\n", dev<<2);
+			if(iobusmap[dev])
+				iobusmap[dev]();
+			// TODO: clear IOB STATUS and IOB DATAI too?
+			iobus1 &= ~IOBUS_PULSES;
 		}
-
 
 		if(membus0 & MEMBUS_MAI_ADDR_ACK){
 			membus0 &= ~MEMBUS_MAI_ADDR_ACK;
