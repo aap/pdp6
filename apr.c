@@ -315,6 +315,34 @@ set_pih(Apr *apr, int pih)
 	apr->pi_req = get_pi_req(apr);
 }
 
+/* Recalculate the PI requests on the IO bus from each device */
+void
+recalc_req(void)
+{
+	int i;
+	int req;
+	req = 0;
+	for(i = 0; i < 128; i++)
+		req |= ioreq[i];
+	iobus1 = iobus1&~0177 | req&0177;
+}
+
+void
+recalc_cpa_req(Apr *apr)
+{
+	u8 req = 0;
+	// 8-5
+	if(apr->cpa_illeg_op || apr->cpa_non_exist_mem || apr->cpa_pdl_ov ||
+	   apr->cpa_clock_flag && apr->cpa_clock_enable ||
+	   apr->ar_pc_chg_flag && apr->cpa_pc_chg_enable ||
+	   apr->ar_ov_flag && apr->cpa_arov_enable)
+		req = apr->cpa_pia;
+	if(ioreq[0] != req){
+		ioreq[0] = req;
+		recalc_req();
+	}
+}
+
 void
 set_mc_rq(Apr *apr, bool value)
 {
@@ -489,8 +517,13 @@ pulse(mr_clr){
 }
 
 pulse(ex_clr){
-	apr->pr = 0;		// 5-13, 7-4
-	apr->rlr = 0;		// 5-13, 7-5
+	apr->pr = 0;		// 7-4
+	apr->rlr = 0;		// 7-5
+}
+
+pulse(ex_set){
+	apr->pr  = (iobus0 >> 28) & 0377;	// 7-4
+	apr->rlr = (iobus0 >> 10) & 0377;	// 7-5
 }
 
 pulse(mr_start){
@@ -508,9 +541,8 @@ pulse(mr_start){
 	apr->cpa_pc_chg_enable = 0;
 	apr->cpa_pdl_ov = 0;
 	apr->cpa_arov_enable = 0;
-	apr->cpa_pia33 = 0;
-	apr->cpa_pia34 = 0;
-	apr->cpa_pia35 = 0;
+	apr->cpa_pia = 0;
+	ioreq[0] = 0;
 
 	// PI
 	apr->pi_ov = 0;		// 8-4
@@ -903,12 +935,11 @@ pulse(et10){
 	if(apr->ir_fwt && !apr->ar_cry0 && apr->ar_cry1 ||
 	   (MEMAC || apr->ir_as) && AR_OV_SET){
 		apr->ar_ov_flag = 1;			// 6-10
-		if(apr->cpa_arov_enable)
-			; // TODO
+		recalc_cpa_req(apr);
 	}
 	if(apr->ir_jp && !(apr->ir & H6) && apr->ar_cry0){
 		apr->cpa_pdl_ov = 1;			// 8-5
-		; // TODO
+		recalc_cpa_req(apr);
 	}
 	if(apr->inst == JFCL)
 		ar_jfcl_clr(apr);			// 6-10
@@ -926,8 +957,7 @@ pulse(et9){
 		apr->pc = apr->pc+1 & RT;	// 5-12
 	if((apr->pc_set || pc_inc) && !(apr->ir_jrst && apr->ir & H11)){
 		apr->ar_pc_chg_flag = 1;	// 6-10
-		if(apr->cpa_pc_chg_enable)	// 8-1
-			;
+		recalc_cpa_req(apr);
 	}
 
 	if(apr->ir_acbm || apr->ir_jp && apr->inst != JSR)
@@ -1454,7 +1484,7 @@ pulse(mc_non_exist_mem_rst){
 pulse(mc_non_exist_mem){
 	trace("MC NON EXIST MEM\n");
 	apr->cpa_non_exist_mem = 1;			// 8-5
-	// TODO: IOB PI REQ CPA PIA
+	recalc_cpa_req(apr);
 	if(!apr->sw_mem_disable)
 		nextpulse(apr, mc_non_exist_mem_rst);	// 7-9
 }
@@ -1462,7 +1492,7 @@ pulse(mc_non_exist_mem){
 pulse(mc_illeg_address){
 	trace("MC ILLEG ADDRESS\n");
 	apr->cpa_illeg_op = 1;				// 8-5
-	// TODO: IOB PI REQ CPA PIA
+	recalc_cpa_req(apr);
 	nextpulse(apr, st7);				// 5-6
 }
 
@@ -1645,27 +1675,67 @@ pulse(key_manual){
 void
 wake_cpa(void)
 {
-	print("CPA woken\n");
+	// 8-5
+	if(IOB_STATUS){
+		if(apr.cpa_pdl_ov)        iobus0 |= F19;
+		if(apr.cpa_iot_user)      iobus0 |= F20;
+		if(apr.ex_user)           iobus0 |= F21;
+		if(apr.cpa_illeg_op)      iobus0 |= F22;
+		if(apr.cpa_non_exist_mem) iobus0 |= F23;
+		if(apr.cpa_clock_enable)  iobus0 |= F25;
+		if(apr.cpa_clock_flag)    iobus0 |= F26;
+		if(apr.cpa_pc_chg_enable) iobus0 |= F28;
+		if(apr.ar_pc_chg_flag)    iobus0 |= F29;
+		if(apr.cpa_arov_enable)   iobus0 |= F31;
+		if(apr.ar_ov_flag)        iobus0 |= F32;
+		iobus0 |= apr.cpa_pia & 7;
+	}
+	if(IOB_CONO_SET){
+		if(iobus0 & F18) apr.cpa_pdl_ov = 0;
+		if(iobus0 & F19) iobus1 |= IOBUS_IOB_RESET;	// 8-1
+		if(iobus0 & F22) apr.cpa_illeg_op = 0;
+		if(iobus0 & F23) apr.cpa_non_exist_mem = 0;
+		if(iobus0 & F24) apr.cpa_clock_enable = 0;
+		if(iobus0 & F25) apr.cpa_clock_enable = 1;
+		if(iobus0 & F26) apr.cpa_clock_flag = 0;
+		if(iobus0 & F27) apr.cpa_pc_chg_enable = 0;
+		if(iobus0 & F28) apr.cpa_pc_chg_enable = 1;
+		if(iobus0 & F29) apr.ar_pc_chg_flag = 0;	// 6-10
+		if(iobus0 & F30) apr.cpa_arov_enable = 0;
+		if(iobus0 & F31) apr.cpa_arov_enable = 1;
+		if(iobus0 & F32) apr.ar_ov_flag = 0;		// 6-10
+		apr.cpa_pia = iobus0 & 7;
+		recalc_cpa_req(&apr);
+	}
+
+	// 5-2
+	if(IOB_DATAI)
+		apr.ar = apr.data;
+	// 5-13
+	if(IOB_DATAO_CLEAR)
+		ex_clr(&apr);
+	if(IOB_DATAO_SET)
+		ex_set(&apr);
 }
 
 void
 wake_pi(void)
 {
 	// 8-4, 8-5
-	if(iobus1 & IOBUS_IOB_STATUS){
+	if(IOB_STATUS){
 		trace("PI STATUS %llo\n", iobus0);
 		if(apr.pi_active) iobus0 |= F28;
 		iobus0 |= apr.pio;
 	}
 
 	// 8-4, 8-3
-	if(iobus1 & IOBUS_CONO_CLEAR){
+	if(IOB_CONO_CLEAR){
 		trace("PI CONO CLEAR %llo\n", iobus0);
 		if(iobus0 & F23)
 			// can call directly
 			pi_reset(&apr);
 	}
-	if(iobus1 & IOBUS_CONO_SET){
+	if(IOB_CONO_SET){
 		trace("PI CONO SET %llo\n", iobus0);
 		if(iobus0 & F24)
 			set_pir(&apr, apr.pir | iobus0&0177);
@@ -1769,9 +1839,6 @@ aprmain(void *p)
 		if(apr->iot_go)
 			nextpulse(apr, iot_t2);
 		/* pulse and signals through IO bus */
-		if(iobus1 & IOBUS_IOB_RESET){
-			iobus1 &= ~IOBUS_IOB_RESET;
-		}
 		if(iobus1 & (IOBUS_PULSES | IOBUS_IOB_STATUS | IOBUS_IOB_DATAI)){
 			int dev = 0;
 			if(iobus1 & IOBUS_IOS3_1) dev |= 0100;
@@ -1786,6 +1853,9 @@ aprmain(void *p)
 				iobusmap[dev]();
 			// TODO: clear IOB STATUS and IOB DATAI too?
 			iobus1 &= ~IOBUS_PULSES;
+		}
+		if(iobus1 & IOBUS_IOB_RESET){
+			iobus1 &= ~IOBUS_IOB_RESET;
 		}
 
 		if(membus0 & MEMBUS_MAI_ADDR_ACK){

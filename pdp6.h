@@ -139,7 +139,7 @@ struct Apr {
 
 	bool cpa_iot_user, cpa_illeg_op, cpa_non_exist_mem,
 	     cpa_clock_enable, cpa_clock_flag, cpa_pc_chg_enable, cpa_pdl_ov,
-	     cpa_arov_enable, cpa_pia33, cpa_pia34, cpa_pia35;
+	     cpa_arov_enable, cpa_pia;
 
 	bool iot_go;
 
@@ -256,6 +256,15 @@ enum {
 /* 0 is cable 1 & 2 (data); 1 is cable 3 & 4 (above bits) */
 extern word iobus0, iobus1;
 
+#define IOB_DATAO_CLEAR (iobus1 & IOBUS_DATAO_CLEAR)
+#define IOB_DATAO_SET (iobus1 & IOBUS_DATAO_SET)
+#define IOB_CONO_CLEAR (iobus1 & IOBUS_CONO_CLEAR)
+#define IOB_CONO_SET (iobus1 & IOBUS_CONO_SET)
+#define IOB_STATUS (iobus1 & IOBUS_IOB_STATUS)
+#define IOB_DATAI (iobus1 & IOBUS_IOB_DATAI)
+
 /* every entry is a function to wake up the device */
 /* TODO: how to handle multiple APRs? */
-void (*iobusmap[128])(void);
+extern void (*iobusmap[128])(void);
+/* current PI req for each device */
+extern u8 ioreq[128];

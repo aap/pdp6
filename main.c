@@ -847,9 +847,9 @@ error:
 		ff_lght[26].state = apr.cpa_clock_flag;
 		ff_lght[27].state = apr.cpa_pc_chg_enable;
 		ff_lght[28].state = apr.cpa_arov_enable;
-		ff_lght[29].state = apr.cpa_pia33;
-		ff_lght[30].state = apr.cpa_pia34;
-		ff_lght[31].state = apr.cpa_pia35;
+		ff_lght[29].state = !!(apr.cpa_pia&4);
+		ff_lght[30].state = !!(apr.cpa_pia&2);
+		ff_lght[31].state = !!(apr.cpa_pia&1);
 		ff_lght[32].state = apr.pi_ov;
 		ff_lght[33].state = apr.pi_cyc;
 		ff_lght[34].state = !!apr.pi_req;
