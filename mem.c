@@ -66,6 +66,7 @@ dumpmem(void)
  * by pulsing the processor through the bus.
  * A read is completed immediately and signalled by a second pulse.
  * A write is completed on a second call. */
+// TODO: implement this properly... according to the manual
 void
 wakemem(void)
 {
@@ -85,12 +86,13 @@ wakemem(void)
 		if(membus0 & MEMBUS_RD_RQ){
 			membus1 = *hold & FW;
 			membus0 |= MEMBUS_MAI_RD_RS;
-			hold = NULL;
+			if(!(membus0 & MEMBUS_WR_RQ))
+				hold = NULL;
 		}
 	}
-	if(membus0 & MEMBUS_MAI_WR_RS && hold){
+	if(membus0 & MEMBUS_WR_RS && hold){
 		*hold = membus1 & FW;
-		membus0 &= ~MEMBUS_MAI_WR_RS;
+		membus0 &= ~MEMBUS_WR_RS;
 		hold = NULL;
 	}
 }

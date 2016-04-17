@@ -347,10 +347,9 @@ void
 set_mc_rq(Apr *apr, bool value)
 {
 	apr->mc_rq = value;		// 7-9
-	if(value && (apr->mc_rd || apr->mc_wr)){
+	if(value && (apr->mc_rd || apr->mc_wr))
 		membus0 |= MEMBUS_RQ_CYC;
-		wakemem();
-	}else
+	else
 		membus0 &= ~MEMBUS_RQ_CYC;
 }
 
@@ -424,6 +423,7 @@ pulse(mc_addr_ack);
 pulse(key_rd_wr_ret);
 pulse(it0);
 pulse(it1);
+pulse(ft0);
 pulse(at0);
 pulse(at1);
 pulse(at3a);
@@ -513,6 +513,7 @@ pulse(mr_clr){
 	apr->sf3 = 0;		// 5-6
 	apr->sf5a = 0;		// 5-6
 	apr->sf7 = 0;		// 5-6
+	apr->iot_f0a = 0;	// 8-1
 	apr->sct2_ret = NULL;
 }
 
@@ -564,6 +565,86 @@ pulse(mr_pwr_clr){
 	// TODO: is this correct then?
 	mr_start(apr);	// 5-2
 	mr_clr(apr);	// 5-2
+}
+
+/* CPA and PI devices */
+
+void
+wake_cpa(void)
+{
+	// 8-5
+	if(IOB_STATUS){
+		if(apr.cpa_pdl_ov)        iobus0 |= F19;
+		if(apr.cpa_iot_user)      iobus0 |= F20;
+		if(apr.ex_user)           iobus0 |= F21;
+		if(apr.cpa_illeg_op)      iobus0 |= F22;
+		if(apr.cpa_non_exist_mem) iobus0 |= F23;
+		if(apr.cpa_clock_enable)  iobus0 |= F25;
+		if(apr.cpa_clock_flag)    iobus0 |= F26;
+		if(apr.cpa_pc_chg_enable) iobus0 |= F28;
+		if(apr.ar_pc_chg_flag)    iobus0 |= F29;
+		if(apr.cpa_arov_enable)   iobus0 |= F31;
+		if(apr.ar_ov_flag)        iobus0 |= F32;
+		iobus0 |= apr.cpa_pia & 7;
+	}
+	if(IOB_CONO_SET){
+		if(iobus0 & F18) apr.cpa_pdl_ov = 0;
+		if(iobus0 & F19) iobus1 |= IOBUS_IOB_RESET;	// 8-1
+		if(iobus0 & F22) apr.cpa_illeg_op = 0;
+		if(iobus0 & F23) apr.cpa_non_exist_mem = 0;
+		if(iobus0 & F24) apr.cpa_clock_enable = 0;
+		if(iobus0 & F25) apr.cpa_clock_enable = 1;
+		if(iobus0 & F26) apr.cpa_clock_flag = 0;
+		if(iobus0 & F27) apr.cpa_pc_chg_enable = 0;
+		if(iobus0 & F28) apr.cpa_pc_chg_enable = 1;
+		if(iobus0 & F29) apr.ar_pc_chg_flag = 0;	// 6-10
+		if(iobus0 & F30) apr.cpa_arov_enable = 0;
+		if(iobus0 & F31) apr.cpa_arov_enable = 1;
+		if(iobus0 & F32) apr.ar_ov_flag = 0;		// 6-10
+		apr.cpa_pia = iobus0 & 7;
+		recalc_cpa_req(&apr);
+	}
+
+	// 5-2
+	if(IOB_DATAI)
+		apr.ar = apr.data;
+	// 5-13
+	if(IOB_DATAO_CLEAR)
+		ex_clr(&apr);
+	if(IOB_DATAO_SET)
+		ex_set(&apr);
+}
+
+void
+wake_pi(void)
+{
+	// 8-4, 8-5
+	if(IOB_STATUS){
+		trace("PI STATUS %llo\n", iobus0);
+		if(apr.pi_active) iobus0 |= F28;
+		iobus0 |= apr.pio;
+	}
+
+	// 8-4, 8-3
+	if(IOB_CONO_CLEAR){
+		trace("PI CONO CLEAR %llo\n", iobus0);
+		if(iobus0 & F23)
+			// can call directly
+			pi_reset(&apr);
+	}
+	if(IOB_CONO_SET){
+		trace("PI CONO SET %llo\n", iobus0);
+		if(iobus0 & F24)
+			set_pir(&apr, apr.pir | iobus0&0177);
+		if(iobus0 & F25)
+			apr.pio |= iobus0&0177;
+		if(iobus0 & F26)
+			apr.pio &= ~(iobus0&0177);
+		if(iobus0 & F27)
+			apr.pi_active = 0;
+		if(iobus0 & F28)
+			apr.pi_active = 1;
+	}
 }
 
 /*
@@ -618,8 +699,23 @@ pulse(iot_t2){
 	nextpulse(apr, iot_t3a);
 }
 
+pulse(iot_t0a){
+	trace("IOT T0A\n");
+	apr->iot_f0a = 0;			// 8-1
+	apr->ir |= H12;				// 5-8
+	decodeir(apr);
+	apr->ma = 0;				// 7-3
+	if(apr->pi_cyc && apr->ar_cry0)
+		apr->pi_ov = 1;			// 8-4
+	if(!apr->pi_cyc && !apr->ar_cry0)
+		apr->pc = apr->pc+1 & RT;	// 5-12
+	nextpulse(apr, ft0);			// 5-4
+}
+
 pulse(iot_t0){
 	trace("IOT T0\n");
+	apr->iot_f0a = 1;			// 8-1
+	nextpulse(apr, mc_rd_wr_rs_pulse);	// 7-8
 }
 
 /*
@@ -1147,11 +1243,25 @@ pulse(et0){
 	// TODO: subroutines
 }
 
+char *ionames[] = {
+	"BLKI",
+	"DATAI",
+	"BLKO",
+	"DATAO",
+	"CONO",
+	"CONI",
+	"CONSZ",
+	"CONSO"
+};
+
 pulse(et0a){
 	static int gen = 0;
 	trace("ET0A\n");
+	print("%o: ", apr->pc);
 	if((apr->inst & 0700) != 0700)
 		print("%d %s\n", gen++, names[apr->inst]);
+	else
+		print("%d %s\n", gen++, ionames[(apr->io_inst>>5) & 7]);
 
 	if(PI_HOLD)
 		set_pih(apr, apr->pi_req);	// 8-3, 8-4
@@ -1194,8 +1304,8 @@ pulse(et0a){
  * Fetch
  *
  * After this stage we have:
- * AR = (AC) (if AC is fetched)
- * MQ = (AC+1) or ((AC)LT|RT) if fetched
+ * AR = 0,E or (AC)
+ * MQ = 0; (AC+1) or ((AC)LT|RT) if fetched
  * MB = [0?],E or (E)
  */
 
@@ -1442,6 +1552,7 @@ pulse(mc_rs_t1){
 	if(apr->af0) nextpulse(apr, at0);			// 5-3
 	if(apr->af3) nextpulse(apr, at3);			// 5-3
 	if(apr->if1a) nextpulse(apr, it1a);			// 5-3
+	if(apr->iot_f0a) nextpulse(apr, iot_t0a);		// 8-1
 }
 
 pulse(mc_rs_t0){
@@ -1455,8 +1566,7 @@ pulse(mc_wr_rs){
 	if(apr->ma == apr->mas)
 		apr->mi = apr->mb;	// 7-7
 	membus1 = apr->mb;		// 7-8
-	membus0 |= MEMBUS_MAI_WR_RS;	// 7-8
-	wakemem();
+	membus0 |= MEMBUS_WR_RS;	// 7-8
 	if(!apr->mc_stop)
 		nextpulse(apr, mc_rs_t0);	// 7-8
 }
@@ -1673,115 +1783,6 @@ pulse(key_manual){
 }
 
 void
-wake_cpa(void)
-{
-	// 8-5
-	if(IOB_STATUS){
-		if(apr.cpa_pdl_ov)        iobus0 |= F19;
-		if(apr.cpa_iot_user)      iobus0 |= F20;
-		if(apr.ex_user)           iobus0 |= F21;
-		if(apr.cpa_illeg_op)      iobus0 |= F22;
-		if(apr.cpa_non_exist_mem) iobus0 |= F23;
-		if(apr.cpa_clock_enable)  iobus0 |= F25;
-		if(apr.cpa_clock_flag)    iobus0 |= F26;
-		if(apr.cpa_pc_chg_enable) iobus0 |= F28;
-		if(apr.ar_pc_chg_flag)    iobus0 |= F29;
-		if(apr.cpa_arov_enable)   iobus0 |= F31;
-		if(apr.ar_ov_flag)        iobus0 |= F32;
-		iobus0 |= apr.cpa_pia & 7;
-	}
-	if(IOB_CONO_SET){
-		if(iobus0 & F18) apr.cpa_pdl_ov = 0;
-		if(iobus0 & F19) iobus1 |= IOBUS_IOB_RESET;	// 8-1
-		if(iobus0 & F22) apr.cpa_illeg_op = 0;
-		if(iobus0 & F23) apr.cpa_non_exist_mem = 0;
-		if(iobus0 & F24) apr.cpa_clock_enable = 0;
-		if(iobus0 & F25) apr.cpa_clock_enable = 1;
-		if(iobus0 & F26) apr.cpa_clock_flag = 0;
-		if(iobus0 & F27) apr.cpa_pc_chg_enable = 0;
-		if(iobus0 & F28) apr.cpa_pc_chg_enable = 1;
-		if(iobus0 & F29) apr.ar_pc_chg_flag = 0;	// 6-10
-		if(iobus0 & F30) apr.cpa_arov_enable = 0;
-		if(iobus0 & F31) apr.cpa_arov_enable = 1;
-		if(iobus0 & F32) apr.ar_ov_flag = 0;		// 6-10
-		apr.cpa_pia = iobus0 & 7;
-		recalc_cpa_req(&apr);
-	}
-
-	// 5-2
-	if(IOB_DATAI)
-		apr.ar = apr.data;
-	// 5-13
-	if(IOB_DATAO_CLEAR)
-		ex_clr(&apr);
-	if(IOB_DATAO_SET)
-		ex_set(&apr);
-}
-
-void
-wake_pi(void)
-{
-	// 8-4, 8-5
-	if(IOB_STATUS){
-		trace("PI STATUS %llo\n", iobus0);
-		if(apr.pi_active) iobus0 |= F28;
-		iobus0 |= apr.pio;
-	}
-
-	// 8-4, 8-3
-	if(IOB_CONO_CLEAR){
-		trace("PI CONO CLEAR %llo\n", iobus0);
-		if(iobus0 & F23)
-			// can call directly
-			pi_reset(&apr);
-	}
-	if(IOB_CONO_SET){
-		trace("PI CONO SET %llo\n", iobus0);
-		if(iobus0 & F24)
-			set_pir(&apr, apr.pir | iobus0&0177);
-		if(iobus0 & F25)
-			apr.pio |= iobus0&0177;
-		if(iobus0 & F26)
-			apr.pio &= ~(iobus0&0177);
-		if(iobus0 & F27)
-			apr.pi_active = 0;
-		if(iobus0 & F28)
-			apr.pi_active = 1;
-	}
-}
-
-/*
-void
-handleio(void)
-{
-	if(iobus1 & IOBUS_IOB_STATUS)
-		print("IOB <- STATUS\n");
-	if(iobus1 & IOBUS_IOB_DATAI)
-		print("IOB <- DATAI\n");
-	if(iobus1 & IOBUS_CONO_SET){
-		print("CONO SET\n");
-		iobus1 &= ~IOBUS_CONO_SET;
-	}
-	if(iobus1 & IOBUS_CONO_CLEAR){
-		print("CONO CLEAR\n");
-		iobus1 &= ~IOBUS_CONO_CLEAR;
-	}
-	if(iobus1 & IOBUS_DATAO_SET){
-		print("DATAO SET\n");
-		iobus1 &= ~IOBUS_DATAO_SET;
-	}
-	if(iobus1 & IOBUS_DATAO_CLEAR){
-		print("DATAO CLEAR\n");
-		iobus1 &= ~IOBUS_DATAO_CLEAR;
-	}
-	if(iobus1 & IOBUS_IOB_RESET){
-		print("IOB RESET\n");
-		iobus1 &= ~IOBUS_IOB_RESET;
-	}
-}
-*/
-
-void
 nextpulse(Apr *apr, Pulse *p)
 {
 	if(apr->nnextpulses >= MAXPULSE){
@@ -1848,7 +1849,7 @@ aprmain(void *p)
 			if(iobus1 & IOBUS_IOS7_1) dev |= 0004;
 			if(iobus1 & IOBUS_IOS8_1) dev |= 0002;
 			if(iobus1 & IOBUS_IOS9_1) dev |= 0001;
-			print("bus active for %o\n", dev<<2);
+			//print("bus active for %o\n", dev<<2);
 			if(iobusmap[dev])
 				iobusmap[dev]();
 			// TODO: clear IOB STATUS and IOB DATAI too?
@@ -1858,6 +1859,16 @@ aprmain(void *p)
 			iobus1 &= ~IOBUS_IOB_RESET;
 		}
 
+		/* Pulses to memory */
+		if(membus0 & (MEMBUS_WR_RS | MEMBUS_RQ_CYC)){
+			wakemem();
+			/* Normally this should still be asserted but it
+			 * is interpreted as a pulse every loop iteration here.
+			 * Clearing it is a hack */
+			membus0 &= ~MEMBUS_RQ_CYC;
+		}
+
+		/* Pulses from memory */
 		if(membus0 & MEMBUS_MAI_ADDR_ACK){
 			membus0 &= ~MEMBUS_MAI_ADDR_ACK;
 			apr->extpulse &= ~4;
@@ -1872,6 +1883,8 @@ aprmain(void *p)
 			if(apr->mc_rq && !apr->mc_stop)
 				nextpulse(apr, mc_non_exist_mem);	// 7-9
 		}
+		if(i)
+			print("--------------\n");
 	}
 	print("power off\n");
 	return NULL;

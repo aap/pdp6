@@ -155,6 +155,7 @@ struct Apr {
 	bool chf5, chf7;
 	bool sf3, sf5a, sf7;
 	bool shf1;
+	bool iot_f0a;
 
 	/* temporaries */
 	bool ex_inh_rel;
@@ -211,7 +212,7 @@ enum {
 	MEMBUS_MA18_0       = 0002000000000,
 	MEMBUS_MA18_1       = 0004000000000,
 	MEMBUS_RQ_CYC       = 0020000000000,
-	MEMBUS_MAI_WR_RS    = 0100000000000,
+	MEMBUS_WR_RS        = 0100000000000,
 	MEMBUS_MAI_RD_RS    = 0200000000000,
 	MEMBUS_MAI_ADDR_ACK = 0400000000000,
 };
@@ -257,11 +258,11 @@ enum {
 extern word iobus0, iobus1;
 
 #define IOB_DATAO_CLEAR (iobus1 & IOBUS_DATAO_CLEAR)
-#define IOB_DATAO_SET (iobus1 & IOBUS_DATAO_SET)
-#define IOB_CONO_CLEAR (iobus1 & IOBUS_CONO_CLEAR)
-#define IOB_CONO_SET (iobus1 & IOBUS_CONO_SET)
-#define IOB_STATUS (iobus1 & IOBUS_IOB_STATUS)
-#define IOB_DATAI (iobus1 & IOBUS_IOB_DATAI)
+#define IOB_DATAO_SET   (iobus1 & IOBUS_DATAO_SET)
+#define IOB_CONO_CLEAR  (iobus1 & IOBUS_CONO_CLEAR)
+#define IOB_CONO_SET    (iobus1 & IOBUS_CONO_SET)
+#define IOB_STATUS      (iobus1 & IOBUS_IOB_STATUS)
+#define IOB_DATAI       (iobus1 & IOBUS_IOB_DATAI)
 
 /* every entry is a function to wake up the device */
 /* TODO: how to handle multiple APRs? */
