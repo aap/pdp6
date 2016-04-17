@@ -156,6 +156,7 @@ struct Apr {
 	bool sf3, sf5a, sf7;
 	bool shf1;
 	bool iot_f0a;
+	bool blt_f0a, blt_f3a, blt_f5a;
 
 	/* temporaries */
 	bool ex_inh_rel;

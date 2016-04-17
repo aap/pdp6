@@ -424,6 +424,7 @@ pulse(key_rd_wr_ret);
 pulse(it0);
 pulse(it1);
 pulse(ft0);
+pulse(ft1a);
 pulse(at0);
 pulse(at1);
 pulse(at3a);
@@ -437,6 +438,9 @@ pulse(mc_split_rd_rq);
 pulse(mc_wr_rq_pulse);
 pulse(mc_rdwr_rq_pulse);
 pulse(mc_rd_wr_rs_pulse);
+pulse(ar_pm1_t1);
+pulse(ar_ast0);
+pulse(pir_stb);
 
 // TODO: find A LONG, it probably doesn't exist
 
@@ -514,6 +518,9 @@ pulse(mr_clr){
 	apr->sf5a = 0;		// 5-6
 	apr->sf7 = 0;		// 5-6
 	apr->iot_f0a = 0;	// 8-1
+	apr->blt_f0a = 0;	// 6-18
+	apr->blt_f3a = 0;	// 6-18
+	apr->blt_f5a = 0;	// 6-18
 	apr->sct2_ret = NULL;
 }
 
@@ -719,6 +726,77 @@ pulse(iot_t0){
 }
 
 /*
+ * BLT subroutine
+ */
+
+pulse(blt_t6){
+	trace("BLT T6\n");
+	swap(&apr->mb, &apr->ar);	// 6-3
+	nextpulse(apr, ft1a);		// 5-4
+}
+
+pulse(blt_t5a){
+	trace("BLT T5A\n");
+	apr->blt_f5a = 0;			// 6-18
+	if(!(apr->mq & F0))
+		apr->pc = apr->pc+1 & RT;	// 5-12
+	nextpulse(apr, BLT_DONE ? et10 : blt_t6);	// 5-5, 6-18
+}
+
+pulse(blt_t5){
+	trace("BLT T5\n");
+	swap(&apr->mb, &apr->mq);	// 6-17
+	apr->blt_f5a = 1;		// 6-18
+	nextpulse(apr, ar_pm1_t1);	// 6-9
+}
+
+pulse(blt_t4){
+	trace("BLT T4\n");
+	swap(&apr->mb, &apr->ar);	// 6-3
+	nextpulse(apr, pir_stb);	// 8-4
+	nextpulse(apr, blt_t5);		// 6-18
+}
+
+pulse(blt_t3a){
+	trace("BLT T3A\n");
+	apr->blt_f3a = 0;		// 6-18
+	swap(&apr->mb, &apr->mq);	// 6-17
+	nextpulse(apr, blt_t4);		// 6-18
+}
+
+pulse(blt_t3){
+	trace("BLT T3\n");
+	apr->blt_f3a = 1;		// 6-18
+	nextpulse(apr, ar_ast0);	// 6-9
+}
+
+pulse(blt_t2){
+	trace("BLT T2\n");
+	apr->ar &= RT;			// 6-8
+	nextpulse(apr, blt_t3);		// 6-18
+}
+
+pulse(blt_t1){
+	trace("BLT T1\n");
+	swap(&apr->mb, &apr->ar);	// 6-3
+	nextpulse(apr, blt_t2);		// 6-18
+}
+
+pulse(blt_t0a){
+	trace("BLT T0A\n");
+	apr->blt_f0a = 0;		// 6-18
+	apr->mb = apr->mq;		// 6-3
+	nextpulse(apr, blt_t1);		// 6-18
+}
+
+pulse(blt_t0){
+	trace("BLT T0\n");
+	swap(&apr->mb, &apr->mq);	// 6-17
+	apr->blt_f0a = 1;		// 6-18
+	nextpulse(apr, mc_wr_rq_pulse);	// 7-8
+}
+
+/*
  * Shift subroutines
  */
 
@@ -799,6 +877,8 @@ pulse(art3){
 
 	if(apr->af3a) nextpulse(apr, at3a);		// 5-3
 	if(apr->et4_ar_pse) nextpulse(apr, et4);	// 5-5
+	if(apr->blt_f3a) nextpulse(apr, blt_t3a);	// 6-18
+	if(apr->blt_f5a) nextpulse(apr, blt_t5a);	// 6-18
 }
 
 pulse(ar_cry_comp){
@@ -871,13 +951,14 @@ pulse(pir_stb){
 
 pulse(pi_sync){
 	trace("PI SYNC\n");
+	/* Call directly, we need the result in this pulse */
 	if(!apr->pi_cyc)
 		pir_stb(apr);			// 8-4
 	if(apr->pi_req && !apr->pi_cyc)
 		nextpulse(apr, iat0);		// 5-3
 	if(IA_NOT_INT)
 		nextpulse(apr, apr->if1a ? it1 : at1);	// 5-3
-	// no longer needed
+	/* no longer needed */
 	apr->ia_inh = 0;
 }
 
@@ -1174,6 +1255,8 @@ pulse(et3){
 	if(AR_P1)
 		nextpulse(apr, ar_pm1_t1);
 
+	if(apr->inst == BLT)
+		nextpulse(apr, blt_t0);		// 6-18
 	if(apr->shift_op)
 		nextpulse(apr, sht1);		// 6-20
 	if(AR_SBR)
@@ -1553,6 +1636,9 @@ pulse(mc_rs_t1){
 	if(apr->af3) nextpulse(apr, at3);			// 5-3
 	if(apr->if1a) nextpulse(apr, it1a);			// 5-3
 	if(apr->iot_f0a) nextpulse(apr, iot_t0a);		// 8-1
+	if(apr->blt_f0a) nextpulse(apr, blt_t0a);		// 6-18
+	if(apr->blt_f3a) nextpulse(apr, blt_t3a);		// 6-18
+	if(apr->blt_f5a) nextpulse(apr, blt_t5a);		// 6-18
 }
 
 pulse(mc_rs_t0){
@@ -1565,6 +1651,7 @@ pulse(mc_wr_rs){
 	trace("MC WR RS\n");
 	if(apr->ma == apr->mas)
 		apr->mi = apr->mb;	// 7-7
+print("write %llo to %o\n", apr->mb, apr->ma);
 	membus1 = apr->mb;		// 7-8
 	membus0 |= MEMBUS_WR_RS;	// 7-8
 	if(!apr->mc_stop)

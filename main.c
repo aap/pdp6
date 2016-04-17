@@ -137,7 +137,7 @@ Light op_lights[] = {
 	{ lampsurf, { 857, 75, 12, 12 }, 0 },
 	{ lampsurf, { 872, 75, 12, 12 }, 0 },
 	{ lampsurf, { 886, 75, 12, 12 }, 0 },
-	/* PIO */
+	/* PIH */
 	{ lampsurf, {  974, 43, 12, 12 }, 0 },
 	{ lampsurf, {  988, 43, 12, 12 }, 0 },
 	{ lampsurf, { 1002, 43, 12, 12 }, 0 },
@@ -153,7 +153,7 @@ Light op_lights[] = {
 	{ lampsurf, { 1030, 75, 12, 12 }, 0 },
 	{ lampsurf, { 1044, 75, 12, 12 }, 0 },
 	{ lampsurf, { 1058, 75, 12, 12 }, 0 },
-	/* PIH */
+	/* PIO */
 	{ lampsurf, {  974, 107, 12, 12 }, 0 },
 	{ lampsurf, {  988, 107, 12, 12 }, 0 },
 	{ lampsurf, { 1002, 107, 12, 12 }, 0 },
@@ -366,8 +366,12 @@ Light ind_lights[] = {
 	{ lampsurf, { 143,  59, 14, 22 }, 0 },
 	{ lampsurf, { 143,  76, 14, 22 }, 0 },
 	{ lampsurf, { 143,  93, 14, 22 }, 0 },
-	{ lampsurf, { 319, 144, 14, 22 }, 0 },
-	{ lampsurf, { 319, 161, 14, 22 }, 0 },
+	{ lampsurf, { 143, 110, 14, 22 }, 0 },	// BLT
+	{ lampsurf, { 143, 127, 14, 22 }, 0 },
+	{ lampsurf, { 143, 144, 14, 22 }, 0 },
+	{ lampsurf, { 143, 162, 14, 22 }, 0 },	// IOT
+	{ lampsurf, { 319, 144, 14, 22 }, 0 },	// shf1
+	{ lampsurf, { 319, 161, 14, 22 }, 0 },	// sc=777
 };
 
 Light extra_lights[] = {
@@ -870,8 +874,12 @@ error:
 		ff_lght[49].state = apr.sf5a;
 		ff_lght[50].state = apr.sf7;
 		ff_lght[51].state = apr.ar_com_cont;
-		ff_lght[52].state = apr.shf1;
-		ff_lght[53].state = apr.sc == 0777;
+		ff_lght[52].state = apr.blt_f0a;
+		ff_lght[53].state = apr.blt_f3a;
+		ff_lght[54].state = apr.blt_f5a;
+		ff_lght[55].state = apr.iot_f0a;
+		ff_lght[56].state = apr.shf1;
+		ff_lght[57].state = apr.sc == 0777;
 
 		setlights(membus0, membus_lght, 36);
 		setlights(apr.pr, pr_lght, 8);
