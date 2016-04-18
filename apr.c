@@ -423,6 +423,7 @@ pulse(mc_addr_ack);
 pulse(key_rd_wr_ret);
 pulse(it0);
 pulse(it1);
+pulse(it1a);
 pulse(ft0);
 pulse(ft1a);
 pulse(at0);
@@ -933,6 +934,13 @@ pulse(ar_ast0){
 	nextpulse(apr, ar_ast1);	// 6-9
 }
 
+
+pulse(xct_t0){
+	trace("XCT T0\n");
+	nextpulse(apr, mr_clr);		// 5-2
+	nextpulse(apr, it1a);		// 5-3
+}
+
 /*
  * Priority Interrupt
  */
@@ -1259,6 +1267,8 @@ pulse(et3){
 		nextpulse(apr, blt_t0);		// 6-18
 	if(apr->shift_op)
 		nextpulse(apr, sht1);		// 6-20
+	if(apr->inst == XCT)
+		nextpulse(apr, xct_t0);		// 5-10
 	if(AR_SBR)
 		apr->et4_ar_pse = 1;		// 5-5
 	if(!ET4_INH)
@@ -1651,7 +1661,6 @@ pulse(mc_wr_rs){
 	trace("MC WR RS\n");
 	if(apr->ma == apr->mas)
 		apr->mi = apr->mb;	// 7-7
-print("write %llo to %o\n", apr->mb, apr->ma);
 	membus1 = apr->mb;		// 7-8
 	membus0 |= MEMBUS_WR_RS;	// 7-8
 	if(!apr->mc_stop)
