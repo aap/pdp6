@@ -56,6 +56,9 @@ enum Opcode {
 	LDC    = 0135,
 	DPCI   = 0136,
 	DPC    = 0137,
+	ASH    = 0240,
+	ROT    = 0241,
+        LSH    = 0242,
 	ASHC   = 0244,
 	ROTC   = 0245,
 	LSHC   = 0246,
@@ -182,8 +185,6 @@ struct Apr {
 	/* needed for the emulation */
 	int extpulse;
 	bool ia_inh;	// this is asserted for some time
-	// want to get rid of this
-	Pulse *sct2_ret;
 
 	Pulse *pulses1[MAXPULSE], *pulses2[MAXPULSE];
 	Pulse **clist, **nlist;

@@ -37,6 +37,7 @@ swap(word *a, word *b)
 // 6-10
 #define AR_OV_SET (apr->ar_cry0 != apr->ar_cry1)
 #define AR0_XOR_AROV (!!(apr->ar & F0) != apr->ar_cry0_xor_cry1)
+#define AR0_XOR_AR1 (!!(apr->ar & F0) != !!(apr->ar & F1))
 
 /*
  * I'm a bit inconsistent with the decoding.
@@ -227,6 +228,8 @@ decodeir(Apr *apr)
 	apr->ir_iot = !apr->ex_ir_uuo && IOT_A;			// 5-8
 }
 
+void recalc_cpa_req(Apr *apr);
+
 void
 ar_jfcl_clr(Apr *apr)
 {
@@ -235,6 +238,7 @@ ar_jfcl_clr(Apr *apr)
 	if(apr->ir & H10) apr->ar_cry0_flag = 0;
 	if(apr->ir & H11) apr->ar_cry1_flag = 0;
 	if(apr->ir & H12) apr->ar_pc_chg_flag = 0;
+	recalc_cpa_req(apr);
 }
 
 void
@@ -446,6 +450,7 @@ pulse(mc_rdwr_rq_pulse);
 pulse(mc_rd_wr_rs_pulse);
 pulse(ar_pm1_t1);
 pulse(ar_ast0);
+pulse(sht1a);
 pulse(pir_stb);
 
 // TODO: find A LONG, it probably doesn't exist
@@ -466,6 +471,7 @@ pulse(ar_flag_clr){
 	apr->ar_cry1_flag = 0;		// 6-10
 	apr->ar_pc_chg_flag = 0;	// 6-10
 	apr->chf7 = 0;			// 6-19
+	recalc_cpa_req(apr);
 }
 
 pulse(ar_flag_set){
@@ -477,6 +483,7 @@ pulse(ar_flag_set){
 	apr->chf7           = !!(apr->mb & F4); // 6-19
 	if(apr->mb & F5)
 		set_ex_mode_sync(apr, 1);	// 5-13
+	recalc_cpa_req(apr);
 }
 
 // TODO
@@ -528,7 +535,6 @@ pulse(mr_clr){
 	apr->blt_f3a = 0;	// 6-18
 	apr->blt_f5a = 0;	// 6-18
 	apr->uuo_f1 = 0;	// 5-10
-	apr->sct2_ret = NULL;
 
 	// EX UUO SYNC
 	decodeir(apr);
@@ -828,61 +834,114 @@ pulse(blt_t0){
  * Shift subroutines
  */
 
-pulse(ar_sh_lt){
-}
+// 6-14
+#define SC_COM apr->sc = ~apr->sc & 0777
+#define SC_INC apr->sc = apr->sc+1 & 0777
+// 6-7
+#define SHC_ASHC (apr->inst == ASHC || 0) // TODO
+#define SHC_DIV (IR_DIV || IR_FDV || 0) // TODO
 
-pulse(mq_sh_lt){
-}
-
-pulse(ar_sh_rt){
-}
-
-pulse(mq_sh_rt){
-}
+// TODO
+#define MS_MULT 0
 
 pulse(sct2){
 	trace("SCT2\n");
-	nextpulse(apr, apr->sct2_ret);
+	if(apr->shf1) nextpulse(apr, sht1a);	// 6-20
 }
 
 pulse(sct1){
+	word ar0_shl_inp, ar0_shr_inp, ar35_shl_inp;
+	word mq0_shl_inp, mq0_shr_inp, mq1_shr_inp, mq35_shl_inp;
 	trace("SCT1\n");
-	apr->sc = apr->sc+1 & 0777;	// 6-16
-	// TODO: implement shifts
-	if(apr->shift_op && !(apr->mb & RSGN)){
-		ar_sh_lt(apr);
-		mq_sh_lt(apr);
+	SC_INC;		// 6-16
+
+	// 6-7 What a mess, and I don't really understand the schematics
+	if(apr->inst != ASH && !SHC_ASHC)
+		ar0_shl_inp = (apr->ar & F1) << 1;
+	else
+		ar0_shl_inp = apr->ar & F0;
+
+	if(apr->inst == ROTC)
+		ar0_shr_inp = (apr->mq & F35) << 35;
+	else if(apr->inst == ROT)
+		ar0_shr_inp = (apr->ar & F35) << 35;
+	else if(IR_DIV)
+		ar0_shr_inp = (~apr->mq & F35) << 35;
+	else if(apr->inst == LSH || apr->inst == LSHC || CH_LOAD)
+		ar0_shr_inp = 0;
+	else if(apr->inst == ASH || SHC_ASHC || MS_MULT || IR_FDV)
+		ar0_shr_inp = apr->ar & F0;
+
+	if(apr->inst == ROT)
+		ar35_shl_inp = (apr->ar & F0) >> 35;
+	else if(apr->inst == ASHC)
+		ar35_shl_inp = (apr->mq & F1) >> 34;
+	else if(apr->inst == ROTC || apr->inst == LSHC || SHC_DIV)
+		ar35_shl_inp = (apr->mq & F0) >> 35;
+	else if(CH_DEP || apr->inst == LSH || apr->inst == ASH)
+		ar35_shl_inp = 0;
+
+	if(SHC_ASHC){
+		mq0_shl_inp = apr->ar & F0;
+		mq1_shr_inp = (apr->ar & F35) << 34;
+	}else{
+		mq0_shl_inp = (apr->mq & F1) << 1;
+		mq1_shr_inp = (apr->mq & F0) >> 1;
 	}
-	if(apr->shift_op && (apr->mb & RSGN)){
-		ar_sh_rt(apr);
-		mq_sh_rt(apr);
+
+	if(MS_MULT && apr->sc == 0777 || SHC_ASHC)
+		mq0_shr_inp = apr->ar & F0;
+	else
+		mq0_shr_inp = (apr->ar & F35) << 35;
+
+	if(apr->inst == ROTC)
+		mq35_shl_inp = (apr->ar & F0) >> 35;
+	else if(SHC_DIV)
+		mq35_shl_inp = (~apr->ar & F0) >> 35;
+	else if(CH_N_INC_OP || CH_INC_OP)
+		mq35_shl_inp = 1;
+	else if(apr->inst == LSHC || SHC_ASHC || CH_DEP)
+		mq35_shl_inp = 0;
+
+	// TODO
+	if(apr->shift_op && !(apr->mb & F18)){
+		apr->ar = apr->ar<<1 & 0377777777776 | ar0_shl_inp | ar35_shl_inp;
+		apr->mq = apr->mq<<1 & 0377777777776 | mq0_shl_inp | mq35_shl_inp;
 	}
-	nextpulse(apr, apr->sc == 0777 ? sct2 : sct1);
+	if(apr->shift_op && (apr->mb & F18)){
+		apr->ar = apr->ar>>1 & 0377777777777 | ar0_shr_inp;
+		apr->mq = apr->mq>>1 & 0177777777777 | mq0_shr_inp | mq1_shr_inp;
+	}
+	if(!(apr->mb & F18) && (apr->inst == ASH || apr->inst == ASHC) && AR0_XOR_AR1){
+		apr->ar_ov_flag = 1;			// 6-10
+		recalc_cpa_req(apr);
+	}
+	nextpulse(apr, apr->sc == 0777 ? sct2 : sct1);	// 6-15, 6-16
 }
 
 pulse(sct0){
 	trace("SCT0\n");
-	nextpulse(apr, apr->sc == 0777 ? sct2 : sct1);
+	nextpulse(apr, apr->sc == 0777 ? sct2 : sct1);	// 6-15, 6-16
 }
+
 
 pulse(sht1a){
 	trace("SHT1A\n");
 	apr->shf1 = 0;			// 6-20
-	nextpulse(apr, et10);
+	nextpulse(apr, et10);		// 5-5
 }
 
 pulse(sht1){
 	trace("SHT1\n");
-	if(apr->mb & 0400000)
-		apr->sc = ~apr->sc & 0777;
+	if(apr->mb & F18)
+		SC_COM;			// 6-15
 	apr->shf1 = 1;			// 6-20
-	apr->sct2_ret = sht1a;
-	nextpulse(apr, sct0);
+	nextpulse(apr, sct0);		// 6-16
 }
 
 pulse(sht0){
 	trace("SHT0\n");
-	apr->sc = apr->sc+1 & 0777;	// 6-16
+	SC_INC;	// 6-16
 }
 
 /*
@@ -1348,8 +1407,10 @@ pulse(et1){
 
 	if(apr->inst == POPJ || apr->ex_ir_uuo || apr->inst == BLT)
 		apr->ma = 0;			// 7-3
-	if(apr->shift_op && apr->mb & RSGN)
+	if(apr->shift_op && apr->mb & F18)
 		nextpulse(apr, sht0);		// 6-20
+	if(apr->inst == FSC && !(apr->ar & F0))
+		SC_COM;				// 6-15
 	nextpulse(apr, et3);
 }
 
@@ -1365,17 +1426,6 @@ pulse(et0){
 		ar_flag_clr(apr);		// 6-10
 	// TODO: subroutines
 }
-
-char *ionames[] = {
-	"BLKI",
-	"DATAI",
-	"BLKO",
-	"DATAO",
-	"CONO",
-	"CONI",
-	"CONSZ",
-	"CONSO"
-};
 
 pulse(et0a){
 	static int gen = 0;
