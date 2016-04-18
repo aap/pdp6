@@ -145,7 +145,7 @@ struct Apr {
 
 	/* ?? */
 	bool mq36;
-	bool a_long, uuo_f1;
+	bool a_long;
 
 	/* sbr flip-flops */
 	bool if1a;
@@ -157,6 +157,7 @@ struct Apr {
 	bool shf1;
 	bool iot_f0a;
 	bool blt_f0a, blt_f3a, blt_f5a;
+	bool uuo_f1;
 
 	/* temporaries */
 	bool ex_inh_rel;

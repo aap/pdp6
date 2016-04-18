@@ -1,6 +1,11 @@
 #include "pdp6.h"
 #include "inst.h"
 
+#define DBG_AR print("AR: %012llo\n", apr->ar)
+#define DBG_MB print("MB: %012llo\n", apr->mb)
+#define DBG_MQ print("MQ: %012llo\n", apr->mq)
+#define DBG_MA print("MA: %06o\n", apr->ma)
+#define DBG_IR print("IR: %06o\n", apr->ir)
 
 int dotrace = 1;
 Apr apr;
@@ -522,7 +527,11 @@ pulse(mr_clr){
 	apr->blt_f0a = 0;	// 6-18
 	apr->blt_f3a = 0;	// 6-18
 	apr->blt_f5a = 0;	// 6-18
+	apr->uuo_f1 = 0;	// 5-10
 	apr->sct2_ret = NULL;
+
+	// EX UUO SYNC
+	decodeir(apr);
 }
 
 pulse(ex_clr){
@@ -531,8 +540,8 @@ pulse(ex_clr){
 }
 
 pulse(ex_set){
-	apr->pr  = (iobus0 >> 28) & 0377;	// 7-4
-	apr->rlr = (iobus0 >> 10) & 0377;	// 7-5
+	apr->pr  = iobus0>>28 & 0377;	// 7-4
+	apr->rlr = iobus0>>10 & 0377;	// 7-5
 }
 
 pulse(mr_start){
@@ -724,6 +733,24 @@ pulse(iot_t0){
 	trace("IOT T0\n");
 	apr->iot_f0a = 1;			// 8-1
 	nextpulse(apr, mc_rd_wr_rs_pulse);	// 7-8
+}
+
+/*
+ * UUO subroutine
+ */
+
+pulse(uuo_t2){
+	trace("UUO T2\n");
+	apr->if1a = 1;			// 5-3
+	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
+}
+
+pulse(uuo_t1){
+	trace("UUO T1\n");
+	apr->uuo_f1 = 0;		// 5-10
+	apr->ma = apr->ma+1 & RT;	// 7-3
+	nextpulse(apr, mr_clr);		// 5-2
+	nextpulse(apr, uuo_t2);		// 5-10
 }
 
 /*
@@ -1244,8 +1271,11 @@ pulse(et3){
 	trace("ET3\n");
 
 	if(apr->ex_ir_uuo){
-		apr->mb |= apr->ir & 0777740 << 18;	// 6-3, 6-1
+		// MBLT <- IR(1) (UUO T0) on 6-3
+		apr->mb |= (apr->ir&0777740) << 18;	// 6-1
 		apr->ma |= F30;				// 7-3
+		apr->uuo_f1 = 1;			// 5-10
+		nextpulse(apr, mc_wr_rq_pulse);		// 7-8
 	}
 
 	if(apr->inst == POPJ || apr->inst == BLT)
@@ -1354,7 +1384,7 @@ pulse(et0a){
 	if((apr->inst & 0700) != 0700)
 		print("%d %s\n", gen++, names[apr->inst]);
 	else
-		print("%d %s\n", gen++, ionames[(apr->io_inst>>5) & 7]);
+		print("%d %s\n", gen++, ionames[apr->io_inst>>5 & 7]);
 
 	if(PI_HOLD)
 		set_pih(apr, apr->pi_req);	// 8-3, 8-4
@@ -1550,6 +1580,8 @@ pulse(at2){
 pulse(at1){
 	trace("AT1\n");
 	apr->ex_uuo_sync = 1;		// 5-13
+	// decode here because of EX UUO SYNC
+	decodeir(apr);
 	nextpulse(apr, (apr->ir & 017) == 0 ? at4 : at2);	// 5-3
 }
 
@@ -1558,7 +1590,6 @@ pulse(at0){
 	apr->ar &= ~RT;			// 6-8
 	apr->ar |= apr->mb & RT;	// 6-8
 	apr->ir |= apr->mb>>18 & 037;	// 5-7
-	decodeir(apr);
 	apr->ma = 0;			// 7-3
 	apr->af0 = 0;			// 5-3
 	nextpulse(apr, pi_sync);	// 8-4
@@ -1649,6 +1680,7 @@ pulse(mc_rs_t1){
 	if(apr->blt_f0a) nextpulse(apr, blt_t0a);		// 6-18
 	if(apr->blt_f3a) nextpulse(apr, blt_t3a);		// 6-18
 	if(apr->blt_f5a) nextpulse(apr, blt_t5a);		// 6-18
+	if(apr->uuo_f1) nextpulse(apr, uuo_t1);			// 5-10
 }
 
 pulse(mc_rs_t0){
