@@ -155,7 +155,7 @@ struct Apr {
 	bool af0, af3, af3a;
 	bool f1a, f4a, f6a;
 	bool et4_ar_pse;
-	bool chf5, chf7;
+	bool chf1, chf2, chf3, chf4, chf5, chf6, chf7;
 	bool sf3, sf5a, sf7;
 	bool shf1;
 	bool iot_f0a;

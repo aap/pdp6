@@ -451,6 +451,8 @@ pulse(mc_rd_wr_rs_pulse);
 pulse(ar_pm1_t1);
 pulse(ar_ast0);
 pulse(sht1a);
+pulse(cht3);
+pulse(cht3a);
 pulse(pir_stb);
 
 // TODO: find A LONG, it probably doesn't exist
@@ -486,9 +488,14 @@ pulse(ar_flag_set){
 	recalc_cpa_req(apr);
 }
 
-// TODO
 pulse(mp_clr){
-	apr->chf5 = 0;		// 6-19
+	// 6-19
+	apr->chf1 = 0;
+	apr->chf2 = 0;
+	apr->chf3 = 0;
+	apr->chf4 = 0;
+	apr->chf5 = 0;
+	apr->chf6 = 0;
 	apr->shf1 = 0;		// 6-20
 }
 
@@ -837,12 +844,19 @@ pulse(blt_t0){
 // 6-14
 #define SC_COM apr->sc = ~apr->sc & 0777
 #define SC_INC apr->sc = apr->sc+1 & 0777
+#define SC_DATA (apr->chf1 ? ~apr->mb>>30 & 077 | 0700 : \
+                 apr->chf2 ? apr->mb>>24 & 077 : \
+                 0)	// TODO
+#define SC_PAD apr->sc ^= SC_DATA
+#define SC_CRY apr->sc += (~apr->sc & SC_DATA) << 1
 // 6-7
 #define SHC_ASHC (apr->inst == ASHC || 0) // TODO
 #define SHC_DIV (IR_DIV || IR_FDV || 0) // TODO
 
 // TODO
 #define MS_MULT 0
+
+/* Shift counter */
 
 pulse(sct2){
 	trace("SCT2\n");
@@ -924,6 +938,39 @@ pulse(sct0){
 	nextpulse(apr, apr->sc == 0777 ? sct2 : sct1);	// 6-15, 6-16
 }
 
+/* Shift adder */
+
+pulse(sat3){
+	trace("SAT3\n");
+	if(apr->chf2) nextpulse(apr, cht3a);	// 6-19
+}
+
+pulse(sat2_1){
+	trace("SAT2,1\n");
+	SC_CRY;			// 6-15
+	nextpulse(apr, sat3);	// 6-16
+}
+
+pulse(sat2){
+	trace("SAT2\n");
+	nextpulse(apr, sat2_1);	// 6-16
+}
+
+pulse(sat1){
+	trace("SAT1\n");
+	SC_PAD;			// 6-15
+	nextpulse(apr, sat2);	// 6-16
+}
+
+pulse(sat0){
+	trace("SAT0\n");
+	apr->chf1 = 0;		// 6-19
+	nextpulse(apr, sat1);	// 6-16
+}
+
+/*
+ * Shift operations subroutine
+ */
 
 pulse(sht1a){
 	trace("SHT1A\n");
@@ -942,6 +989,64 @@ pulse(sht1){
 pulse(sht0){
 	trace("SHT0\n");
 	SC_INC;	// 6-16
+}
+
+/*
+ * Character subroutines
+ */
+
+pulse(cht6){
+	trace("CHT6\n");
+	apr->ar = apr->ar & 0007777777777 |
+		(((word)apr->sc & 077) << 30);	// 6-9, 6-4
+	if(CH_INC_OP)
+		apr->sc = 0;		// 6-15
+	apr->chf2 = 1;			// 6-19
+}
+
+pulse(cht5){
+	trace("CHT5\n");
+	SC_COM;				// 6-15
+	nextpulse(apr, cht6);		// 6-19
+}
+
+pulse(cht4a){
+	trace("CHT4A\n");
+	apr->chf3 = 0;			// 6-19
+	apr->sc |= 0433;
+	nextpulse(apr, cht3);		// 6-19
+}
+
+pulse(cht4){
+	trace("CHT4\n");
+	apr->sc = 0;			// 6-15
+	apr->chf3 = 1;			// 6-19
+	nextpulse(apr, ar_pm1_t1);	// 6-9
+}
+
+pulse(cht3a){
+	trace("CHT3A\n");
+	apr->chf2 = 0;			// 6-19
+	nextpulse(apr, apr->sc & 0400 ? cht5 : cht4);	// 6-19
+}
+
+pulse(cht3){
+	trace("CHT3\n");
+	apr->chf2 = 1;			// 6-19
+	nextpulse(apr, sat0);		// 6-16
+}
+
+pulse(cht2){
+	trace("CHT2\n");
+	SC_PAD;				// 6-15
+	nextpulse(apr, cht3);		// 6-19
+}
+
+pulse(cht1){
+	trace("CHT1\n");
+	apr->ar = apr->mb;		// 6-8
+	apr->chf1 = 1;			// 6-19
+	nextpulse(apr, cht2);		// 6-19
 }
 
 /*
@@ -966,6 +1071,7 @@ pulse(art3){
 	if(apr->et4_ar_pse) nextpulse(apr, et4);	// 5-5
 	if(apr->blt_f3a) nextpulse(apr, blt_t3a);	// 6-18
 	if(apr->blt_f5a) nextpulse(apr, blt_t5a);	// 6-18
+	if(apr->chf3) nextpulse(apr, cht4a);		// 6-19
 }
 
 pulse(ar_cry_comp){
@@ -1424,6 +1530,10 @@ pulse(et0){
 	ar_cry(apr);
 	if(apr->ir_jrst && apr->ir & H11)
 		ar_flag_clr(apr);		// 6-10
+	if(CH_INC_OP)
+		nextpulse(apr, cht1);		// 6-19
+	if(CH_N_INC_OP)
+		nextpulse(apr, cht6);		// 6-19
 	// TODO: subroutines
 }
 
