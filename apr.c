@@ -442,6 +442,7 @@ pulse(iat0);
 pulse(et4);
 pulse(et5);
 pulse(et10);
+pulse(st7);
 pulse(mc_wr_rs);
 pulse(mc_rd_rq_pulse);
 pulse(mc_split_rd_rq);
@@ -453,6 +454,7 @@ pulse(ar_ast0);
 pulse(sht1a);
 pulse(cht3);
 pulse(cht3a);
+pulse(cht8a);
 pulse(pir_stb);
 
 // TODO: find A LONG, it probably doesn't exist
@@ -858,9 +860,16 @@ pulse(blt_t0){
 
 /* Shift counter */
 
+// 6-7, 6-17
+#define AR_SH_LT apr->ar = apr->ar<<1 & 0377777777776 | ar0_shl_inp | ar35_shl_inp
+#define MQ_SH_LT apr->mq = apr->mq<<1 & 0377777777776 | mq0_shl_inp | mq35_shl_inp
+#define AR_SH_RT apr->ar = apr->ar>>1 & 0377777777777 | ar0_shr_inp
+#define MQ_SH_RT apr->mq = apr->mq>>1 & 0177777777777 | mq0_shr_inp | mq1_shr_inp
+
 pulse(sct2){
 	trace("SCT2\n");
 	if(apr->shf1) nextpulse(apr, sht1a);	// 6-20
+	if(apr->chf4) nextpulse(apr, cht8a);	// 6-19
 }
 
 pulse(sct1){
@@ -918,14 +927,17 @@ pulse(sct1){
 		mq35_shl_inp = 0;
 
 	// TODO
+	// 6-17
 	if(apr->shift_op && !(apr->mb & F18)){
-		apr->ar = apr->ar<<1 & 0377777777776 | ar0_shl_inp | ar35_shl_inp;
-		apr->mq = apr->mq<<1 & 0377777777776 | mq0_shl_inp | mq35_shl_inp;
+		AR_SH_LT;
+		MQ_SH_LT;
 	}
 	if(apr->shift_op && (apr->mb & F18)){
-		apr->ar = apr->ar>>1 & 0377777777777 | ar0_shr_inp;
-		apr->mq = apr->mq>>1 & 0177777777777 | mq0_shr_inp | mq1_shr_inp;
+		AR_SH_RT;
+		MQ_SH_RT;
 	}
+	if(apr->chf4)
+		MQ_SH_LT;
 	if(!(apr->mb & F18) && (apr->inst == ASH || apr->inst == ASHC) && AR0_XOR_AR1){
 		apr->ar_ov_flag = 1;			// 6-10
 		recalc_cpa_req(apr);
@@ -995,6 +1007,52 @@ pulse(sht0){
  * Character subroutines
  */
 
+pulse(cht9){
+	trace("CHT9\n");
+	apr->sc = apr->fe;		// 6-15
+	apr->chf5 = 1;			// 6-19
+	apr->chf7 = 1;			// 6-19
+}
+
+pulse(cht8a){
+	trace("CHT8A\n");
+	apr->chf4 = 0;			// 6-19
+	apr->sc = 0;			// 6-15
+	apr->ir &= ~037;		// 5-7
+	nextpulse(apr, cht9);
+}
+
+pulse(cht8b){
+	trace("CHT8B\n");
+	apr->chf2 = 0;			// 6-19
+	apr->chf6 = 0;			// 6-19
+	apr->fe = apr->mb>>30 & 077;	// 6-14, 6-15
+	SC_COM;				// 6-15
+	if(apr->inst == CAO)
+		nextpulse(apr, st7);	// 5-6
+	else{
+		apr->chf4 = 1;		// 6-19
+		nextpulse(apr, sct0);	// 6-16
+	}
+}
+
+pulse(cht8){
+	trace("CHT8\n");
+	apr->chf6 = 1;		// 6-19
+	nextpulse(apr, mc_rd_wr_rs_pulse);	// 7-8
+}
+
+pulse(cht7){
+	trace("CHT7\n");
+	SC_PAD;				// 6-15
+	if(CH_INC_OP){
+		swap(&apr->mb, &apr->ar);	// 6-17
+		nextpulse(apr, cht8);		// 6-19
+	}
+	if(CH_N_INC_OP)
+		nextpulse(apr, cht8b);		// 6-19
+}
+
 pulse(cht6){
 	trace("CHT6\n");
 	apr->ar = apr->ar & 0007777777777 |
@@ -1002,6 +1060,7 @@ pulse(cht6){
 	if(CH_INC_OP)
 		apr->sc = 0;		// 6-15
 	apr->chf2 = 1;			// 6-19
+	nextpulse(apr, cht7);		// 6-19
 }
 
 pulse(cht5){
@@ -1841,6 +1900,7 @@ pulse(mc_rs_t1){
 	if(apr->blt_f3a) nextpulse(apr, blt_t3a);		// 6-18
 	if(apr->blt_f5a) nextpulse(apr, blt_t5a);		// 6-18
 	if(apr->uuo_f1) nextpulse(apr, uuo_t1);			// 5-10
+	if(apr->chf6) nextpulse(apr, cht8b);			// 6-19
 }
 
 pulse(mc_rs_t0){
