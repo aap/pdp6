@@ -285,7 +285,6 @@ Light ind_lights[] = {
 	{ lampsurf, { 1186, 146, 12, 12 }, 0 },
 	{ lampsurf, { 1200, 146, 12, 12 }, 0 },
 	{ lampsurf, { 1214, 146, 12, 12 }, 0 },
-	/* flags */
 	/* FE */
 	{ lampsurf, { 539, 161, 14, 22 }, 0 },
 	{ lampsurf, { 451,  42, 14, 22 }, 0 },
@@ -316,9 +315,79 @@ Light ind_lights[] = {
 	{ lampsurf, {  55, 127, 14, 22 }, 0 },
 	{ lampsurf, {  55, 144, 14, 22 }, 0 },
 	{ lampsurf, {  55, 161, 14, 22 }, 0 },
-	/* */
+	/* column 2 */
+	{ lampsurf, {  99,  42, 14, 22 }, 0 },
+	{ lampsurf, {  99,  59, 14, 22 }, 0 },
+	{ lampsurf, {  99,  76, 14, 22 }, 0 },
+	{ lampsurf, {  99,  93, 14, 22 }, 0 },
+	{ lampsurf, {  99, 110, 14, 22 }, 0 },
+	{ lampsurf, {  99, 127, 14, 22 }, 0 },
+	{ lampsurf, {  99, 144, 14, 22 }, 0 },
+	{ lampsurf, {  99, 161, 14, 22 }, 0 },
+	/* column 3 */
+	{ lampsurf, { 143,  42, 14, 22 }, 0 },
+	{ lampsurf, { 143,  59, 14, 22 }, 0 },
+	{ lampsurf, { 143,  76, 14, 22 }, 0 },
+	{ lampsurf, { 143,  93, 14, 22 }, 0 },
+	{ lampsurf, { 143, 110, 14, 22 }, 0 },
+	{ lampsurf, { 143, 127, 14, 22 }, 0 },
+	{ lampsurf, { 143, 144, 14, 22 }, 0 },
+	{ lampsurf, { 143, 162, 14, 22 }, 0 },
+	/* column 4 */
+	{ lampsurf, { 187,  42, 14, 22 }, 0 },
+	{ lampsurf, { 187,  59, 14, 22 }, 0 },
+	{ lampsurf, { 187,  76, 14, 22 }, 0 },
+	{ lampsurf, { 187,  93, 14, 22 }, 0 },
+	{ lampsurf, { 187, 110, 14, 22 }, 0 },
+	{ lampsurf, { 187, 127, 14, 22 }, 0 },
+	{ lampsurf, { 187, 144, 14, 22 }, 0 },
+	{ lampsurf, { 187, 162, 14, 22 }, 0 },
+	/* column 5 */
+	{ lampsurf, { 231,  42, 14, 22 }, 0 },
+	{ lampsurf, { 231,  59, 14, 22 }, 0 },
+	{ lampsurf, { 231,  76, 14, 22 }, 0 },
+	{ lampsurf, { 231,  93, 14, 22 }, 0 },
+	{ lampsurf, { 231, 110, 14, 22 }, 0 },
+	{ lampsurf, { 231, 127, 14, 22 }, 0 },
+	{ lampsurf, { 231, 144, 14, 22 }, 0 },
+	{ lampsurf, { 231, 162, 14, 22 }, 0 },
+	/* column 6 */
+	{ lampsurf, { 275,  42, 14, 22 }, 0 },
+	{ lampsurf, { 275,  59, 14, 22 }, 0 },
+	{ lampsurf, { 275,  76, 14, 22 }, 0 },
+	{ lampsurf, { 275,  93, 14, 22 }, 0 },
+	{ lampsurf, { 275, 110, 14, 22 }, 0 },
+	{ lampsurf, { 275, 127, 14, 22 }, 0 },
+	{ lampsurf, { 275, 144, 14, 22 }, 0 },
+	{ lampsurf, { 275, 162, 14, 22 }, 0 },
+	/* column 7 */
+	{ lampsurf, { 319,  42, 14, 22 }, 0 },
+	{ lampsurf, { 319,  59, 14, 22 }, 0 },
+	{ lampsurf, { 319,  76, 14, 22 }, 0 },
+	{ lampsurf, { 319,  93, 14, 22 }, 0 },
 	{ lampsurf, { 319, 110, 14, 22 }, 0 },
 	{ lampsurf, { 319, 127, 14, 22 }, 0 },
+	{ lampsurf, { 319, 144, 14, 22 }, 0 },
+	{ lampsurf, { 319, 161, 14, 22 }, 0 },
+	/* column 8 */
+	{ lampsurf, { 363,  42, 14, 22 }, 0 },
+	{ lampsurf, { 363,  59, 14, 22 }, 0 },
+	{ lampsurf, { 363,  76, 14, 22 }, 0 },
+	{ lampsurf, { 363,  93, 14, 22 }, 0 },
+	{ lampsurf, { 363, 110, 14, 22 }, 0 },
+	{ lampsurf, { 363, 127, 14, 22 }, 0 },
+	{ lampsurf, { 363, 144, 14, 22 }, 0 },
+	{ lampsurf, { 363, 161, 14, 22 }, 0 },
+	/* column 9 */
+	{ lampsurf, { 407,  42, 14, 22 }, 0 },
+	{ lampsurf, { 407,  59, 14, 22 }, 0 },
+	{ lampsurf, { 407,  76, 14, 22 }, 0 },
+	{ lampsurf, { 407,  93, 14, 22 }, 0 },
+	{ lampsurf, { 407, 110, 14, 22 }, 0 },
+	{ lampsurf, { 407, 127, 14, 22 }, 0 },
+	{ lampsurf, { 407, 144, 14, 22 }, 0 },
+	{ lampsurf, { 407, 161, 14, 22 }, 0 },
+	/* FE and SC see above */
 	/* column 12 */
 	{ lampsurf, { 539,  42, 14, 22 }, 0 },
 	{ lampsurf, { 539,  59, 14, 22 }, 0 },
@@ -326,6 +395,8 @@ Light ind_lights[] = {
 	{ lampsurf, { 539,  93, 14, 22 }, 0 },
 	{ lampsurf, { 539, 110, 14, 22 }, 0 },
 	{ lampsurf, { 539, 127, 14, 22 }, 0 },
+	/* SC0 *
+	 * FE0 */
 	/* column 13 */
 	{ lampsurf, { 583,  42, 14, 22 }, 0 },
 	{ lampsurf, { 583,  59, 14, 22 }, 0 },
@@ -344,34 +415,6 @@ Light ind_lights[] = {
 	{ lampsurf, { 627, 127, 14, 22 }, 0 },
 	{ lampsurf, { 627, 144, 14, 22 }, 0 },
 	{ lampsurf, { 627, 161, 14, 22 }, 0 },
-	/* column 9 */
-	{ lampsurf, { 407,  42, 14, 22 }, 0 },
-	{ lampsurf, { 407,  59, 14, 22 }, 0 },
-	{ lampsurf, { 407,  76, 14, 22 }, 0 },
-	{ lampsurf, { 407,  93, 14, 22 }, 0 },
-	{ lampsurf, { 407, 110, 14, 22 }, 0 },
-	{ lampsurf, { 407, 127, 14, 22 }, 0 },
-	{ lampsurf, { 407, 144, 14, 22 }, 0 },
-	{ lampsurf, { 407, 161, 14, 22 }, 0 },
-	/* sbr flip-flops */
-	{ lampsurf, {  99,  42, 14, 22 }, 0 },
-	{ lampsurf, {  99,  59, 14, 22 }, 0 },
-	{ lampsurf, {  99,  76, 14, 22 }, 0 },
-	{ lampsurf, {  99,  93, 14, 22 }, 0 },
-	{ lampsurf, {  99, 110, 14, 22 }, 0 },
-	{ lampsurf, {  99, 127, 14, 22 }, 0 },
-	{ lampsurf, {  99, 144, 14, 22 }, 0 },
-	{ lampsurf, {  99, 161, 14, 22 }, 0 },
-	{ lampsurf, { 143,  42, 14, 22 }, 0 },
-	{ lampsurf, { 143,  59, 14, 22 }, 0 },
-	{ lampsurf, { 143,  76, 14, 22 }, 0 },
-	{ lampsurf, { 143,  93, 14, 22 }, 0 },
-	{ lampsurf, { 143, 110, 14, 22 }, 0 },	// BLT
-	{ lampsurf, { 143, 127, 14, 22 }, 0 },
-	{ lampsurf, { 143, 144, 14, 22 }, 0 },
-	{ lampsurf, { 143, 162, 14, 22 }, 0 },	// IOT
-	{ lampsurf, { 319, 144, 14, 22 }, 0 },	// shf1
-	{ lampsurf, { 319, 161, 14, 22 }, 0 },	// sc=777
 };
 
 Light extra_lights[] = {
@@ -830,56 +873,103 @@ error:
 		ff_lght[5].state = apr.mc_rd;
 		ff_lght[6].state = apr.mc_wr;
 		ff_lght[7].state = apr.mc_rq;
-		ff_lght[8].state = apr.mc_split_cyc_sync;
-		ff_lght[9].state = apr.mc_stop_sync;
-		ff_lght[10].state = !apr.ex_user;
-		ff_lght[11].state = apr.cpa_illeg_op;
-		ff_lght[12].state = apr.ex_ill_op;
-		ff_lght[13].state = apr.ex_uuo_sync;
-		ff_lght[14].state = apr.ex_pi_sync;
-		ff_lght[15].state = apr.mq36;
-		ff_lght[16].state = apr.key_rim_sbr;
-		ff_lght[17].state = apr.ar_cry0_xor_cry1;
-		ff_lght[18].state = apr.ar_cry0;
-		ff_lght[19].state = apr.ar_cry1;
-		ff_lght[20].state = apr.ar_ov_flag;
-		ff_lght[21].state = apr.ar_cry0_flag;
-		ff_lght[22].state = apr.ar_cry1_flag;
-		ff_lght[23].state = apr.ar_pc_chg_flag;
-		ff_lght[24].state = apr.cpa_non_exist_mem;
-		ff_lght[25].state = apr.cpa_clock_enable;
-		ff_lght[26].state = apr.cpa_clock_flag;
-		ff_lght[27].state = apr.cpa_pc_chg_enable;
-		ff_lght[28].state = apr.cpa_arov_enable;
-		ff_lght[29].state = !!(apr.cpa_pia&4);
-		ff_lght[30].state = !!(apr.cpa_pia&2);
-		ff_lght[31].state = !!(apr.cpa_pia&1);
-		ff_lght[32].state = apr.pi_ov;
-		ff_lght[33].state = apr.pi_cyc;
-		ff_lght[34].state = !!apr.pi_req;
-		ff_lght[35].state = apr.iot_go;
-		ff_lght[36].state = apr.a_long;
-		ff_lght[37].state = apr.ma == apr.mas;
-		ff_lght[38].state = apr.uuo_f1;
-		ff_lght[39].state = apr.cpa_pdl_ov;
-		ff_lght[40].state = apr.if1a;
-		ff_lght[41].state = apr.af0;
-		ff_lght[42].state = apr.af3;
-		ff_lght[43].state = apr.af3a;
-		ff_lght[44].state = apr.et4_ar_pse;
-		ff_lght[45].state = apr.f1a;
-		ff_lght[46].state = apr.f4a;
-		ff_lght[47].state = apr.f6a;
-		ff_lght[48].state = apr.sf3;
-		ff_lght[49].state = apr.sf5a;
-		ff_lght[50].state = apr.sf7;
-		ff_lght[51].state = apr.ar_com_cont;
-		ff_lght[52].state = apr.blt_f0a;
-		ff_lght[53].state = apr.blt_f3a;
-		ff_lght[54].state = apr.blt_f5a;
-		ff_lght[55].state = apr.iot_f0a;
-		ff_lght[56].state = apr.shf1;
-		ff_lght[57].state = apr.sc == 0777;
+
+		ff_lght[8].state = apr.if1a;
+		ff_lght[9].state = apr.af0;
+		ff_lght[10].state = apr.af3;
+		ff_lght[11].state = apr.af3a;
+		ff_lght[12].state = apr.et4_ar_pse;
+		ff_lght[13].state = apr.f1a;
+		ff_lght[14].state = apr.f4a;
+		ff_lght[15].state = apr.f6a;
+
+		ff_lght[16].state = apr.sf3;
+		ff_lght[17].state = apr.sf5a;
+		ff_lght[18].state = apr.sf7;
+		ff_lght[19].state = apr.ar_com_cont;
+		ff_lght[20].state = apr.blt_f0a;
+		ff_lght[21].state = apr.blt_f3a;
+		ff_lght[22].state = apr.blt_f5a;
+		ff_lght[23].state = apr.iot_f0a;
+
+		ff_lght[24].state = 0;
+		ff_lght[25].state = 0;
+		ff_lght[26].state = 0;
+		ff_lght[27].state = 0;
+		ff_lght[28].state = 0;
+		ff_lght[29].state = 0;
+		ff_lght[30].state = 0;
+		ff_lght[31].state = 0;
+
+		ff_lght[32].state = 0;
+		ff_lght[33].state = 0;
+		ff_lght[34].state = 0;
+		ff_lght[35].state = 0;
+		ff_lght[36].state = 0;
+		ff_lght[37].state = 0;
+		ff_lght[38].state = 0;
+		ff_lght[39].state = 0;
+
+		ff_lght[40].state = 0;
+		ff_lght[41].state = 0;
+		ff_lght[42].state = 0;
+		ff_lght[43].state = 0;
+		ff_lght[44].state = 0;
+		ff_lght[45].state = 0;
+		ff_lght[46].state = 0;
+		ff_lght[47].state = 0;
+
+		ff_lght[48].state = 0;
+		ff_lght[49].state = 0;
+		ff_lght[50].state = 0;
+		ff_lght[51].state = 0;
+		ff_lght[52].state = apr.mc_split_cyc_sync;
+		ff_lght[53].state = apr.mc_stop_sync;
+		ff_lght[54].state = apr.shf1;
+		ff_lght[55].state = apr.sc == 0777;
+
+		ff_lght[56].state = apr.chf1;
+		ff_lght[57].state = apr.chf2;
+		ff_lght[58].state = apr.chf3;
+		ff_lght[59].state = apr.chf4;
+		ff_lght[60].state = apr.chf5;
+		ff_lght[61].state = apr.chf6;
+		ff_lght[62].state = apr.lcf1;
+		ff_lght[63].state = apr.dcf1;
+
+		ff_lght[64].state = apr.pi_ov;
+		ff_lght[65].state = apr.pi_cyc;
+		ff_lght[66].state = !!apr.pi_req;
+		ff_lght[67].state = apr.iot_go;
+		ff_lght[68].state = apr.a_long;
+		ff_lght[69].state = apr.ma == apr.mas;
+		ff_lght[70].state = apr.uuo_f1;
+		ff_lght[71].state = apr.cpa_pdl_ov;
+
+		ff_lght[72].state = !apr.ex_user;
+		ff_lght[73].state = apr.cpa_illeg_op;
+		ff_lght[74].state = apr.ex_ill_op;
+		ff_lght[75].state = apr.ex_uuo_sync;
+		ff_lght[76].state = apr.ex_pi_sync;
+		ff_lght[77].state = apr.mq36;
+
+		ff_lght[78].state = apr.key_rim_sbr;
+		ff_lght[79].state = apr.ar_cry0_xor_cry1;
+		ff_lght[80].state = apr.ar_cry0;
+		ff_lght[81].state = apr.ar_cry1;
+		ff_lght[82].state = apr.ar_ov_flag;
+		ff_lght[83].state = apr.ar_cry0_flag;
+		ff_lght[84].state = apr.ar_cry1_flag;
+		ff_lght[85].state = apr.ar_pc_chg_flag;
+
+		ff_lght[86].state = apr.cpa_non_exist_mem;
+		ff_lght[87].state = apr.cpa_clock_enable;
+		ff_lght[88].state = apr.cpa_clock_flag;
+		ff_lght[89].state = apr.cpa_pc_chg_enable;
+		ff_lght[90].state = apr.cpa_arov_enable;
+		ff_lght[91].state = !!(apr.cpa_pia&4);
+		ff_lght[92].state = !!(apr.cpa_pia&2);
+		ff_lght[93].state = !!(apr.cpa_pia&1);
 
 		setlights(membus0, membus_lght, 36);
 		setlights(apr.pr, pr_lght, 8);

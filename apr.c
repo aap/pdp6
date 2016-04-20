@@ -455,6 +455,8 @@ pulse(sht1a);
 pulse(cht3);
 pulse(cht3a);
 pulse(cht8a);
+pulse(lct0a);
+pulse(dct0a);
 pulse(pir_stb);
 
 // TODO: find A LONG, it probably doesn't exist
@@ -498,6 +500,7 @@ pulse(mp_clr){
 	apr->chf4 = 0;
 	apr->chf5 = 0;
 	apr->chf6 = 0;
+	apr->lcf1 = 0;		// 6-20
 	apr->shf1 = 0;		// 6-20
 }
 
@@ -544,6 +547,7 @@ pulse(mr_clr){
 	apr->blt_f3a = 0;	// 6-18
 	apr->blt_f5a = 0;	// 6-18
 	apr->uuo_f1 = 0;	// 5-10
+	apr->dcf1 = 0;		// 6-20
 
 	// EX UUO SYNC
 	decodeir(apr);
@@ -870,6 +874,8 @@ pulse(sct2){
 	trace("SCT2\n");
 	if(apr->shf1) nextpulse(apr, sht1a);	// 6-20
 	if(apr->chf4) nextpulse(apr, cht8a);	// 6-19
+	if(apr->lcf1) nextpulse(apr, lct0a);	// 6-20
+	if(apr->dcf1) nextpulse(apr, dct0a);	// 6-20
 }
 
 pulse(sct1){
@@ -938,6 +944,13 @@ pulse(sct1){
 	}
 	if(apr->chf4)
 		MQ_SH_LT;
+	if(apr->lcf1)
+		AR_SH_RT;
+	if(apr->dcf1){
+		AR_SH_LT;
+		MQ_SH_LT;
+	}
+
 	if(!(apr->mb & F18) && (apr->inst == ASH || apr->inst == ASHC) && AR0_XOR_AR1){
 		apr->ar_ov_flag = 1;			// 6-10
 		recalc_cpa_req(apr);
@@ -1007,11 +1020,64 @@ pulse(sht0){
  * Character subroutines
  */
 
+pulse(dct3){
+	trace("DCT3\n");
+	apr->mb &= apr->ar;		// 6-3
+	apr->chf7 = 0;			// 6-19
+	nextpulse(apr, et10);		// 5-5
+}
+
+pulse(dct2){
+	trace("DCT2\n");
+	apr->ar = ~apr->ar & FW;	// 6-17
+	nextpulse(apr, dct3);		// 6-20
+}
+
+pulse(dct1){
+	trace("DCT1\n");
+	apr->ar &= apr->mb;		// 6-8
+	apr->mb = apr->mq;		// 6-17
+	nextpulse(apr, dct2);		// 6-20
+}
+
+pulse(dct0a){
+	trace("DCT0A\n");
+	apr->dcf1 = 0;			// 6-20
+	swap(&apr->mb, &apr->mq);	// 6-17, 6-13 (dct0b)
+	apr->ar = ~apr->ar & FW;	// 6-17
+	nextpulse(apr, dct1);		// 6-20
+}
+
+pulse(dct0){
+	trace("DCT0\n");
+	apr->dcf1 = 1;			// 6-20
+	SC_COM;				// 6-15
+	nextpulse(apr, sct0);		// 6-16
+}
+
+pulse(lct0a){
+	trace("LCT0A\n");
+	apr->lcf1 = 0;			// 6-20
+	apr->ar &= apr->mb;		// 6-8
+	apr->chf7 = 0;			// 6-19
+	nextpulse(apr, et10);		// 5-5
+}
+
+pulse(lct0){
+	trace("LCT0\n");
+	apr->ar = apr->mb;		// 6-8
+	apr->mb = apr->mq;		// 6-17
+	SC_COM;				// 6-15
+	apr->lcf1 = 1;			// 6-20
+	nextpulse(apr, sct0);		// 6-16
+}
+
 pulse(cht9){
 	trace("CHT9\n");
 	apr->sc = apr->fe;		// 6-15
 	apr->chf5 = 1;			// 6-19
 	apr->chf7 = 1;			// 6-19
+	nextpulse(apr, at0);		// 5-3
 }
 
 pulse(cht8a){
@@ -1593,6 +1659,10 @@ pulse(et0){
 		nextpulse(apr, cht1);		// 6-19
 	if(CH_N_INC_OP)
 		nextpulse(apr, cht6);		// 6-19
+	if(CH_LOAD)
+		nextpulse(apr, lct0);		// 6-20
+	if(CH_DEP)
+		nextpulse(apr, dct0);		// 6-20
 	// TODO: subroutines
 }
 
