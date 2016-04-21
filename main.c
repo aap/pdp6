@@ -921,8 +921,8 @@ error:
 
 		ff_lght[48].state = 0;
 		ff_lght[49].state = 0;
-		ff_lght[50].state = 0;
-		ff_lght[51].state = 0;
+		ff_lght[50].state = apr.mpf1;
+		ff_lght[51].state = apr.mpf2;
 		ff_lght[52].state = apr.mc_split_cyc_sync;
 		ff_lght[53].state = apr.mc_stop_sync;
 		ff_lght[54].state = apr.shf1;

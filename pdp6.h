@@ -108,6 +108,7 @@ struct Apr {
 	word mb;
 	word ar;
 	word mq;
+	bool mq36;
 	u16 sc, fe;
 	u8 pr, rlr, rla;
 	bool run;
@@ -147,7 +148,6 @@ struct Apr {
 	bool iot_go;
 
 	/* ?? */
-	bool mq36;
 	bool a_long;
 
 	/* sbr flip-flops */
@@ -159,6 +159,8 @@ struct Apr {
 	bool lcf1, dcf1;
 	bool sf3, sf5a, sf7;
 	bool shf1;
+	bool mpf1, mpf2;
+	bool msf1;
 	bool iot_f0a;
 	bool blt_f0a, blt_f3a, blt_f5a;
 	bool uuo_f1;
