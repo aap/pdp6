@@ -161,6 +161,7 @@ struct Apr {
 	bool shf1;
 	bool mpf1, mpf2;
 	bool msf1;
+	bool dsf1, dsf2, dsf3, dsf4, dsf5, dsf6, dsf7, dsf8, dsf9;
 	bool iot_f0a;
 	bool blt_f0a, blt_f3a, blt_f5a;
 	bool uuo_f1;

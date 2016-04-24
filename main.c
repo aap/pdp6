@@ -908,19 +908,19 @@ error:
 		ff_lght[36].state = 0;
 		ff_lght[37].state = 0;
 		ff_lght[38].state = 0;
-		ff_lght[39].state = 0;
+		ff_lght[39].state = apr.chf7;
 
-		ff_lght[40].state = 0;
-		ff_lght[41].state = 0;
-		ff_lght[42].state = 0;
-		ff_lght[43].state = 0;
-		ff_lght[44].state = 0;
-		ff_lght[45].state = 0;
-		ff_lght[46].state = 0;
-		ff_lght[47].state = 0;
+		ff_lght[40].state = apr.dsf1;
+		ff_lght[41].state = apr.dsf2;
+		ff_lght[42].state = apr.dsf3;
+		ff_lght[43].state = apr.dsf4;
+		ff_lght[44].state = apr.dsf5;
+		ff_lght[45].state = apr.dsf6;
+		ff_lght[46].state = apr.dsf7;
+		ff_lght[47].state = apr.dsf8;
 
-		ff_lght[48].state = 0;
-		ff_lght[49].state = 0;
+		ff_lght[48].state = apr.dsf9;
+		ff_lght[49].state = apr.msf1;
 		ff_lght[50].state = apr.mpf1;
 		ff_lght[51].state = apr.mpf2;
 		ff_lght[52].state = apr.mc_split_cyc_sync;
