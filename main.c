@@ -3,6 +3,35 @@
 #include <SDL/SDL_image.h>
 #include <pthread.h>
 
+word dtopdp(double d){
+	uint64_t x, s, e, m;
+	word f;
+	x = *(uint64_t*)&d;
+	s = (x >> 63) & 1;
+	e = (x >> 52) & 0x7FF;
+	m = x & 0xFFFFFFFFFFFFF;
+	e -= 1023;
+	e += 128;
+	m >>= 25;
+	f = s << 35;
+	f |= e << 27;
+	f |= m;
+	return f;
+}
+double pdptod(word f){
+	uint64_t x, s, e, m;
+	s = (f >> 35) & 1;
+	e = (f >> 27) & 0377;
+	m = f & 0777777777;
+	e -= 128;
+	e += 1023;
+	m <<= 25;
+	x = s << 63;
+	x |= e << 52;
+	x |= m;
+	return *(double*)&x;
+}
+
 SDL_Surface *screen;
 
 SDL_Surface *keysurf[3];

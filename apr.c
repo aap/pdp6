@@ -39,6 +39,7 @@ swap(word *a, word *b)
 #define AR_OV_SET (apr->ar_cry0 != apr->ar_cry1)
 #define AR0_XOR_AROV (!!(apr->ar & F0) != apr->ar_cry0_xor_cry1)
 #define AR0_XOR_AR1 (!!(apr->ar & F0) != !!(apr->ar & F1))
+#define AR0_EQ_SC0 (!!(apr->ar & F0) == !!(apr->sc & 0400))
 #define SET_OVERFLOW apr->ar_ov_flag = 1, recalc_cpa_req(apr)
 
 // 6-13
@@ -473,6 +474,7 @@ pulse(lct0a);
 pulse(dct0a);
 pulse(mst2);
 pulse(mpt0a);
+pulse(fst0a);
 
 // TODO: find A LONG, it probably doesn't exist
 
@@ -532,6 +534,7 @@ pulse(ds_clr){
 	apr->dsf6 = 0;
 	apr->dsf8 = 0;
 	apr->dsf9 = 0;
+	apr->fsf1 = 0;	// 6-19
 }
 
 pulse(mr_clr){
@@ -884,6 +887,7 @@ pulse(blt_t0){
 #define SC_INC apr->sc = apr->sc+1 & 0777
 #define SC_DATA (apr->chf1 ? ~apr->mb>>30 & 077 | 0700 : \
                  apr->chf2 ? apr->mb>>24 & 077 : \
+                 apr->fsf1 || 0 ? apr->ar>>27 & 0777 : \
                  0)	// TODO
 #define SC_PAD apr->sc ^= SC_DATA
 #define SC_CRY apr->sc += (~apr->sc & SC_DATA) << 1
@@ -1000,6 +1004,7 @@ pulse(sct0){
 pulse(sat3){
 	trace("SAT3\n");
 	if(apr->chf2) nextpulse(apr, cht3a);	// 6-19
+	if(apr->fsf1) nextpulse(apr, fst0a);	// 6-19
 }
 
 pulse(sat2_1){
@@ -1535,6 +1540,30 @@ pulse(nrt6){
 }
 
 /*
+ * Floating scale
+ */
+
+pulse(fst1){
+	trace("FST1\n");
+	SC_INC;		// 6-16
+}
+
+pulse(fst0a){
+	trace("FST0A\n");
+	apr->fsf1 = 0;	// 6-19
+	if(!AR0_EQ_SC0)
+		SET_OVERFLOW;	// 6-17
+	apr->ar |= apr->ar&0400777777777 | (apr->sc&0377)<<27;	 // 6-4
+	nextpulse(apr, et10);	// 5-5
+}
+
+pulse(fst0){
+	trace("FST0\n");
+	apr->fsf1 = 1;		// 6-19
+	nextpulse(apr, sat0);	// 6-16
+}
+
+/*
  * Fixed point multiply
  */
 
@@ -1991,13 +2020,20 @@ pulse(et3){
 	if(AR_P1)
 		nextpulse(apr, ar_pm1_t1);
 
+	if(IR_FPCH && !(apr->ir & H3) &&
+	   (apr->inst == 0130 || apr->inst == 0131 || !(apr->ir & H4) || !(apr->ir & H5)))
+		nextpulse(apr, st7);		// 5-6
 	if(apr->inst == BLT)
 		nextpulse(apr, blt_t0);		// 6-18
 	if(apr->shift_op)
 		nextpulse(apr, sht1);		// 6-20
+	if(apr->inst == FSC){
+		if(apr->ar & F0)
+			nextpulse(apr, fst1);	// 6-19
+		nextpulse(apr, fst0);		// 6-19
+	}
 	if(apr->inst == XCT)
 		nextpulse(apr, xct_t0);		// 5-10
-	// FSC
 	if(AR_SBR)
 		apr->et4_ar_pse = 1;		// 5-5
 	if(!ET4_INH)
