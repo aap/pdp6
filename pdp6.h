@@ -15,10 +15,6 @@ typedef uint16_t u16;
 typedef uint8_t  u8;
 typedef char bool;
 
-/* convert between PDP-6 float and ieee double */
-word dtopdp(double d);
-double pdptod(word f);
-
 enum Mask {
 	FW   = 0777777777777,
 	RT   = 0000000777777,
@@ -167,6 +163,11 @@ struct Apr {
 	bool msf1;
 	bool dsf1, dsf2, dsf3, dsf4, dsf5, dsf6, dsf7, dsf8, dsf9;
 	bool fsf1;
+	bool fmf1, fmf2;
+	bool fdf1, fdf2;
+	bool faf1, faf2, faf3, faf4;
+	bool fpf1, fpf2;
+	bool nrf1, nrf2, nrf3;
 	bool iot_f0a;
 	bool blt_f0a, blt_f3a, blt_f5a;
 	bool uuo_f1;

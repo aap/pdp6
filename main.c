@@ -3,35 +3,6 @@
 #include <SDL/SDL_image.h>
 #include <pthread.h>
 
-word dtopdp(double d){
-	uint64_t x, s, e, m;
-	word f;
-	x = *(uint64_t*)&d;
-	s = (x >> 63) & 1;
-	e = (x >> 52) & 0x7FF;
-	m = x & 0xFFFFFFFFFFFFF;
-	e -= 1023;
-	e += 128;
-	m >>= 25;
-	f = s << 35;
-	f |= e << 27;
-	f |= m;
-	return f;
-}
-double pdptod(word f){
-	uint64_t x, s, e, m;
-	s = (f >> 35) & 1;
-	e = (f >> 27) & 0377;
-	m = f & 0777777777;
-	e -= 128;
-	e += 1023;
-	m <<= 25;
-	x = s << 63;
-	x |= e << 52;
-	x |= m;
-	return *(double*)&x;
-}
-
 SDL_Surface *screen;
 
 SDL_Surface *keysurf[3];
@@ -921,21 +892,21 @@ error:
 		ff_lght[22].state = apr.blt_f5a;
 		ff_lght[23].state = apr.iot_f0a;
 
-		ff_lght[24].state = 0;
-		ff_lght[25].state = 0;
-		ff_lght[26].state = 0;
-		ff_lght[27].state = 0;
-		ff_lght[28].state = 0;
-		ff_lght[29].state = 0;
-		ff_lght[30].state = 0;
-		ff_lght[31].state = 0;
+		ff_lght[24].state = apr.fpf1;
+		ff_lght[25].state = apr.fpf2;
+		ff_lght[26].state = apr.faf1;
+		ff_lght[27].state = apr.faf2;
+		ff_lght[28].state = apr.faf3;
+		ff_lght[29].state = apr.faf4;
+		ff_lght[30].state = apr.fmf1;
+		ff_lght[31].state = apr.fmf2;
 
-		ff_lght[32].state = 0;
-		ff_lght[33].state = 0;
+		ff_lght[32].state = apr.fdf1;
+		ff_lght[33].state = apr.fdf2;
 		ff_lght[34].state = 0;
-		ff_lght[35].state = 0;
-		ff_lght[36].state = 0;
-		ff_lght[37].state = 0;
+		ff_lght[35].state = apr.nrf1;
+		ff_lght[36].state = apr.nrf2;
+		ff_lght[37].state = apr.nrf3;
 		ff_lght[38].state = 0;
 		ff_lght[39].state = apr.chf7;
 

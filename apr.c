@@ -40,6 +40,7 @@ swap(word *a, word *b)
 #define AR0_XOR_AROV (!!(apr->ar & F0) != apr->ar_cry0_xor_cry1)
 #define AR0_XOR_AR1 (!!(apr->ar & F0) != !!(apr->ar & F1))
 #define AR0_EQ_SC0 (!!(apr->ar & F0) == !!(apr->sc & 0400))
+#define AR_EQ_FP_HALF ((apr->ar & 0377777777) == 0 && apr->ar & F9)
 #define SET_OVERFLOW apr->ar_ov_flag = 1, recalc_cpa_req(apr)
 
 // 6-13
@@ -475,6 +476,13 @@ pulse(dct0a);
 pulse(mst2);
 pulse(mpt0a);
 pulse(fst0a);
+pulse(fmt0a);
+pulse(fmt0b);
+pulse(fdt0a);
+pulse(fdt0b);
+pulse(fpt1a);
+pulse(fpt1b);
+pulse(nrt0_5);
 
 // TODO: find A LONG, it probably doesn't exist
 
@@ -517,11 +525,29 @@ pulse(mp_clr){
 	apr->chf4 = 0;
 	apr->chf5 = 0;
 	apr->chf6 = 0;
-	apr->lcf1 = 0;		// 6-20
-	apr->shf1 = 0;		// 6-20
-	apr->mpf1 = 0;		// 6-21
-	apr->mpf2 = 0;		// 6-21
+	// 6-20
+	apr->lcf1 = 0;
+	apr->shf1 = 0;
+	// 6-21
+	apr->mpf1 = 0;
+	apr->mpf2 = 0;
 	apr->msf1 = 0;		// 6-24
+	// 6-22
+	apr->fmf1 = 0;
+	apr->fmf2 = 0;
+	apr->fdf1 = 0;
+	apr->fdf2 = 0;
+	apr->faf1 = 0;
+	apr->faf2 = 0;
+	apr->faf3 = 0;
+	apr->faf4 = 0;
+	// 6-23
+	apr->fpf1 = 0;
+	apr->fpf2 = 0;
+	// 6-27
+	apr->nrf1 = 0;
+	apr->nrf2 = 0;
+	apr->nrf3 = 0;
 }
 
 pulse(ds_clr){
@@ -887,15 +913,15 @@ pulse(blt_t0){
 #define SC_INC apr->sc = apr->sc+1 & 0777
 #define SC_DATA (apr->chf1 ? ~apr->mb>>30 & 077 | 0700 : \
                  apr->chf2 ? apr->mb>>24 & 077 : \
-                 apr->fsf1 || 0 ? apr->ar>>27 & 0777 : \
-                 0)	// TODO
+                 apr->fsf1 || apr->fpf1 || apr->faf2 ? apr->ar>>27 & 0777 : \
+                 apr->fpf2 || apr->faf1 ? apr->mb>>27 & 0777 : 0)
 #define SC_PAD apr->sc ^= SC_DATA
 #define SC_CRY apr->sc += (~apr->sc & SC_DATA) << 1
 // 6-7
-#define SHC_ASHC (apr->inst == ASHC || 0) // TODO
-#define SHC_DIV (IR_DIV || IR_FDV || 0) // TODO
+#define SHC_ASHC (apr->inst == ASHC || apr->nrf2 || apr->faf3)
+#define SHC_DIV (IR_DIV || IR_FDV || !apr->nrf2)
 
-#define MS_MULT (apr->mpf1 /* XXX || apr->fmf2*/) 	// 6-24
+#define MS_MULT (apr->mpf1 || apr->fmf2) 	// 6-24
 
 /* Shift counter */
 
@@ -973,7 +999,7 @@ pulse(sct1){
 		AR_SH_LT;
 		MQ_SH_LT;
 	}
-	if(apr->shift_op && (apr->mb & F18)){
+	if(apr->shift_op && (apr->mb & F18) || apr->faf3){
 		AR_SH_RT;
 		MQ_SH_RT;
 	}
@@ -985,7 +1011,6 @@ pulse(sct1){
 		AR_SH_LT;
 		MQ_SH_LT;
 	}
-	// TODO faf3
 
 	if(!(apr->mb & F18) && (apr->inst == ASH || apr->inst == ASHC) && AR0_XOR_AR1){
 		apr->ar_ov_flag = 1;			// 6-10
@@ -1005,6 +1030,8 @@ pulse(sat3){
 	trace("SAT3\n");
 	if(apr->chf2) nextpulse(apr, cht3a);	// 6-19
 	if(apr->fsf1) nextpulse(apr, fst0a);	// 6-19
+	if(apr->fpf1) nextpulse(apr, fpt1a);	// 6-23
+	if(apr->fpf2) nextpulse(apr, fpt1b);	// 6-23
 }
 
 pulse(sat2_1){
@@ -1221,6 +1248,7 @@ pulse(cht1){
 pulse(mst6){
 	trace("MST6\n");
 	if(apr->mpf1) nextpulse(apr, mpt0a);	// 6-21
+	if(apr->fmf2) nextpulse(apr, fmt0b);	// 6-22
 }
 
 pulse(mst5){
@@ -1296,7 +1324,7 @@ pulse(dst21a){
 	swap(&apr->mb, &apr->mq);	// 6-17
 	if(IR_DIV)
 		nextpulse(apr, et9);	// 5-5
-	// TODO fdf2
+	if(apr->fdf2) nextpulse(apr, fdt0b);	// 6-22
 }
 
 pulse(dst21){
@@ -1531,17 +1559,100 @@ pulse(ds_div_t0){
 }
 
 /*
- *
+ * Floating point subroutines
  */
+
+/* Normalize return */
+
+// 6-27
+#define AR_0_AND_MQ1_0 (apr->ar == 0 && !(apr->mq & F1))
+#define AR9_EQ_AR0 (!!(apr->ar & F9) == !!(apr->ar & F0))
+#define NR_ROUND (apr->ir & H6 && apr->mq & F1 && !apr->nrf3)
 
 pulse(nrt6){
 	trace("NRT6\n");
 	nextpulse(apr, et10);		// 5-5
 }
 
-/*
- * Floating scale
- */
+pulse(nrt5a){
+	trace("NRT5A\n");
+	apr->nrf1 = 0;		// 6-27
+	apr->nrf3 = 1;		// 6-27
+	nextpulse(apr, nrt0_5);	// 6-27
+}
+
+pulse(nrt5){
+	trace("NRT5\n");
+	apr->nrf1 = 1;			// 6-27
+	nextpulse(apr, ar_pm1_t1);	// 6-9
+}
+
+pulse(nrt4){
+	trace("NRT4\n");
+	apr->ar |= ((word)apr->sc&0377) << 27;	// 6-9
+	nextpulse(apr, nrt6);		// 6-27
+}
+
+pulse(nrt3){
+	trace("NRT3\n");
+	if(!(apr->ar & F0) || NR_ROUND)
+		SC_COM;			// 6-15
+	if(!(apr->sc & 0400))
+		SET_OVERFLOW;		// 6-17
+	nextpulse(apr, NR_ROUND ? nrt5 : nrt4);	// 6-27
+}
+
+pulse(nrt2){
+	word ar0_shl_inp, ar35_shl_inp;
+	word mq0_shl_inp, mq35_shl_inp;
+	trace("NRT2\n");
+	SC_INC;		// 6-16
+	// 6-7
+	ar0_shl_inp = apr->ar & F0;
+	mq0_shl_inp = apr->ar & F0;
+	ar35_shl_inp = (apr->mq & F1) >> 34;
+	mq35_shl_inp = 0;
+	AR_SH_LT;	// 6-17
+	MQ_SH_LT;	// 6-17
+	if(AR_EQ_FP_HALF || !AR9_EQ_AR0)
+		nextpulse(apr, nrt3);	// 6-27
+	else
+		nextpulse(apr, nrt2);	// 6-27
+}
+
+pulse(nrt1){
+	trace("NRT1\n");
+	SC_COM;			// 6-15
+	if(AR_EQ_FP_HALF || !AR9_EQ_AR0)
+		nextpulse(apr, nrt3);	// 6-27
+	else
+		nextpulse(apr, nrt2);	// 6-27
+}
+
+pulse(nrt0){
+	word ar0_shr_inp;
+	word mq0_shr_inp, mq1_shr_inp;
+	trace("NRT0\n");
+	SC_INC;			// 6-16
+	// 6-7
+	ar0_shr_inp = apr->ar & F0;
+	mq0_shr_inp = apr->ar & F0;
+	mq1_shr_inp = (apr->ar & F35) << 34;
+	AR_SH_RT;	// 6-17
+	MQ_SH_RT;	// 6-17
+	if(AR_0_AND_MQ1_0)
+		nextpulse(apr, nrt6);	// 6-27
+	else
+		nextpulse(apr, nrt1);	// 6-27
+}
+
+pulse(nrt0_5){
+	trace("NRT0.5\n");
+	apr->nrf2 = 1;		// 6-27
+	nextpulse(apr, nrt0);	// 6-27
+}
+
+/* Scale */
 
 pulse(fst1){
 	trace("FST1\n");
@@ -1561,6 +1672,133 @@ pulse(fst0){
 	trace("FST0\n");
 	apr->fsf1 = 1;		// 6-19
 	nextpulse(apr, sat0);	// 6-16
+}
+
+/* Exponent calculate */
+
+// 6-23
+#define AR0_XOR_FMF1 (!!(apr->ar & F0) != !!apr->fmf1)
+#define AR0_XOR_MB0_XOR_FMF1 (AR0_XOR_FMF1 != !!(apr->mb & F0))
+#define MB0_EQ_FMF1 (!!(apr->mb & F0) == !!apr->fmf1)
+
+pulse(fpt4){
+	trace("FPT4\n");
+	// 6-22
+	if(apr->fmf1) nextpulse(apr, fmt0a);
+	if(apr->fdf1) nextpulse(apr, fdt0a);
+}
+
+pulse(fpt3){
+	trace("FPT3\n");
+	apr->fe |= apr->sc;	// 6-15
+	apr->sc = 0;		// 6-15
+	// 6-3, 6-4
+	if(apr->mb & F0) apr->mb |= 0377000000000;
+	else             apr->mb &= ~0377000000000;
+	// 6-9, 6-4
+	if(apr->ar & F0) apr->ar |= 0377000000000;
+	else             apr->ar &= ~0377000000000;
+	nextpulse(apr, fpt4);	// 6-23
+}
+
+pulse(fpt2){
+	trace("FPT2\n");
+	SC_INC;			// 6-17
+}
+
+pulse(fpt1b){
+	trace("FPT1B\n");
+	apr->fpf2 = 0;		// 6-23
+	if(MB0_EQ_FMF1)
+		SC_COM;		// 6-15
+	nextpulse(apr, fpt3);	// 6-23
+}
+
+pulse(fpt1aa){
+	trace("FPT1AA\n");
+	apr->fpf2 = 1;		// 6-23
+	nextpulse(apr, sat0);	// 6-15
+}
+
+pulse(fpt1a){
+	trace("FPT1A\n");
+	apr->fpf1 = 0;		// 6-23
+	if(AR0_XOR_MB0_XOR_FMF1)
+		nextpulse(apr, fpt2);	// 6-23
+	else
+		SC_COM;		// 6-15
+	nextpulse(apr, fpt1aa);	// 6-23
+}
+
+pulse(fpt1){
+	trace("FPT1\n");
+	apr->fpf1 = 1;		// 6-23
+	if(AR0_XOR_FMF1)
+		SC_COM;		// 6-15
+	nextpulse(apr, sat0);	// 6-16
+}
+
+pulse(fpt0){
+	trace("FPT0\n");
+	apr->sc |= 0200;	// 6-14
+	nextpulse(apr, fpt1);	// 6-23
+}
+
+/* Multiply */
+
+pulse(fmt0b){
+	trace("FMT0B\n");
+	apr->fmf2 = 0;		// 6-22
+	apr->sc |= apr->fe;	// 6-15
+	apr->nrf2 = 1;		// 6-27
+	if(AR_0_AND_MQ1_0)
+		nextpulse(apr, nrt6);	// 6-27
+	else
+		nextpulse(apr, nrt1);	// 6-27
+}
+
+pulse(fmt0a){
+	trace("FMT0A\n");
+	apr->fmf1 = 0;		// 6-22
+	apr->fmf2 = 1;		// 6-22
+	apr->sc |= 0744;	// 6-14
+	nextpulse(apr, mst1);	// 6-24
+}
+
+pulse(fmt0){
+	trace("FMT0\n");
+	apr->fmf1 = 1;		// 6-22
+	nextpulse(apr, fpt0);	// 6-23
+}
+
+/* Divide */
+
+pulse(fdt1){
+	trace("FDT1\n");
+}
+
+pulse(fdt0b){
+	trace("FDT0B\n");
+	apr->fdf2 = 0;		// 6-22
+	nextpulse(apr, fdt1);	// 6-22
+}
+
+pulse(fdt0a){
+	trace("FDT0A\n");
+	apr->fdf1 = 0;		// 6-22
+	apr->fdf2 = 1;		// 6-22
+}
+
+pulse(fdt0){
+	trace("FDT0\n");
+	apr->fdf1 = 1;		// 6-22
+	nextpulse(apr, fpt0);	// 6-23
+}
+
+/* Add/Subtract */
+
+pulse(fat0){
+	trace("FAT0\n");
 }
 
 /*
@@ -1632,6 +1870,7 @@ pulse(art3){
 	if(apr->dsf6) nextpulse(apr, dst17a);		// 6-26
 	if(apr->dsf8) nextpulse(apr, dst19a);		// 6-26
 	if(apr->dsf9) nextpulse(apr, dst21a);		// 6-26
+	if(apr->nrf1) nextpulse(apr, nrt5a);		// 6-27
 }
 
 pulse(ar_cry_comp){
@@ -2111,8 +2350,10 @@ pulse(et0){
 	if(IR_MUL)
 		nextpulse(apr, mpt0);		// 6-12
 	// FAD
-	// FMP
-	// FDV
+	if(IR_FMP)
+		nextpulse(apr, fmt0);		// 6-22
+	if(IR_FDV)
+		nextpulse(apr, fdt0);		// 6-22
 	if(IR_DIV){
 		nextpulse(apr, ds_div_t0);	// 6-25
 		if(apr->ir & H6)	// DIV
