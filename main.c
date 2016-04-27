@@ -903,11 +903,11 @@ error:
 
 		ff_lght[32].state = apr.fdf1;
 		ff_lght[33].state = apr.fdf2;
-		ff_lght[34].state = 0;
+		ff_lght[34].state = apr.ir & H6 && apr.mq & F1 && !apr.nrf3;
 		ff_lght[35].state = apr.nrf1;
 		ff_lght[36].state = apr.nrf2;
 		ff_lght[37].state = apr.nrf3;
-		ff_lght[38].state = 0;
+		ff_lght[38].state = apr.fsf1;
 		ff_lght[39].state = apr.chf7;
 
 		ff_lght[40].state = apr.dsf1;
