@@ -423,7 +423,7 @@ relocate(Apr *apr)
 	membus0 &= ~0007777777761;
 	membus0 |= ma_fmc_select ? MEMBUS_MA_FMC_SEL1 : MEMBUS_MA_FMC_SEL0;
 	membus0 |= (apr->ma&01777) << 4;
-	membus0 |= (apr->rla&017) << 14;
+	membus0 |= ((word)apr->rla&017) << 14;
 	membus0 |= apr->rla & 0020 ? MEMBUS_MA21_1|MEMBUS_MA21 : MEMBUS_MA21_0;
 	membus0 |= apr->rla & 0040 ? MEMBUS_MA20_1 : MEMBUS_MA20_0;
 	membus0 |= apr->rla & 0100 ? MEMBUS_MA19_1 : MEMBUS_MA19_0;
@@ -1571,7 +1571,7 @@ pulse(ds_div_t0){
 
 pulse(nrt6){
 	trace("NRT6\n");
-	nextpulse(apr, et10);		// 5-5
+	nextpulse(apr, et10);	// 5-5
 }
 
 pulse(nrt5a){
@@ -1664,7 +1664,7 @@ pulse(fst0a){
 	apr->fsf1 = 0;	// 6-19
 	if(!AR0_EQ_SC0)
 		SET_OVERFLOW;	// 6-17
-	apr->ar |= apr->ar&0400777777777 | (apr->sc&0377)<<27;	 // 6-4
+	apr->ar |= apr->ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4
 	nextpulse(apr, et10);	// 5-5
 }
 
@@ -1774,12 +1774,23 @@ pulse(fmt0){
 /* Divide */
 
 pulse(fdt1){
+	word ar0_shr_inp;
+	word mq0_shr_inp, mq1_shr_inp;
 	trace("FDT1\n");
+	// 6-7
+	ar0_shr_inp = apr->ar & F0;
+	mq0_shr_inp = apr->ar & F0;
+	mq1_shr_inp = (apr->ar & F35) << 34;
+	AR_SH_RT;	// 6-17
+	MQ_SH_RT;	// 6-17
+	nextpulse(apr, nrt0_5);	// 6-27
 }
 
 pulse(fdt0b){
 	trace("FDT0B\n");
 	apr->fdf2 = 0;		// 6-22
+	apr->sc = apr->fe;	// 6-15
+	apr->nrf2 = 1;		// 6-27
 	nextpulse(apr, fdt1);	// 6-22
 }
 
@@ -1787,6 +1798,8 @@ pulse(fdt0a){
 	trace("FDT0A\n");
 	apr->fdf1 = 0;		// 6-22
 	apr->fdf2 = 1;		// 6-22
+	apr->sc = 0741;		// 6-14
+	nextpulse(apr, apr->ar & F0 ? dst0 : dst10);	// 6-25
 }
 
 pulse(fdt0){
@@ -2238,7 +2251,7 @@ pulse(et3){
 
 	if(apr->ex_ir_uuo){
 		// MBLT <- IR(1) (UUO T0) on 6-3
-		apr->mb |= (apr->ir&0777740) << 18;	// 6-1
+		apr->mb |= ((word)apr->ir&0777740) << 18;	// 6-1
 		apr->ma |= F30;				// 7-3
 		apr->uuo_f1 = 1;			// 5-10
 		nextpulse(apr, mc_wr_rq_pulse);		// 7-8
