@@ -39,6 +39,7 @@ swap(word *a, word *b)
 #define AR_OV_SET (apr->ar_cry0 != apr->ar_cry1)
 #define AR0_XOR_AROV (!!(apr->ar & F0) != apr->ar_cry0_xor_cry1)
 #define AR0_XOR_AR1 (!!(apr->ar & F0) != !!(apr->ar & F1))
+#define AR0_XOR_MB0 (!!(apr->ar & F0) != !!(apr->mb & F0))
 #define AR0_EQ_SC0 (!!(apr->ar & F0) == !!(apr->sc & 0400))
 #define AR_EQ_FP_HALF ((apr->ar & 0377777777) == 0 && apr->ar & F9)
 #define SET_OVERFLOW apr->ar_ov_flag = 1, recalc_cpa_req(apr)
@@ -483,6 +484,9 @@ pulse(fdt0b);
 pulse(fpt1a);
 pulse(fpt1b);
 pulse(nrt0_5);
+pulse(fat1a);
+pulse(fat5a);
+pulse(fat10);
 
 // TODO: find A LONG, it probably doesn't exist
 
@@ -938,6 +942,7 @@ pulse(sct2){
 	if(apr->chf4) nextpulse(apr, cht8a);	// 6-19
 	if(apr->lcf1) nextpulse(apr, lct0a);	// 6-20
 	if(apr->dcf1) nextpulse(apr, dct0a);	// 6-20
+	if(apr->faf3) nextpulse(apr, fat5a);	// 6-22
 }
 
 pulse(sct1){
@@ -1032,6 +1037,7 @@ pulse(sat3){
 	if(apr->fsf1) nextpulse(apr, fst0a);	// 6-19
 	if(apr->fpf1) nextpulse(apr, fpt1a);	// 6-23
 	if(apr->fpf2) nextpulse(apr, fpt1b);	// 6-23
+	if(apr->faf2) nextpulse(apr, fat1a);	// 6-22
 }
 
 pulse(sat2_1){
@@ -1589,16 +1595,16 @@ pulse(nrt5){
 
 pulse(nrt4){
 	trace("NRT4\n");
-	apr->ar |= ((word)apr->sc&0377) << 27;	// 6-9
+	apr->ar |= apr->ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4, 6-9
 	nextpulse(apr, nrt6);		// 6-27
 }
 
 pulse(nrt3){
 	trace("NRT3\n");
-	if(!(apr->ar & F0) || NR_ROUND)
-		SC_COM;			// 6-15
 	if(!(apr->sc & 0400))
 		SET_OVERFLOW;		// 6-17
+	if(!(apr->ar & F0) || NR_ROUND)
+		SC_COM;			// 6-15
 	nextpulse(apr, NR_ROUND ? nrt5 : nrt4);	// 6-27
 }
 
@@ -1664,7 +1670,7 @@ pulse(fst0a){
 	apr->fsf1 = 0;	// 6-19
 	if(!AR0_EQ_SC0)
 		SET_OVERFLOW;	// 6-17
-	apr->ar |= apr->ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4
+	apr->ar |= apr->ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4, 6-9
 	nextpulse(apr, et10);	// 5-5
 }
 
@@ -1810,8 +1816,107 @@ pulse(fdt0){
 
 /* Add/Subtract */
 
+pulse(fat10){
+	trace("FAT10\n");
+	apr->faf4 = 0;		// 6-22
+	apr->faf1 = 0;		// 6-22
+	nextpulse(apr, nrt0_5);	// 6-27
+}
+
+pulse(fat9){
+	trace("FAT9\n");
+	apr->faf4 = 1;		// 6-22
+	nextpulse(apr, cfac_ar_add);	// 6-17
+}
+
+pulse(fat8a){
+	trace("FAT8A\n");
+	// 6-3, 6-4
+	if(apr->mb & F0) apr->mb |= 0377000000000;
+	else             apr->mb &= ~0377000000000;
+	nextpulse(apr, fat9);	// 6-22
+}
+
+pulse(fat8){
+	trace("FAT8\n");
+	SC_PAD;			// 6-15
+	nextpulse(apr, fat8a);	// 6-22
+}
+
+pulse(fat7){
+	trace("FAT7\n");
+	if(apr->mb & F0)
+		SC_COM;		// 6-15
+	nextpulse(apr, fat8);	// 6-22
+}
+
+pulse(fat6){
+	trace("FAT6\n");
+	apr->ar = 0;		// 6-8
+	nextpulse(apr, fat5a);	// 6-22
+}
+
+pulse(fat5a){
+	trace("FAT5A\n");
+	apr->faf3 = 0;		// 6-22
+	apr->sc = 0;		// 6-15
+	apr->faf1 = 1;		// 6-22
+	nextpulse(apr, fat7);	// 6-22
+}
+
+pulse(fat5){
+	trace("FAT5\n");
+	// 6-9, 6-4
+	if(apr->ar & F0) apr->ar |= 0377000000000;
+	else             apr->ar &= ~0377000000000;
+	apr->faf3 = 1;		// 6-22
+	nextpulse(apr, sct0);	// 6-16
+}
+
+pulse(fat4){
+	trace("FAT4\n");
+	nextpulse(apr, (apr->sc & 0700) == 0700 ? fat5 : fat6);	// 6-22
+}
+
+pulse(fat3){
+	trace("FAT3\n");
+	SC_COM;			// 6-15
+	nextpulse(apr, (apr->sc & 0700) == 0700 ? fat5 : fat6);	// 6-22
+}
+
+pulse(fat2){
+	trace("FAT2\n");
+	SC_INC;			// 6-16
+	nextpulse(apr, fat3);	// 6-22
+}
+
+pulse(fat1b){
+	trace("FAT1B\n");
+	apr->faf1 = 0;		// 6-22
+	apr->faf2 = 1;		// 6-22
+}
+
+pulse(fat1a){
+	trace("FAT1A\n");
+	apr->faf2 = 0;		// 6-22
+	if(!!(apr->ar & F0) == !!(apr->sc & 0400))
+		swap(&apr->mb, &apr->ar);	// 6-17
+	nextpulse(apr, apr->sc & 0400 ? fat4 : fat2);	// 6-22
+}
+
+pulse(fat1){
+	trace("FAT1\n");
+	SC_PAD;			// 6-15
+	nextpulse(apr, fat1b);	// 6-22
+	nextpulse(apr, sat0);	// 6-16
+}
+
 pulse(fat0){
 	trace("FAT0\n");
+	if(!AR0_XOR_MB0)
+		SC_COM;		// 6-15
+	apr->faf1 = 1;		// 6-22
+	nextpulse(apr, fat1);	// 6-22
 }
 
 /*
@@ -1884,6 +1989,7 @@ pulse(art3){
 	if(apr->dsf8) nextpulse(apr, dst19a);		// 6-26
 	if(apr->dsf9) nextpulse(apr, dst21a);		// 6-26
 	if(apr->nrf1) nextpulse(apr, nrt5a);		// 6-27
+	if(apr->faf4) nextpulse(apr, fat10);		// 6-22
 }
 
 pulse(ar_cry_comp){
@@ -2239,9 +2345,8 @@ pulse(et4){
 		nextpulse(apr, iot_t0);		// 8-1
 	else if(apr->ir_iot)
 		apr->iot_go = 1;		// 8-1
-
-	// FSB
-
+	if(IR_FSB)
+		nextpulse(apr, fat0);		// 6-22
 	if(!ET5_INH)
 		nextpulse(apr, et5);		// 5-5
 }
@@ -2362,7 +2467,8 @@ pulse(et0){
 		nextpulse(apr, dct0);		// 6-20
 	if(IR_MUL)
 		nextpulse(apr, mpt0);		// 6-12
-	// FAD
+	if(IR_FAD)
+		nextpulse(apr, fat0);		// 6-22
 	if(IR_FMP)
 		nextpulse(apr, fmt0);		// 6-22
 	if(IR_FDV)
