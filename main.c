@@ -2,6 +2,8 @@
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>
 #include <pthread.h>
+#include <time.h>
+#include <unistd.h>
 
 SDL_Surface *screen;
 
@@ -669,6 +671,18 @@ mouse(int button, int state, int x, int y)
 	}
 }
 
+void
+wakepanel(void)
+{
+	SDL_Event user_event;
+
+	user_event.type = SDL_USEREVENT;
+	user_event.user.code = 1;
+	user_event.user.data1 = NULL;
+	user_event.user.data2 = NULL;
+	SDL_PushEvent(&user_event);
+}
+
 int
 main()
 {
@@ -804,10 +818,25 @@ error:
 	rim_maint_sw->r.y += extra_panel.y;
 
 	initmem();
+	inittty();
 	memset(&apr, 0xff, sizeof apr);
 	apr.extpulse = 0;
 
+/*	int frm = 0;
+	time_t tm, tm2;
+	tm = time(nil);*/
 	for(;;){
+/*
+		frm++;
+		tm2 = time(nil);
+		if((tm2 - tm) > 5){
+			print("fps: %f\n", (float)frm/(tm2-tm));
+			tm = tm2;
+			frm = 0;
+		}
+*/
+//		usleep(1000);
+
 		while(SDL_PollEvent(&ev))
 			switch(ev.type){
 			case SDL_MOUSEMOTION:
@@ -825,6 +854,9 @@ error:
 				dumpmem();
 				SDL_Quit();
 				return 0;
+			case SDL_USEREVENT:
+				print("user\n");
+				break;
 			}
 		setlights(apr.ir, ir_lght, 18);
 		setlights(apr.mi, mi_lght, 36);

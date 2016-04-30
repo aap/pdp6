@@ -13,7 +13,8 @@ typedef uint32_t hword;
 typedef uint32_t u32;
 typedef uint16_t u16;
 typedef uint8_t  u8;
-typedef char bool;
+typedef unsigned char uchar;
+typedef uchar bool;
 
 enum Mask {
 	FW   = 0777777777777,
@@ -96,7 +97,7 @@ enum {
 typedef struct Apr Apr;
 
 typedef void Pulse(Apr *apr);
-#define pulse(p) void p(Apr *apr)
+#define pulse(p) static void p(Apr *apr)
 
 struct Apr {
 	hword ir;
@@ -143,7 +144,8 @@ struct Apr {
 
 	bool cpa_iot_user, cpa_illeg_op, cpa_non_exist_mem,
 	     cpa_clock_enable, cpa_clock_flag, cpa_pc_chg_enable, cpa_pdl_ov,
-	     cpa_arov_enable, cpa_pia;
+	     cpa_arov_enable;
+	int cpa_pia;
 
 	bool iot_go;
 
@@ -270,6 +272,7 @@ enum {
 /* 0 is cable 1 & 2 (data); 1 is cable 3 & 4 (above bits) */
 extern word iobus0, iobus1;
 
+#define IOB_RESET       (iobus1 & IOBUS_IOB_RESET)
 #define IOB_DATAO_CLEAR (iobus1 & IOBUS_DATAO_CLEAR)
 #define IOB_DATAO_SET   (iobus1 & IOBUS_DATAO_SET)
 #define IOB_CONO_CLEAR  (iobus1 & IOBUS_CONO_CLEAR)
@@ -282,3 +285,8 @@ extern word iobus0, iobus1;
 extern void (*iobusmap[128])(void);
 /* current PI req for each device */
 extern u8 ioreq[128];
+void recalc_req(void);
+
+void inittty(void);
+
+//void wakepanel(void);

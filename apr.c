@@ -1,5 +1,10 @@
 #include "pdp6.h"
 #include "inst.h"
+#include <unistd.h>
+
+word iobus0, iobus1;
+void (*iobusmap[128])(void);
+u8 ioreq[128];
 
 #define DBG_AR print("AR: %012llo\n", apr->ar)
 #define DBG_MB print("MB: %012llo\n", apr->mb)
@@ -7,7 +12,7 @@
 #define DBG_MA print("MA: %06o\n", apr->ma)
 #define DBG_IR print("IR: %06o\n", apr->ir)
 
-int dotrace = 1;
+int dotrace = 0;
 int pulsestepping = 0;
 Apr apr;
 
@@ -158,7 +163,6 @@ swap(word *a, word *b)
 #define IOT_CONI (apr->ir_iot && apr->io_inst == CONI)
 #define IOT_CONSZ (apr->ir_iot && apr->io_inst == CONSZ)
 #define IOT_CONSO (apr->ir_iot && apr->io_inst == CONSO)
-#define IOT_CONI (apr->ir_iot && apr->io_inst == CONI)
 #define IOT_BLK (apr->ir_iot && (apr->io_inst == BLKI || apr->io_inst == BLKO))
 #define IOT_OUTGOING (apr->ir_iot && (apr->io_inst == DATAO || apr->io_inst == CONO))
 #define IOT_STATUS (apr->ir_iot && \
@@ -172,7 +176,7 @@ decodeir(Apr *apr)
 	apr->io_inst = apr->ir & 0700340;
 
 	// 5-7
-	iobus1 &= ~037777000000;
+	iobus1 &= ~037777000000LL;
 	iobus1 |= apr->ir & H3 ? IOBUS_IOS3_1 : IOBUS_IOS3_0;
 	iobus1 |= apr->ir & H4 ? IOBUS_IOS4_1 : IOBUS_IOS4_0;
 	iobus1 |= apr->ir & H5 ? IOBUS_IOS5_1 : IOBUS_IOS5_0;
@@ -253,7 +257,7 @@ void
 ar_cry(Apr *apr)
 {
 	// 6-10
-	apr->ar_cry0_xor_cry1 = AR_OV_SET && ~MEMAC;
+	apr->ar_cry0_xor_cry1 = AR_OV_SET && !MEMAC;
 }
 
 void
@@ -341,7 +345,7 @@ recalc_req(void)
 	req = 0;
 	for(i = 0; i < 128; i++)
 		req |= ioreq[i];
-	iobus1 = iobus1&~0177 | req&0177;
+	iobus1 = iobus1&~0177LL | req&0177;
 }
 
 void
@@ -421,7 +425,7 @@ relocate(Apr *apr)
 		apr->rla += apr->rlr;
 
 	// 7-2, 7-10
-	membus0 &= ~0007777777761;
+	membus0 &= ~0007777777761LL;
 	membus0 |= ma_fmc_select ? MEMBUS_MA_FMC_SEL1 : MEMBUS_MA_FMC_SEL0;
 	membus0 |= (apr->ma&01777) << 4;
 	membus0 |= ((word)apr->rla&017) << 14;
@@ -1699,11 +1703,11 @@ pulse(fpt3){
 	apr->fe |= apr->sc;	// 6-15
 	apr->sc = 0;		// 6-15
 	// 6-3, 6-4
-	if(apr->mb & F0) apr->mb |= 0377000000000;
-	else             apr->mb &= ~0377000000000;
+	if(apr->mb & F0) apr->mb |= 0377000000000LL;
+	else             apr->mb &= ~0377000000000LL;
 	// 6-9, 6-4
-	if(apr->ar & F0) apr->ar |= 0377000000000;
-	else             apr->ar &= ~0377000000000;
+	if(apr->ar & F0) apr->ar |= 0377000000000LL;
+	else             apr->ar &= ~0377000000000LL;
 	nextpulse(apr, fpt4);	// 6-23
 }
 
@@ -2076,8 +2080,6 @@ pulse(pi_sync){
 		nextpulse(apr, iat0);		// 5-3
 	if(IA_NOT_INT)
 		nextpulse(apr, apr->if1a ? it1 : at1);	// 5-3
-	/* no longer needed */
-	apr->ia_inh = 0;
 }
 
 // 5-1
@@ -2411,6 +2413,9 @@ pulse(et1){
 	if(PI_RST)
 		clear_pih(apr);			// 8-4
 
+	// 6-3
+	if(apr->ir_acbm)
+		apr->mb &= apr->ar;
 	// 6-8
 	if(apr->ir_boole && (apr->ir_boole_op == 06 ||
 	                     apr->ir_boole_op == 011 ||
@@ -2432,9 +2437,6 @@ pulse(et1){
 	if(HWT_AR_0 || IOT_STATUS || IOT_DATAI)
 		apr->ar = 0;
 
-	// 6-3
-	if(apr->ir_acbm)
-		apr->mb &= ~apr->ar;
 	if(HWT_SWAP || FWT_SWAP || apr->inst == BLT)
 		SWAPLTRT(apr->mb);
 
@@ -3056,6 +3058,7 @@ aprmain(void *p)
 				if(c == 'x')
 					pulsestepping = 0;
 		}
+		//usleep(50000);
 
 		for(i = 0; i < apr->ncurpulses; i++)
 			apr->clist[i](apr);
@@ -3071,7 +3074,7 @@ aprmain(void *p)
 		if(apr->extpulse & 2){
 			apr->extpulse &= ~2;
 			apr->run = 0;
-			// cleared after PI SYNC
+			// hack: cleared when the pulse list was empty
 			apr->ia_inh = 1;
 		}
 
@@ -3097,6 +3100,10 @@ aprmain(void *p)
 			iobus1 &= ~IOBUS_PULSES;
 		}
 		if(iobus1 & IOBUS_IOB_RESET){
+			int d;
+			for(d = 0; d < nelem(iobusmap); d++)
+				if(iobusmap[d])
+					iobusmap[d]();
 			iobus1 &= ~IOBUS_IOB_RESET;
 		}
 
@@ -3124,8 +3131,14 @@ aprmain(void *p)
 			if(apr->mc_rq && !apr->mc_stop)
 				nextpulse(apr, mc_non_exist_mem);	// 7-9
 		}
-		if(i)
-			print("--------------\n");
+		if(i){
+		//	wakepanel();
+			trace("--------------\n");
+		}else{
+			/* no longer needed */
+			apr->ia_inh = 0;
+		}
+
 	}
 	print("power off\n");
 	return NULL;
