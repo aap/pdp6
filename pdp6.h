@@ -290,3 +290,7 @@ void recalc_req(void);
 void inittty(void);
 
 //void wakepanel(void);
+
+// for debugging
+char *names[0700];
+char *ionames[010];

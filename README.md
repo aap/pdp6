@@ -26,7 +26,8 @@ Otherwise you need SDL and pthread.
 
 ## Running
 
-Only the cpu is implemented. There are no external devices yet.
+The cpu and the console tty are implemented.
+There are no other external devices yet.
 The only things missing from the cpu are the clock to generate interrupts
 and the repeat key mechanism.
 The simulator reads `fmem` and `mem` to initialise the memory and fast memory.

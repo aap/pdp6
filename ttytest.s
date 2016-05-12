@@ -37,7 +37,10 @@ PUTCHR:
 	 JRST	.-2
 	IORI	0,200
 	DATAO	TTY,0
-	POPJ	P,
+	CAIE	0,"\n|200
+	 POPJ	P,
+	MOVEI	0,"\r
+	JRST	PUTCHR
 
 STR:
 	"a
