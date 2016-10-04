@@ -1,0 +1,27 @@
+. = 1000
+#	MOVEI	0,3
+#	MOVEI	1,12
+#	MUL 	1,0
+#	IMUL 	1,0
+
+#	MOVE	0,DIVITST
+#	IDIV	0,DIVITST+1
+
+	MOVE	0,DIVTST
+	MOVE	1,DIVTST+1
+	DIV	0,DIVTST+2
+
+	JRST	4,
+
+DIVITST:
+	-36
+	-12
+
+DIVTST:
+	-1
+	-7
+	-3
+
+	-1
+	-6
+	-3

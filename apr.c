@@ -926,7 +926,7 @@ pulse(blt_t0){
 #define SC_CRY apr->sc += (~apr->sc & SC_DATA) << 1
 // 6-7
 #define SHC_ASHC (apr->inst == ASHC || apr->nrf2 || apr->faf3)
-#define SHC_DIV (IR_DIV || IR_FDV || !apr->nrf2)
+#define SHC_DIV ((IR_DIV || IR_FDV) && !apr->nrf2)
 
 #define MS_MULT (apr->mpf1 || apr->fmf2) 	// 6-24
 

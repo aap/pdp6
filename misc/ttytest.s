@@ -1,0 +1,61 @@
+P=17
+TTY=120
+
+
+PDLLEN=100
+
+.=40
+	JRST	4,
+	JRST	4,
+
+.=1000
+ENTRY:	JRST	START
+PDL:	.=.+PDLLEN
+SP:	-PDLLEN,,PDL-1
+
+START:
+	MOVE	P,SP
+	MOVE	0,STR
+	PUSHJ	P,PUTSTR
+#	PUSHJ	P,GETCH
+#	PUSHJ	P,PUTCHR
+#	MOVEI	0,"\n
+#	PUSHJ	P,PUTCHR
+#	MOVEI	0,"a
+#	PUSHJ	P,PUTCHR
+	JRST	4,
+
+PUTSTR:
+	MOVE	4,0		# save str pointer to AC4
+PLOOP:
+	MOVE	0,(4)		# load char
+	JRST	4,
+	AOS	4		# advance to next
+	SKIPN	0		# check for end of string
+	 POPJ	P,
+	PUSHJ	P,PUTCHR	# print char
+	JRST	PLOOP		# next char
+
+GETCH:
+	CONI	TTY,0
+	TRNN	0,40
+	 JRST	.-2
+	DATAI	TTY,0
+	TRZ	0,200
+	POPJ	P,
+
+PUTCHR:
+	CONI	TTY,1
+	TRNE	1,20
+	 JRST	.-2
+	IORI	0,200
+	DATAO	TTY,0
+	CAIE	0,"\n|200
+	 POPJ	P,
+	MOVEI	0,"\r
+	JRST	PUTCHR
+
+STR:
+	"a
+	"b
+	"c
