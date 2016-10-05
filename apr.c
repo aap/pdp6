@@ -5,27 +5,15 @@ word iobus0, iobus1;
 void (*iobusmap[128])(void);
 u8 ioreq[128];
 
-#define DBG_AR print("AR: %012llo\n", apr->ar)
-#define DBG_MB print("MB: %012llo\n", apr->mb)
-#define DBG_MQ print("MQ: %012llo\n", apr->mq)
-#define DBG_MA print("MA: %06o\n", apr->ma)
-#define DBG_IR print("IR: %06o\n", apr->ir)
+#define DBG_AR debug("AR: %012llo\n", apr->ar)
+#define DBG_MB debug("MB: %012llo\n", apr->mb)
+#define DBG_MQ debug("MQ: %012llo\n", apr->mq)
+#define DBG_MA debug("MA: %06o\n", apr->ma)
+#define DBG_IR debug("IR: %06o\n", apr->ir)
 
-int dotrace = 0;
-int pulsestepping = 0;
 Apr apr;
 
-void
-trace(char *fmt, ...)
-{
-	va_list ap;
-	if(!dotrace)
-		return;
-	va_start(ap, fmt);
-	print("  ");
-	vfprintf(stdout, fmt, ap);
-	va_end(ap);
-}
+int pulsestepping = 0;
 
 #define SWAPLTRT(a) (a = (a)<<18 & LT | (a)>>18 & RT)
 #define CONS(a, b) ((a)&LT | (b)&RT)
@@ -2486,11 +2474,11 @@ pulse(et0){
 pulse(et0a){
 	static int gen = 0;
 	trace("ET0A\n");
-	print("%o: ", apr->pc);
+	debug("%o: ", apr->pc);
 	if((apr->inst & 0700) != 0700)
-		print("%d %s\n", gen++, names[apr->inst]);
+		debug("%d %s\n", gen++, names[apr->inst]);
 	else
-		print("%d %s\n", gen++, ionames[apr->io_inst>>5 & 7]);
+		debug("%d %s\n", gen++, ionames[apr->io_inst>>5 & 7]);
 
 	if(PI_HOLD)
 		set_pih(apr, apr->pi_req);	// 8-3, 8-4
@@ -2855,7 +2843,7 @@ pulse(mc_rq_pulse){
 	ma_ok = relocate(apr);
 	apr->mc_stop = 0;		// 7-9
 	/* hack to catch non-existent memory */
-	apr->extpulse |= 4;
+	apr->extpulse |= EXT_NONEXIT_MEM;
 	if(ma_ok || apr->ex_inh_rel)
 		set_mc_rq(apr, 1);	// 7-9
 	else
@@ -3063,15 +3051,13 @@ aprmain(void *p)
 			apr->clist[i](apr);
 
 		/* KEY MANUAL */
-		if(apr->extpulse & 1){
-			apr->extpulse &= ~1;
-			// BUG: without a print somewhere the thing doesn't work :(
-			print("KEY MANUAL\n");
+		if(apr->extpulse & EXT_KEY_MANUAL){
+			apr->extpulse &= ~EXT_KEY_MANUAL;
 			nextpulse(apr, key_manual);
 		}
 		/* KEY INST STOP */
-		if(apr->extpulse & 2){
-			apr->extpulse &= ~2;
+		if(apr->extpulse & EXT_KEY_STOP){
+			apr->extpulse &= ~EXT_KEY_STOP;
 			apr->run = 0;
 			// hack: cleared when the pulse list was empty
 			apr->ia_inh = 1;
@@ -3082,7 +3068,7 @@ aprmain(void *p)
 		 * IOT INIT SET UP or IOT FINAL SETUP really */
 		if(apr->iot_go)
 			nextpulse(apr, iot_t2);
-		/* pulse and signals through IO bus */
+		/* pulses and signals through IO bus */
 		if(iobus1 & (IOBUS_PULSES | IOBUS_IOB_STATUS | IOBUS_IOB_DATAI)){
 			int dev = 0;
 			if(iobus1 & IOBUS_IOS3_1) dev |= 0100;
@@ -3092,7 +3078,7 @@ aprmain(void *p)
 			if(iobus1 & IOBUS_IOS7_1) dev |= 0004;
 			if(iobus1 & IOBUS_IOS8_1) dev |= 0002;
 			if(iobus1 & IOBUS_IOS9_1) dev |= 0001;
-			//print("bus active for %o\n", dev<<2);
+			//debug("bus active for %o\n", dev<<2);
 			if(iobusmap[dev])
 				iobusmap[dev]();
 			// TODO: clear IOB STATUS and IOB DATAI too?
@@ -3118,15 +3104,15 @@ aprmain(void *p)
 		/* Pulses from memory */
 		if(membus0 & MEMBUS_MAI_ADDR_ACK){
 			membus0 &= ~MEMBUS_MAI_ADDR_ACK;
-			apr->extpulse &= ~4;
+			apr->extpulse &= ~EXT_NONEXIT_MEM;
 			nextpulse(apr, mai_addr_ack);
 		}
 		if(membus0 & MEMBUS_MAI_RD_RS){
 			membus0 &= ~MEMBUS_MAI_RD_RS;
 			nextpulse(apr, mai_rd_rs);
 		}
-		if(apr->extpulse & 4){
-			apr->extpulse &= ~4;
+		if(apr->extpulse & EXT_NONEXIT_MEM){
+			apr->extpulse &= ~EXT_NONEXIT_MEM;
 			if(apr->mc_rq && !apr->mc_stop)
 				nextpulse(apr, mc_non_exist_mem);	// 7-9
 		}
@@ -3139,7 +3125,7 @@ aprmain(void *p)
 		}
 
 	}
-	print("power off\n");
+	debug("power off\n");
 	return NULL;
 }
 
@@ -3285,25 +3271,25 @@ testinst(Apr *apr)
 //	for(inst = 0140; inst < 0141; inst++){
 		apr->ir = inst << 9 | 1 << 5;
 		decodeir(apr);
-		print("%06o %6s ", apr->ir, names[inst]);
+		debug("%06o %6s ", apr->ir, names[inst]);
 /*
-		print("%s ", FAC_INH ? "FAC_INH" : "       ");
-		print("%s ", FAC2 ? "FAC2" : "    ");
-		print("%s ", FC_C_ACRT ? "FC_C_ACRT" : "         ");
-		print("%s ", FC_C_ACLT ? "FC_C_ACLT" : "         ");
-		print("%s ", FC_E ? "FC_E" : "    ");
+		debug("%s ", FAC_INH ? "FAC_INH" : "       ");
+		debug("%s ", FAC2 ? "FAC2" : "    ");
+		debug("%s ", FC_C_ACRT ? "FC_C_ACRT" : "         ");
+		debug("%s ", FC_C_ACLT ? "FC_C_ACLT" : "         ");
+		debug("%s ", FC_E ? "FC_E" : "    ");
 */
-		print("%s ", FC_E_PSE ? "FC_E_PSE" : "        ");
-		print("%s ", SC_E ? "SC_E" : "    ");
-		print("%s ", SAC_INH ? "SAC_INH" : "       ");
-		print("%s ", SAC2 ? "SAC2" : "    ");
-		print("\n");
+		debug("%s ", FC_E_PSE ? "FC_E_PSE" : "        ");
+		debug("%s ", SC_E ? "SC_E" : "    ");
+		debug("%s ", SAC_INH ? "SAC_INH" : "       ");
+		debug("%s ", SAC2 ? "SAC2" : "    ");
+		debug("\n");
 // FC_E_PSE
-//print("FC_E_PSE: %d %d %d %d %d %d %d %d %d %d\n", apr->hwt_10 , apr->hwt_11 , apr->fwt_11 , \
+//debug("FC_E_PSE: %d %d %d %d %d %d %d %d %d %d\n", apr->hwt_10 , apr->hwt_11 , apr->fwt_11 , \
 //                  IOT_BLK , apr->inst == EXCH , CH_DEP , CH_INC_OP , \
 //                  MEMAC_MEM , apr->boole_as_10 , apr->boole_as_11);
-//print("CH: %d %d %d %d %d\n", CH_INC, CH_INC_OP, CH_N_INC_OP, CH_LOAD, CH_DEP);
-//print("FAC_INH: %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+//debug("CH: %d %d %d %d %d\n", CH_INC, CH_INC_OP, CH_N_INC_OP, CH_LOAD, CH_DEP);
+//debug("FAC_INH: %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
 //	apr->hwt_11 , apr->fwt_00 , apr->fwt_01 , apr->fwt_11 ,
 //	apr->inst == XCT , apr->ex_ir_uuo ,
 //	apr->inst == JSP , apr->inst == JSR ,

@@ -4,6 +4,33 @@
 #include <pthread.h>
 #include <time.h>
 #include <unistd.h>
+#include "args.h"
+
+char *argv0;
+
+FILE *debugfp;
+int dotrace;
+
+void
+trace(char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	if(dotrace){
+		fprintf(debugfp, "  ");
+		vfprintf(debugfp, fmt, ap);
+	}
+	va_end(ap);
+}
+
+void
+debug(char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	vfprintf(debugfp, fmt, ap);
+	va_end(ap);
+}
 
 SDL_Surface *screen;
 
@@ -587,6 +614,8 @@ poweron(void)
 	pthread_create(&apr_thread, NULL, aprmain, &apr);
 }
 
+int tmpextpulse;
+
 void
 mouse(int button, int state, int x, int y)
 {
@@ -657,11 +686,11 @@ mouse(int button, int state, int x, int y)
 			case 4:	/* deposit */
 			case 5:	/* examine */
 				if(keys[i].state && apr.sw_power)
-					apr.extpulse |= 1;
+					tmpextpulse |= EXT_KEY_MANUAL;
 				break;
 			case 2:	/* stop */
 				if(keys[i].state == 1)	// inst
-					apr.extpulse |= 2;
+					tmpextpulse |= EXT_KEY_STOP;
 				break;
 			case 6:	/* on off reader */
 			case 7: /* punch */
@@ -683,8 +712,14 @@ wakepanel(void)
 	SDL_PushEvent(&user_event);
 }
 
+void
+usage(void)
+{
+	exit(1);
+}
+
 int
-main()
+main(int argc, char *argv[])
 {
 	SDL_Event ev;
 	SDL_MouseButtonEvent *mbev;
@@ -699,6 +734,23 @@ main()
 
 //	void testinst(Apr*);
 //	testinst(&apr);
+
+	debugfp = stdout;
+	//dotrace = 1;
+
+	ARGBEGIN{
+	case 't':
+		dotrace++;
+		break;
+	case 'd':
+		if(debugfp = fopen(EARGF(usage()), "w"), debugfp == nil){
+			fprintf(stderr, "Can't open debug file\n");
+			exit(1);
+		}
+		break;
+	default:
+		usage();
+	}ARGEND;
 
 	if(SDL_Init(SDL_INIT_VIDEO) < 0){
 error:
@@ -875,6 +927,7 @@ error:
 		apr.sw_rim_maint = rim_maint_sw->state;
 		apr.data = getswitches(data_sw, 36);
 		apr.mas = getswitches(ma_sw, 18);
+
 		apr.key_start     = keys[0].state == 1;
 		apr.key_readin    = keys[0].state == 2;
 		apr.key_inst_cont = keys[1].state == 1;
@@ -891,6 +944,8 @@ error:
 		apr.key_rd_on     = keys[6].state == 2;
 		apr.key_pt_rd     = keys[7].state == 1;
 		apr.key_pt_wr     = keys[7].state == 2;
+		apr.extpulse |= tmpextpulse;
+		tmpextpulse = 0;
 
 		setlights(apr.mb, mb_lght, 36);
 		setlights(apr.ar, ar_lght, 36);

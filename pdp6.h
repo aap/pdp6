@@ -16,6 +16,11 @@ typedef uint8_t  u8;
 typedef unsigned char uchar;
 typedef uchar bool;
 
+extern FILE *debugfp;
+extern int dotrace;
+void trace(char *fmt, ...);
+void debug(char *fmt, ...);
+
 enum Mask {
 	FW   = 0777777777777,
 	RT   = 0000000777777,
@@ -47,6 +52,13 @@ enum FullwordBits {
 	F27 = 0000000000400, F28 = 0000000000200, F29 = 0000000000100,
 	F30 = 0000000000040, F31 = 0000000000020, F32 = 0000000000010,
 	F33 = 0000000000004, F34 = 0000000000002, F35 = 0000000000001
+};
+
+/* external pulses, bits of Apr.extpulse */
+enum Extpulse {
+	EXT_KEY_MANUAL  = 1,
+	EXT_KEY_STOP    = 2,
+	EXT_NONEXIT_MEM = 4
 };
 
 enum Opcode {
