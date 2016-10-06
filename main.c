@@ -715,6 +715,7 @@ wakepanel(void)
 void
 usage(void)
 {
+	fprintf(stderr, "usage: %s [-td]\n", argv0);
 	exit(1);
 }
 
