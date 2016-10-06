@@ -731,26 +731,28 @@ main(int argc, char *argv[])
 	int i;
 	Light *l;
 	Switch *sw;
+	const char *outfile;
 
 //	void testinst(Apr*);
 //	testinst(&apr);
 
 	debugfp = stdout;
-	//dotrace = 1;
 
+	outfile = "/dev/null";
 	ARGBEGIN{
 	case 't':
 		dotrace++;
 		break;
 	case 'd':
-		if(debugfp = fopen(EARGF(usage()), "w"), debugfp == nil){
-			fprintf(stderr, "Can't open debug file\n");
-			exit(1);
-		}
+		outfile = EARGF(usage());
 		break;
 	default:
 		usage();
 	}ARGEND;
+	if(debugfp = fopen(outfile, "w"), debugfp == nil){
+		fprintf(stderr, "Can't open %s\n", outfile);
+		exit(1);
+	}
 
 	if(SDL_Init(SDL_INIT_VIDEO) < 0){
 error:

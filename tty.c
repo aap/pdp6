@@ -65,7 +65,7 @@ ttythread(void *arg)
 		printf("TTY attached\n");
 		tty.fd = newsockfd;
 		while(n = read(tty.fd, &buf, 1), n > 0){
-			fprintf(stderr, "(got.%c)", buf);
+			//fprintf(stderr, "(got.%c)", buf);
 			tty.tti = buf|0200;
 			tty.tti_flag = 1;
 			recalc_tty_req();
