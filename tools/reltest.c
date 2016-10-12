@@ -1,33 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "pdp6common.h"
-
-word fw(hword l, hword r) { return ((word)l << 18) | (word)r; }
-hword left(word w) { return (w >> 18) & 0777777; }
-hword right(word w) { return w & 0777777; }
-
-/* just a subset here */
-enum ItemType
-{
-	Nothing = 0,
-	Code    = 1,
-	Symbols = 2,
-	Entry   = 4,
-	End     = 5,
-	Name    = 6,
-	Start   = 7,
-};
-
-enum SymType
-{
-	SymName    = 000,
-	SymGlobal  = 004,
-	SymLocal   = 010,
-	SymBlock   = 014,
-	SymGlobalH = 044,	/* hidden
-	SymLocalH  = 050,	 */
-	SymUndef   = 060,
-};
+#include "pdp6bin.h"
 
 word item[01000000];
 hword itemp, headp;

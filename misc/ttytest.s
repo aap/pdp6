@@ -1,6 +1,7 @@
 P=17
 TTY=120
-
+TAC=1
+TAC1=2
 
 PDLLEN=100
 
@@ -15,6 +16,8 @@ SP:	-PDLLEN,,PDL-1
 
 START:
 	MOVE	P,SP
+	MOVEI	0,STR
+	PUSHJ	P,PUTSTR
 	PUSHJ	P,GETCH
 	PUSHJ	P,PUTCHR
 	MOVEI	0,"\n
@@ -27,7 +30,6 @@ PUTSTR:
 	MOVE	4,0		# save str pointer to AC4
 PLOOP:
 	MOVE	0,(4)		# load char
-	JRST	4,
 	AOS	4		# advance to next
 	SKIPN	0		# check for end of string
 	 POPJ	P,
@@ -57,3 +59,4 @@ STR:
 	"a
 	"b
 	"c
+	0

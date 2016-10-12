@@ -3,34 +3,10 @@
 #include <stdint.h>
 #include <assert.h>
 #include "pdp6common.h"
+#include "pdp6bin.h"
+#include "../args.h"
 
-word fw(hword l, hword r) { return ((word)l << 18) | (word)r; }
-word point(word pos, word sz, hword p){ return (pos<<30)|(sz<<24)|p; }
-hword left(word w) { return (w >> 18) & 0777777; }
-hword right(word w) { return w & 0777777; }
-
-/* just a subset here */
-enum ItemType
-{
-	Nothing = 0,
-	Code    = 1,
-	Symbols = 2,
-	Entry   = 4,
-	End     = 5,
-	Name    = 6,
-	Start   = 7,
-};
-
-enum SymType
-{
-	SymName    = 000,
-	SymGlobal  = 004,
-	SymLocal   = 010,
-	SymBlock   = 014,
-	SymGlobalH = 044,	/* hidden
-	SymLocalH  = 050,	 */
-	SymUndef   = 060,
-};
+char *argv0;
 
 enum
 {
@@ -55,6 +31,9 @@ word mem[01000000];
 hword rel, loc;
 
 int error;
+
+char **files;
+int nfiles;
 
 /*
  * debugging helpers
@@ -332,7 +311,6 @@ void
 handlesym(void)
 {
 	int i;
-	word w1, w2;
 
 	while(itemsz){
 		readblock(2);
@@ -351,11 +329,27 @@ skipitem(void)
 		readblock(0);
 }
 
+void
+save(const char *filename)
+{
+	FILE *out;
+	out = mustopen(filename, "wb");
+	fclose(out);
+}
+
+void
+usage(void)
+{
+	fprintf(stderr, "usage: %s\n", argv0);
+	exit(1);
+}
+
 int
-main()
+main(int argc, char *argv[])
 {
 	word w;
-	hword i, type;
+	hword type;
+	int i;
 	void (*typesw[8])(void) = {
 		skipitem,
 		handlecode,
@@ -367,22 +361,36 @@ main()
 		handlestart,
 	};
 
-//	rel = 01000;
-	in = mustopen("test.rel", "rb");
-	while(w = getword(in), w != ~0){
-		type = left(w);
-		itemsz = right(w);
-		typesw[type]();
+	ARGBEGIN{
+	case 'r':
+		rel = strtol(EARGF(usage()), NULL, 8);
+		break;
+	default:
+		usage();
+	}ARGEND;
+
+	nfiles = argc;
+	files = argv;
+
+	for(i = 0; i < nfiles; i++){
+		in = mustopen(files[i], "rb");
+		while(w = getword(in), w != ~0){
+			type = left(w);
+			itemsz = right(w);
+			typesw[type]();
+		}
+		fclose(in);
 	}
-	fclose(in);
 
 	checkundef();
 	if(error)
 		return 1;
 
-	disasmrange(findsym(rad50(0, "LINKSR"))[1],
-	            findsym(rad50(0, "LINEP"))[1]);
-	disasmrange(0600+rel, 0603+rel);
+//	disasmrange(findsym(rad50(0, "LINKSR"))[1],
+//	            findsym(rad50(0, "LINEP"))[1]);
+//	disasmrange(0600+rel, 0603+rel);
+
+	save("a.dump");
 
 	return 0;
 }

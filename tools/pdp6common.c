@@ -1,6 +1,15 @@
 #include <stdio.h>
+#include <string.h>
 #include <stdint.h>
+#include <ctype.h>
 #include "pdp6common.h"
+
+word fw(hword l, hword r) { return ((word)l << 18) | (word)r; }
+word point(word pos, word sz, hword p) { return (pos<<30)|(sz<<24)|p; }
+hword left(word w) { return (w >> 18) & 0777777; }
+hword right(word w) { return w & 0777777; }
+word negw(word w) { return (~w + 1) & 0777777777777; }
+int isneg(word w) { return !!(w & 0400000000); }
 
 /* map ascii to radix50/squoze, also map lower to upper case */
 char
@@ -27,18 +36,26 @@ ascii2rad(char c)
 	return tab[c&0177];
 }
 
+static char rad50tab[] = {
+	' ', '0', '1', '2', '3', '4', '5', '6',
+	'7', '8', '9', 'A', 'B', 'C', 'D', 'E',
+	'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+	'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U',
+	'V', 'W', 'X', 'Y', 'Z', '.', '$', '%',
+	0
+};
+
 /* map radix50/squoze to ascii */
 char
 rad2ascii(char c)
 {
-	static char tab[] = {
-		' ', '0', '1', '2', '3', '4', '5', '6',
-		'7', '8', '9', 'A', 'B', 'C', 'D', 'E',
-		'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-		'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U',
-		'V', 'W', 'X', 'Y', 'Z', '.', '$', '%'
-	};
-	return tab[c%050];
+	return rad50tab[c%050];
+}
+
+int
+israd50(char c)
+{
+	return strchr(rad50tab, toupper(c)) != NULL;
 }
 
 /* convert ascii string + code to radix50 */
@@ -105,22 +122,31 @@ ascii2sixbit(char c)
 	return tab[c&0177];
 }
 
+static char sixbittab[] = {
+	' ', '!', '"', '#', '$', '%', '&', '\'',
+	'(', ')', '*', '+', ',', '-', '.', '/',
+	'0', '1', '2', '3', '4', '5', '6', '7',
+	'8', '9', ':', ';', '<', '=', '>', '?',
+	'@', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
+	'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+	'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',
+	'X', 'Y', 'Z', '[', '\\', ']', '^', '_',
+	0
+	
+};
+
+
 /* map sixbit to ascii */
 char
 sixbit2ascii(char c)
 {
-	static char tab[] = {
-		' ', '!', '"', '#', '$', '%', '&', '\'',
-		'(', ')', '*', '+', ',', '-', '.', '/',
-		'0', '1', '2', '3', '4', '5', '6', '7',
-		'8', '9', ':', ';', '<', '=', '>', '?',
-		'@', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
-		'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
-		'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',
-		'X', 'Y', 'Z', '[', '\\', ']', '^', '_'
-		
-	};
-	return tab[c&077];
+	return sixbittab[c&077];
+}
+
+int
+issixbit(char c)
+{
+	return strchr(sixbittab, toupper(c)) != NULL;
 }
 
 /* convert ascii string to sixbit */
