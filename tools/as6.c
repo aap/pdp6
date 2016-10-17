@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <stdint.h>
 #include <ctype.h>
 #include <stdarg.h>
@@ -21,9 +22,20 @@ enum Toktype
 	Unused = 0,
 	Symbol,
 	Word,
+
+	/* These must be kept as a block for expression parsing */
+	Plus,
+	Minus,
+	Star,
+	Slash,
+	Exclam,
+	Amper,
+	Shift,
+
 	Radix10,
 	Radix8,
 	Radix2,
+
 	Eol,
 
 	/* char classes */
@@ -40,8 +52,9 @@ enum Symtype
 	Intern = 002,	/* exported */
 	Extern = 004,	/* defined in other module */
 
-	Hide   = 010,	/* not visible to debugger */
-	Label  = 020,	/* to forbid redefinition */
+	Def    = 010,
+	Hide   = 020,	/* not visible to debugger */
+	Label  = 040,	/* to forbid redefinition */
 
 	Operator   = 0100,	/* primary instruction and opdef */
 	IoOperator,		/* io instruction */
@@ -84,15 +97,15 @@ int ctab[] = {
 	Unused, Unused, Unused, Unused, Unused, Unused, Unused, Unused,
 	Unused, Unused, Unused, Unused, Unused, Unused, Unused, Unused,
 
-	Ignore,    '!', Unused, Unused, Letter, Letter,    '&', Unused,
-	   '(',    ')',    '*',    '+', Unused,    '-', Letter,    '/',
+	Ignore, Exclam, Unused, Unused, Letter, Letter,  Amper, Unused,
+	   '(',    ')',   Star,   Plus, Unused,  Minus, Letter,  Slash,
 	 Digit,  Digit,  Digit,  Digit,  Digit,  Digit,  Digit,  Digit,
 	 Digit,  Digit, Unused,    ';',    '<', Unused,    '>', Unused,
 
 	Unused, Letter, Letter, Letter, Letter, Letter, Letter, Letter,
 	Letter, Letter, Letter, Letter, Letter, Letter, Letter, Letter,
 	Letter, Letter, Letter, Letter, Letter, Letter, Letter, Letter,
-	Letter, Letter, Letter, Unused, Unused, Unused,    '^',    '_',
+	Letter, Letter, Letter, Unused, Unused, Unused,    '^',  Shift,
 
 	Unused, Letter, Letter, Letter, Letter, Letter, Letter, Letter,
 	Letter, Letter, Letter, Letter, Letter, Letter, Letter, Letter,
@@ -102,13 +115,16 @@ int ctab[] = {
 
 char *argv0;
 char *filename;
-FILE *infp;
+char **files;
+int nfiles;
+FILE *infp, *tmpfp, *lstfp;
 char line[MAXLINE];
+char curline[MAXLINE];	/* unmodified line for listing */
 char *lp;	/* pointer to input */
 char *ops[MAXOPND];	/* tokenized operands */
 int numops;
 int lineno;
-int passno;
+int pass2;
 int error;
 Sym *dot;
 Value absdot, reldot;	/* saved values of dot */
@@ -119,6 +135,8 @@ void
 err(int n, char *fmt, ...)
 {
 	va_list ap;
+//	if(pass2 && n < 2)
+//		return;
 	va_start(ap, fmt);
 	fprintf(stderr, "%s:%d: ", filename, lineno);
 	vfprintf(stderr, fmt, ap);
@@ -147,13 +165,32 @@ mustopen(const char *name, const char *mode)
 	return f;
 }
 
+int lastline;	/* last line number printed in listing */
+void
+listline(void)
+{
+	if(lastline != lineno)
+		fprintf(lstfp, "%05d\t%s\n", lineno, curline);
+	else
+		fprintf(lstfp, "\n");
+	lastline = lineno;
+}
+
 void
 putv(word w, int rel)
 {
-	printf("	%06o%c %06o%c%06o%c\n",
+	printf("\t%06o%c\t%06o%c%06o%c\n",
 		right(dot->v.val), dot->v.rel ? '\'' : ' ',
 		left(w), rel & 2 ? '\'' : ' ',
 		right(w), rel & 1 ? '\'' : ' ');
+	if(pass2){
+		/* TODO: actually put a word */
+		fprintf(lstfp, "%06o%c\t%06o%c%06o%c\t",
+			right(dot->v.val), dot->v.rel ? '\'' : ' ',
+			left(w), rel & 2 ? '\'' : ' ',
+			right(w), rel & 1 ? '\'' : ' ');
+		listline();
+	}
 	dot->v.val++;
 }
 
@@ -162,6 +199,40 @@ getln(void)
 {
 	int c;
 	char *s;
+	static char filen[MAXLINE];
+
+	if(pass2){
+		for(;;){
+			c = getc(tmpfp);
+			if(c == 1){		/* filename */
+				s = filen;
+				while(c = getc(tmpfp), c)
+					*s++ = c;
+				*s = '\0';
+				filename = filen;
+				fprintf(lstfp, "\n\t%s\n\n", filename);
+				lineno = 0;
+				lastline = 0;
+			}else if(c == 2){	/* line */
+				/* if no words were produced,
+				 * list the original line here */
+				if(lastline == lineno-1){
+					fprintf(lstfp, "\t%14s\t", "");
+					listline();
+				}
+
+				s = line;
+				while(c = getc(tmpfp), c)
+					*s++ = c;
+				*s = '\0';
+				lineno++;
+				strcpy(curline, line);
+				return line;
+			}else if(c == 3)	/* EOF */
+				return nil;
+		}
+	}
+
 	s = line;
 	lineno++;
 	while(c = getc(infp), c != EOF){
@@ -180,6 +251,9 @@ getln(void)
 	if(c == EOF)
 		return nil;
 	*s = '\0';
+	putc(2, tmpfp);
+	fputs(line, tmpfp);
+	putc(0, tmpfp);
 	return line;
 }
 
@@ -306,163 +380,290 @@ token(void)
 			break;
 
 		default:
-			t.type = *lp++;
+			t.type = ctab[*lp++];
 			return t;
 		}
 	t.type = Eol;
 	return t;
 }
 
-Value
-apply(int op, Value v1, Value v2)
+/* This holds an expression AST */
+typedef struct Expr Expr;
+struct Expr
 {
-	int shft;
-	shft = v2.val;
-	if(isneg(v2.val))
-		shft = -negw(v2.val);
-	switch(op){
-	case '_':
-		if(shft < 0)
-			v1.val >>= -shft;
-		else
-			v1.val <<= shft;
-		break;
-	case '!':
-		v1.val |= v2.val;
-		break;
-	case '&':
-		v1.val &= v2.val;
-		break;
-	case '*':
-		v1.val *= v2.val;
-		break;
-	case '/':
-		v1.val /= v2.val;
-		break;
-	case '+':
-		v1.val += v2.val;
-		break;
+	int type;	/* word, symbol or operator */
+	word w;		/* type 0 */
+	Sym *s;		/* type 1 */
+	int op;		/* type 2 (unary), 3 (binary) */
+	Expr *l, *r;
+};
 
-	case '-':
-		v1.val -= v2.val;
-		if(v1.rel == v2.rel)
-			v1.rel = 0;
-		goto ret;
-
-	case 0:
-		return v2;
-	}
-	v1.rel += v2.rel;
-	if(v1.rel > 1){
-		err(1, "error: invalid expression type");
-		v1.rel = 0;
-		v1.val = 0;
-	}
-ret:
-	v1.val &= 0777777777777;
-	return v1;
+Expr*
+newexpr(int type)
+{
+	Expr *e;
+	e = malloc(sizeof(Expr));
+	memset(e, 0, sizeof(Expr));
+	e->type = type;
+	return e;
 }
 
-Value
-expr(void)
+void
+freeexpr(Expr *e)
 {
-	/* -
-	 * ^D ^O ^B ^F ^L
-	 * B _
-	 * logical	! &
-	 * mul/div	* /
-	 * add/sub	+ -
-	 * <>
-	 */
+	if(e->type >= 2)
+		freeexpr(e->r);
+	if(e->type == 3)
+		freeexpr(e->l);
+	free(e);
+}
+
+int
+isop(int op)
+{
+	static int prectab[] = {
+		0, 0,	/* Plus, Minus */
+		1, 1,	/* Star, Slash */
+		2, 2,	/* Exclam, Amper */
+		3,	/* Shift */
+	};
+	if(op >= Plus && op <= Shift)
+		return prectab[op-Plus];
+	return -1;
+}
+
+/* Evaluate an expression AST, also record an additive external symbol.
+ * If pass is 1 or 2, the expression must be defined in pass 1 or 2 resp. */
+Value
+eval(Expr *e, Sym **ext, int pass)
+{
+	int shft;
+	Value v, v2;
+	Sym *ex1, *ex2;
+	char name[8];
+
+	switch(e->type){
+	case 0:
+		v.val = e->w;
+		v.rel = 0;
+		return v;
+
+	case 1:
+		if(pass == 1 && (e->s->type & Def) == 0 ||
+		   pass == 2 && e->s->type & Extern){
+			unsixbit(e->s->name, name);
+			err(1, "error: symbol %s must be defined", name);
+			return (Value){ 0, 0 };
+		}
+		if(e->s->type & Extern){
+			*ext = e->s;
+			return (Value){ 0, 0 };
+		}
+		return e->s->v;
+
+	case 2:
+		if(e->op == Minus){
+			v = eval(e->r, ext, pass);
+			if(*ext)
+				err(1, "error: Invalid use of external");
+			v.val = negw(v.val);
+			return v;
+		}
+		panic("expression operator");
+
+	case 3:
+		ex1 = nil;
+		ex2 = nil;
+		v = eval(e->l, &ex1, pass);
+		v2 = eval(e->r, &ex2, pass);
+		if(ex1 == nil)
+			*ext = ex2;
+		else if(ex2 == nil)
+			*ext = ex1;
+		else
+			err(1, "error: Invalid use of external");
+
+		shft = v2.val;
+		if(isneg(v2.val))
+			shft = -negw(v2.val);
+
+		switch(e->op){
+		case Shift:
+			if(shft < 0)
+				v.val >>= -shft;
+			else
+				v.val <<= shft;
+			break;
+		case Exclam:
+			v.val |= v2.val;
+			break;
+		case Amper:
+			v.val &= v2.val;
+			break;
+		case Star:
+			v.val *= v2.val;
+			break;
+		case Slash:
+			v.val /= v2.val;
+			break;
+		case Plus:
+			v.val += v2.val;
+			break;
+
+		case Minus:
+			v.val -= v2.val;
+			if(v.rel == v2.rel)
+				v.rel = 0;
+			goto ret;
+		default:
+			panic("expression operator");
+		}
+		v.rel += v2.rel;
+		if(v.rel > 1){
+			err(1, "error: invalid expression type");
+			return (Value){ 0, 0 };
+		}
+	ret:
+		v.val &= 0777777777777;
+		return v;
+	}
+}
+
+
+Expr*
+parseexpr(int i)
+{
+	Expr *e, *e2;
 	Token t;
-	Value v1, v2;;
-	int op;
-	int neg;
-	int first;
 	int oldradix;
 
-	v1.rel = 0;
-	v1.val = 0;
-	op = 0;
-	neg = 0;
-	first = 1;
+	t = token();
+	if(t.type == Eol){
+		e = newexpr(0);
+		e->w = 0;
+		return e;
+	}
 
-	oldradix = radix;
-	while(t = token(), t.type != Eol)
-		switch(t.type){
-		case Word:
-			v2.val = t.w;
-			v2.rel = 0;
-			goto opnd;
-
-		case Symbol:
-			v2 = t.s->v;
-			goto opnd;
-
-		case '<':
-			v2 = expr();
+	/* unary and atoms */
+	if(i == 4){
+		if(t.type == Word){
+			e = newexpr(0);
+			e->w = t.w;
+		}else if(t.type == Symbol){
+			e = newexpr(1);
+			e->s = t.s;
+		}else if(t.type == Minus){
+			e = newexpr(2);
+			e->op = Minus;
+			e->r = parseexpr(i);
+		}else if(t.type == Radix10 || t.type == Radix8 || t.type == Radix2){
+			oldradix = radix;
+			if(t.type == Radix10)
+				radix = 10;
+			else if(t.type == Radix8)
+				radix = 8;
+			else if(t.type == Radix2)
+				radix = 2;
+			e = parseexpr(i);
+			radix = oldradix;
+		}else if(t.type == '<'){
+			e = parseexpr(0);
 			t = token();
 			if(t.type != '>'){
 				err(1, "error: '>' expected");
 				peekt = t;
 			}
-			goto opnd;
-
-		opnd:
-			radix = oldradix;
-			if(neg){
-				neg = 0;
-				v2.val = negw(v2.val);
-			}
-			v1 = apply(op, v1, v2);
-			first = 0;
-			op = 0;
-			break;
-
-		case Radix10:
-			radix = 10;
-			break;
-		case Radix8:
-			radix = 8;
-			break;
-		case Radix2:
-			radix = 2;
-			break;
-
-		case '^':
-			printf("%c\n", *lp);
-			return v1;
-
-		case '-':
-			if(op || first){
-				neg = 1;
-				break;
-			}else
-				op = t.type;
-			break;
-		case '_':
-		case '!':
-		case '&':
-		case '*':
-		case '/':
-		case '+':
-			if(op)
-				err(1, "error: bad expression");
-			op = t.type;
-			break;
-
-		default:
-			peekt = t;
-			return v1;
+		}else{
+			err(1, "error: expression syntax %o", t.type);
+			return nil;
 		}
-	return v1;
+		return e;
+	}
+
+	/* n-ary expressions */
+	if(t.type == Word || t.type == Symbol ||
+	   t.type == Minus || t.type == '<' ||
+	   t.type == Radix10 || t.type == Radix8 || t.type == Radix2 ){
+		peekt = t;
+		e = parseexpr(i+1);
+	}else{
+		err(1, "error: expression syntax %o", t.type);
+		return nil;
+	}
+
+	for(t = token(); isop(t.type) == i; t = token()){
+		e2 = newexpr(3);
+		e2->op = t.type;
+		e2->l = e;
+		e2->r = parseexpr(i+1);
+		e = e2;
+	}
+	if(t.type != Eol)
+		peekt = t;
+	return e;
+}
+
+void
+printexpr(Expr *e)
+{
+	char name[8];
+	char *opnames[] = {
+		"+", "-", "*", "/", "!", "&", "_", "^D", "^O", "^B"
+	};
+	if(e->type == 0)
+		printf("%lo", e->w);
+	else if(e->type == 1){
+		unsixbit(e->s->name, name);
+		printf("%s", name);
+	}else if(e->type == 2){
+		printf("(%s ", opnames[e->op - Plus]);
+		printexpr(e->r);
+		printf(")");
+	}else if(e->type == 3){
+		printf("(");
+		printexpr(e->l);
+		printf(" %s ", opnames[e->op - Plus]);
+		printexpr(e->r);
+		printf(")");
+	}
+}
+
+Value
+expr(int pass)
+{
+	/* -			5
+	 * ^D ^O ^B ^F ^L	4
+	 * B _			3
+	 * logical	! &	2
+	 * mul/div	* /	1
+	 * add/sub	+ -	0
+	 * <>
+	 */
+
+	Expr *e;
+	Sym *ext;
+	Value v;
+	char name[8];
+
+	printf("EXP LINE: %s %o\n", lp, peekt.type);
+	ext = nil;
+	e = parseexpr(0);
+	printf("EXPR: ");
+	printexpr(e);
+	printf("\n");
+	v = eval(e, &ext, pass);
+	if(ext){
+		unsixbit(ext->name, name);
+		printf("SAW EXTERNAL: %s\n", name);
+	}
+	freeexpr(e);
+	return v;
 }
 
 /* split operands separated by ',' starting at lp; remove whitespace */
 void
 splitop(void)
 {
-	int i;
 	int nparn;
 
 	numops = 0;
@@ -501,9 +702,7 @@ splitop(void)
 		}
 	}
 	*lp = '\0';
-//	for(i = 0; i < numops; i++)
-//		printf("{%s} ", ops[i]);
-//	putchar('\n');
+
 }
 
 /* Primary and IO instruction statement */
@@ -539,7 +738,7 @@ opline(word w, int io)
 	}
 
 	lp = acp;
-	ac = expr();
+	ac = expr(2);
 
 	i = 0;
 	lp = ep;
@@ -547,12 +746,13 @@ opline(word w, int io)
 		lp++;
 		i = 1;
 	}
-	y = expr();
+	y = expr(0);
 
 	x = (Value){ 0, 0 };
 	t = token();
 	if(t.type == '('){
-		x = expr();
+		/* TODO: this is probably a statement */
+		x = expr(2);
 		t = token();
 		if(t.type != ')')
 			err(1, "error: ')' expected");
@@ -587,6 +787,8 @@ internal(void)
 {
 	Sym *s;
 	int i;
+	if(pass2)
+		return;
 	splitop();
 	for(i = 0; i < numops; i++){
 		s = getsym(sixbit(ops[i]));
@@ -602,6 +804,8 @@ external(void)
 {
 	Sym *s;
 	int i;
+	if(pass2)
+		return;
 	splitop();
 	for(i = 0; i < numops; i++){
 		s = getsym(sixbit(ops[i]));
@@ -623,9 +827,9 @@ xwd(void)
 		err(0, "warning: need two operands");
 	else{
 		lp = ops[0];
-		l = expr();
+		l = expr(2);
 		lp = ops[1];
-		r = expr();
+		r = expr(0);
 	}
 	putv(fw(right(l.val), right(r.val)), (l.rel<<1) | r.rel);
 }
@@ -653,7 +857,7 @@ locOp(void)
 	if(dot->v.rel) reldot = dot->v;
 	else absdot = dot->v;
 	if(*lp && *lp != ';'){
-		dot->v = expr();
+		dot->v = expr(1);
 		dot->v.val &= 0777777;
 		dot->v.rel = 0;
 	}else
@@ -667,7 +871,7 @@ relocOp(void)
 	if(dot->v.rel) reldot = dot->v;
 	else absdot = dot->v;
 	if(*lp && *lp != ';'){
-		dot->v = expr();
+		dot->v = expr(1);
 		dot->v.val &= 0777777;
 		dot->v.rel = 1;
 	}else
@@ -765,7 +969,7 @@ radixOp(void)
 		return;
 	r = radix;
 	radix = 10;
-	v = expr();
+	v = expr(1);
 	radix = r;
 	if(v.val < 2 || v.val > 10)
 		err(1, "error: invalid radix %d", v.val);
@@ -799,7 +1003,7 @@ statement(void)
 				 * ::! label internal hide
 				 */
 				lp++;
-				type = Label | Local;
+				type = Label | Local | Def;
 				if(*lp == ':'){
 					lp++;
 					type |= Intern;
@@ -808,12 +1012,14 @@ statement(void)
 					lp++;
 					type |= Hide;
 				}
-				if(s->type != Undef){
-					err(1, "error: redefinition of %s", name);
-					return;
+				if(!pass2){
+					if(s->type & Def){
+						err(1, "error: redefinition of %s", name);
+						return;
+					}
+					s->type = type;
+					s->v = dot->v;
 				}
-				s->type = type;
-				s->v = dot->v;
 			}else if(*lp == '='){
 				/* assignment:
 				 * =   assign
@@ -822,7 +1028,7 @@ statement(void)
 				 * ==: assign internal hide
 				 */
 				lp++;
-				type = Local;
+				type = Local | Def;
 				if(*lp == '='){
 					lp++;
 					type |= Hide;
@@ -831,13 +1037,15 @@ statement(void)
 					lp++;
 					type |= Intern;
 				}
-				val = expr();
-				if(s->type & Label){
-					err(1, "error: redefinition of %s", name);
-					return;
+				val = expr(1);
+				if(!pass2){
+					if(s->type & Label){
+						err(1, "error: redefinition of %s", name);
+						return;
+					}
+					s->type = type;
+					s->v = val;
 				}
-				s->type = type;
-				s->v = val;
 			}else if(s->type == Operator){
 				unsixbit(s->name, name);
 				opline(s->v.val, 0);
@@ -856,9 +1064,9 @@ statement(void)
 		exp:
 		case Word:
 		case Radix10: case Radix8: case Radix2:
-		case '-':
+		case Minus:
 			peekt = t;
-			val = expr();
+			val = expr(0);
 			putv(val.val, val.rel);
 			break;
 
@@ -868,15 +1076,96 @@ statement(void)
 }
 
 void
-dumpsymtab(void)
+assemble(void)
+{
+	while(lp = getln()){
+		peekt.type = Unused;
+		statement();
+	}
+}
+
+void
+resetdot(void)
+{
+	dot = getsym(sixbit("."));
+	dot->type = Local | Hide;
+	absdot = (Value){ 0, 0 };
+	reldot = (Value){ 0, 1 };
+	dot->v = reldot;
+}
+
+void
+checkundef(int glob)
 {
 	char name[8];
 	Sym *s;
 	for(s = symtab; s < &symtab[MAXSYM]; s++)
-		if(s->name && s->type != Operator && s->type != IoOperator){
+		if(s->name &&
+		   s->type != Operator && s->type != IoOperator && s->type != Pseudo){
 			unsixbit(s->name, name);
-			printf("%s %3o: %012lo %o\n", name, s->type, s->v.val, s->v.rel);
+			if(s->type == Undef){
+				if(glob)
+					s->type |= Extern;
+				else
+					err(1, "undefined symbol: %s\n", name);
+			}
 		}
+}
+
+int
+symcmp(const void *a, const void *b)
+{
+	char s1[8], s2[8];
+	unsixbit((*(Sym**)a)->name, s1);
+	unsixbit((*(Sym**)b)->name, s2);
+	return strcmp(s1, s2);
+}
+
+void
+listsymtab(void)
+{
+	hword l, r;
+	char name[8];
+	Sym *s;
+	Sym *sortlist[MAXSYM];
+	int i, nsym;
+
+	nsym = 0;
+	for(s = symtab; s < &symtab[MAXSYM]; s++){
+		if(s->name == 0 || s == dot ||
+		   s->type == Operator || s->type == IoOperator || s->type == Pseudo)
+			continue;
+		sortlist[nsym++] = s;
+	}
+	qsort(sortlist, nsym, sizeof(Sym*), symcmp);
+
+
+	fprintf(lstfp, "\nSYMBOL TABLE\n\n");
+	for(i = 0; i < nsym; i++){
+		s = sortlist[i];
+		unsixbit(s->name, name);
+		l = left(s->v.val);
+		r = right(s->v.val);
+		fprintf(lstfp, "%s%6s", name, "");
+		if(l)
+			fprintf(lstfp, "%06o", l);
+		else
+			fprintf(lstfp, "%6s", "");
+		fprintf(lstfp, "%06o%c ", r, s->v.rel ? '\'' : ' ');
+		if(s->type & Extern)
+			fprintf(lstfp, "EXT");
+		if(s->type & Intern)
+			fprintf(lstfp, "INT");
+		fprintf(lstfp, "\n");
+
+		printf("%s %3o: %012lo %o\n", name, s->type, s->v.val, s->v.rel);
+	}
+}
+
+void
+cleanup(void)
+{
+	remove("a.tmp");
 }
 
 void
@@ -890,50 +1179,93 @@ void initsymtab(void);
 int
 main(int argc, char *argv[])
 {
+	int i;
+
 	ARGBEGIN{
 	default:
 		usage();
 		break;
 	}ARGEND;
 
-	lineno = 0;
-	passno = 1;
-	infp = stdin;
-	filename = "stdin";
-	if(argc){
-		filename = argv[0];
-		infp = mustopen(filename, "r");
-	}
+	nfiles = argc;
+	files = argv;
+
+	tmpfp = mustopen("a.tmp", "w");
+	atexit(cleanup);
 
 	initsymtab();
 
 	{
 	Sym *s;
 	s = getsym(sixbit("HELLO"));
-	s->type = Local;
+	s->type = Local | Def;
 	s->v.val = 0432100001234;
 	s->v.rel = 1;
 	s = getsym(sixbit("ASDF"));
-	s->type = Extern;
+	s->type = Intern | Def;
 	s->v.val = 0100;
 	s->v.rel = 1;
+	s = getsym(sixbit("BAR"));
+	s->type = Local | Def;
+	s->v.val = 0100;
+	s->v.rel = 0;
+	s = getsym(sixbit("QUUX"));
+	s->type = Extern;
+	s->v.val = 0;
+	s->v.rel = 0;
 	s = getsym(sixbit("QWERTY"));
-	s->type = Label;
+	s->type = Label | Def;
 	s->v.val = 010;
 	s->v.rel = 1;
 	s = getsym(sixbit("QWERTYUIOP"));
 	}
 
-	while(lp = getln()){
-		peekt.type = Unused;
-		printf("%s:%d: %s\n", filename, lineno, lp);
-		statement();
-	}
-	dumpsymtab();
+	resetdot();
+	pass2 = 0;
+	if(argc){
+		for(i = 0; i < argc; i++){
+			filename = argv[i];
+			infp = mustopen(filename, "r");
+			putc(1, tmpfp);
+			fputs(filename, tmpfp);
+			putc(0, tmpfp);
+			lineno = 0;
 
-	fclose(infp);
-	if(error)
+			assemble();
+			fclose(infp);
+		}
+	}else{
+		filename = "stdin";
+		infp = stdin;
+		putc(1, tmpfp);
+		fputs(filename, tmpfp);
+		putc(0, tmpfp);
+		lineno = 0;
+
+		assemble();
+	}
+	putc(3, tmpfp);
+
+	fclose(tmpfp);
+	checkundef(1);
+
+	if(error & 1)
 		panic("Error\n*****");
+
+	lstfp = mustopen("a.lst", "w");
+	tmpfp = mustopen("a.tmp", "r");
+
+	resetdot();
+	pass2 = 1;
+	printf("\n   PASS2\n\n");
+
+	assemble();
+
+	listsymtab();
+
+	fclose(tmpfp);
+	fclose(lstfp);
+
 	return 0;
 }
 
@@ -965,12 +1297,6 @@ initsymtab(void)
 	Op *op;
 	Ps *ps;
 	Sym *s;
-
-	dot = getsym(sixbit("."));
-	dot->type = Local | Hide;
-	absdot = (Value){ 0, 0 };
-	reldot = (Value){ 0, 1 };
-	dot->v = reldot;
 
 	for(op = oplist; op->name[0]; op++){
 		s = getsym(sixbit(op->name));
