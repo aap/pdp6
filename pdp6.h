@@ -300,6 +300,8 @@ extern u8 ioreq[128];
 void recalc_req(void);
 
 void inittty(void);
+void initpt(void);
+void ptr_setmotor(int m);
 
 //void wakepanel(void);
 

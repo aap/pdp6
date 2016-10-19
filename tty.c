@@ -60,13 +60,14 @@ ttythread(void *arg)
 	listen(sockfd,5);
 	clilen = sizeof(cli_addr);
 
-	pthread_t thread_id;
 	while(newsockfd = accept(sockfd, (struct sockaddr*)&cli_addr, &clilen)){
 		printf("TTY attached\n");
 		tty.fd = newsockfd;
 		while(n = read(tty.fd, &buf, 1), n > 0){
+			tty.tti_busy = 1;
 			//fprintf(stderr, "(got.%c)", buf);
 			tty.tti = buf|0200;
+			tty.tti_busy = 0;
 			tty.tti_flag = 1;
 			recalc_tty_req();
 		}
@@ -100,8 +101,10 @@ wake_tty(void)
 		if(tty.tto_flag) iobus0 |= F32;
 		iobus0 |= tty.pia & 7;
 	}
-	if(IOB_DATAI)
-		apr.ar = tty.tti;
+	if(IOB_DATAI){
+		iobus0 |= tty.tti;
+		tty.tti_flag = 0;
+	}
 	if(IOB_CONO_CLEAR)
 		tty.pia = 0;
 	if(IOB_CONO_SET){
@@ -115,15 +118,18 @@ wake_tty(void)
 		if(iobus0 & F32) tty.tto_flag = 1;
 		tty.pia |= iobus0 & 7;
 	}
-	if(IOB_DATAO_CLEAR)
+	if(IOB_DATAO_CLEAR){
 		tty.tto = 0;
+		tty.tto_busy = 1;
+		tty.tto_flag = 0;
+	}
 	if(IOB_DATAO_SET){
 		tty.tto = iobus0 & 0377;
-		tty.tto_busy = 1;
 		if(tty.tto & 0200 && tty.fd >= 0){
 			tty.tto &= ~0200;
 			write(tty.fd, &tty.tto, 1);
 		}
+		// TTO DONE
 		tty.tto_busy = 0;
 		tty.tto_flag = 1;
 	}

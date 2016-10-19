@@ -389,7 +389,7 @@ handlestart(void)
  *	CONSO	PTR,10
  *	JRST	.-1
  * B:	0
- *	JRST	!
+ *	JRST	A
  */
 void
 save(const char *filename)

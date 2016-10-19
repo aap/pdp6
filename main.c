@@ -678,14 +678,14 @@ mouse(int button, int state, int x, int y)
 			keys[i].state = 1;
 		if(buttonstate & 4)
 			keys[i].state = 2;
-		if(prevst != keys[i].state){
+		if(prevst != keys[i].state && apr.sw_power){
 			switch(i){
 			case 0:	/* start */
 			case 1:	/* cont */
 			case 3:	/* execute, reset */
 			case 4:	/* deposit */
 			case 5:	/* examine */
-				if(keys[i].state && apr.sw_power)
+				if(keys[i].state)
 					tmpextpulse |= EXT_KEY_MANUAL;
 				break;
 			case 2:	/* stop */
@@ -693,6 +693,11 @@ mouse(int button, int state, int x, int y)
 					tmpextpulse |= EXT_KEY_STOP;
 				break;
 			case 6:	/* on off reader */
+				if(keys[i].state == 1)	// off
+					ptr_setmotor(0);
+				else if(keys[i].state == 2)	// on
+					ptr_setmotor(1);
+				break;
 			case 7: /* punch */
 				break;
 			}
@@ -874,6 +879,7 @@ error:
 
 	initmem();
 	inittty();
+	initpt();
 	memset(&apr, 0xff, sizeof apr);
 	apr.extpulse = 0;
 

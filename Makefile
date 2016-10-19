@@ -1,4 +1,4 @@
-SRC=main.c apr.c mem.c tty.c
+SRC=main.c apr.c mem.c tty.c pt.c
 # clang
 #CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses \
 #        -Wno-bitwise-op-parentheses
