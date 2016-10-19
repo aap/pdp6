@@ -11,6 +11,32 @@ hword right(word w) { return w & 0777777; }
 word negw(word w) { return (~w + 1) & 0777777777777; }
 int isneg(word w) { return !!(w & 0400000000); }
 
+void
+writew(word w, FILE *fp)
+{
+	int j;
+	w &= 0777777777777;
+	for(j = 5; j >= 0; j--)
+		putc(0200 | (w>>j*6)&077, fp);
+}
+
+word
+readw(FILE *fp)
+{
+	int i, b;
+	word w;
+	w = 0;
+	for(i = 0; i < 6; i++){
+	cont:
+		if(b = getc(fp), b == EOF)
+			return ~0;
+		if((b & 0200) == 0)
+			goto cont;
+		w = (w << 6) | (b & 077);
+	}
+	return w;
+}
+
 /* map ascii to radix50/squoze, also map lower to upper case */
 char
 ascii2rad(char c)

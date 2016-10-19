@@ -69,6 +69,14 @@ struct Value
 	int rel;	/* 0 = absolute, else relative */
 };
 
+typedef struct Additive Additive;
+struct Additive
+{
+	int l;
+	Value v;
+	Additive *next;
+};
+
 typedef struct Sym Sym;
 struct Sym
 {
@@ -78,8 +86,8 @@ struct Sym
 		Value v;
 		void (*f)(void);
 	};
+	Additive *add;
 };
-Sym symtab[MAXSYM];
 
 typedef struct Token Token;
 struct Token
@@ -117,7 +125,11 @@ char *argv0;
 char *filename;
 char **files;
 int nfiles;
-FILE *infp, *tmpfp, *lstfp;
+FILE *infp, *tmpfp, *relfp, *lstfp;
+char progtitle[MAXLINE];
+char progsubtitle[MAXLINE];
+int hadstart;
+Value start;
 char line[MAXLINE];
 char curline[MAXLINE];	/* unmodified line for listing */
 char *lp;	/* pointer to input */
@@ -126,17 +138,29 @@ int numops;
 int lineno;
 int pass2;
 int error;
+Sym symtab[MAXSYM];
 Sym *dot;
 Value absdot, reldot;	/* saved values of dot */
 int radix = 8;
 Token peekt;
 
+/*
+ * for REL output
+ */
+word item[01000000];
+hword itemp;
+hword itemtype, itemsz;
+
+hword relocp;
+word blockreloc;
+int blocksz;
+
+/* Helpers */
+
 void
 err(int n, char *fmt, ...)
 {
 	va_list ap;
-//	if(pass2 && n < 2)
-//		return;
 	va_start(ap, fmt);
 	fprintf(stderr, "%s:%d: ", filename, lineno);
 	vfprintf(stderr, fmt, ap);
@@ -165,6 +189,60 @@ mustopen(const char *name, const char *mode)
 	return f;
 }
 
+/* Output/listing */
+
+void
+writeout(void)
+{
+	hword i;
+	for(i = 0; i < itemp-1; i++){
+		writew(item[i], relfp);
+	//	printf("\t\tDUMP: %06o %06o\n", left(item[i]), right(item[i]));
+	}
+	printf("\n");
+}
+
+/* Start a REL block */
+void
+startblock(void)
+{
+	if(blocksz){
+		blockreloc <<= 2*(18-blocksz);
+		item[relocp] = blockreloc;
+		relocp = itemp++;
+		blockreloc = 0;
+		blocksz = 0;
+	}
+}
+
+/* Put a relocated word into REL block */
+void
+putword(word w, int reloc)
+{
+	item[itemp++] = w;
+	blockreloc = blockreloc<<2 | reloc;
+	blocksz++;
+	itemsz++;
+	if(blocksz == 18)
+		startblock();
+}
+
+/* Start a REL item and write out the last one */
+void
+startitem(hword it)
+{
+	startblock();
+	if(itemsz){
+		item[0] = fw(itemtype, itemsz);
+		writeout();
+	}
+
+	itemtype = it;
+	itemsz = 0;
+	itemp = 1;
+	relocp = itemp++;
+}
+
 int lastline;	/* last line number printed in listing */
 void
 listline(void)
@@ -176,23 +254,44 @@ listline(void)
 	lastline = lineno;
 }
 
+word relbreak, absbreak;
+Value lastdot;
+
+/* Emit a relocated word at dot and advance dot */
 void
 putv(word w, int rel)
 {
-	printf("\t%06o%c\t%06o%c%06o%c\n",
-		right(dot->v.val), dot->v.rel ? '\'' : ' ',
-		left(w), rel & 2 ? '\'' : ' ',
-		right(w), rel & 1 ? '\'' : ' ');
 	if(pass2){
-		/* TODO: actually put a word */
 		fprintf(lstfp, "%06o%c\t%06o%c%06o%c\t",
 			right(dot->v.val), dot->v.rel ? '\'' : ' ',
 			left(w), rel & 2 ? '\'' : ' ',
 			right(w), rel & 1 ? '\'' : ' ');
 		listline();
+
+		if(dot->v.rel != lastdot.rel ||
+		   dot->v.val != lastdot.val+1){
+			startitem(Code);
+			putword(dot->v.val, dot->v.rel);
+		}
+		putword(w, rel);
+	}else{
+		printf("\t%06o%c\t%06o%c%06o%c\n",
+			right(dot->v.val), dot->v.rel ? '\'' : ' ',
+			left(w), rel & 2 ? '\'' : ' ',
+			right(w), rel & 1 ? '\'' : ' ');
 	}
+	lastdot = dot->v;
 	dot->v.val++;
+	if(dot->v.rel){
+		if(dot->v.val > relbreak)
+			relbreak = dot->v.val;
+	}else{
+		if(dot->v.val > absbreak)
+			absbreak = dot->v.val;
+	}
 }
+
+/* Input */
 
 char*
 getln(void)
@@ -201,8 +300,15 @@ getln(void)
 	char *s;
 	static char filen[MAXLINE];
 
-	if(pass2){
+	if(pass2)
 		for(;;){
+			/* if no words were produced,
+			 * list the original line here */
+			if(lastline == lineno-1){
+				fprintf(lstfp, "\t%14s\t", "");
+				listline();
+			}
+
 			c = getc(tmpfp);
 			if(c == 1){		/* filename */
 				s = filen;
@@ -214,13 +320,6 @@ getln(void)
 				lineno = 0;
 				lastline = 0;
 			}else if(c == 2){	/* line */
-				/* if no words were produced,
-				 * list the original line here */
-				if(lastline == lineno-1){
-					fprintf(lstfp, "\t%14s\t", "");
-					listline();
-				}
-
 				s = line;
 				while(c = getc(tmpfp), c)
 					*s++ = c;
@@ -231,7 +330,6 @@ getln(void)
 			}else if(c == 3)	/* EOF */
 				return nil;
 		}
-	}
 
 	s = line;
 	lineno++;
@@ -264,6 +362,8 @@ skipwhite(void)
 		lp++;
 }
 
+/* Symbols */
+
 /* Just find symbol, or return nil.
  * TODO: improve linear search... */
 Sym*
@@ -294,6 +394,37 @@ found:
 	}
 	return s;
 }
+
+void
+updateext(Sym *s, Value *v, int l)
+{
+	Additive *a;
+
+	if(!pass2 || s == nil)
+		return;
+
+	if(l){
+		a = malloc(sizeof(Additive));
+		a->l = 1;
+		a->v = dot->v;
+		a->next = s->add;
+		s->add = a;
+	}else{
+		if(v->val == 0 && v->rel == 0){
+			/* add to request chain */
+			*v = s->v;
+			s->v = dot->v;
+		}else{
+			a = malloc(sizeof(Additive));
+			a->l = 0;
+			a->v = dot->v;
+			a->next = s->add;
+			s->add = a;
+		}
+	}
+}
+
+/* Token parsing */
 
 /* parse a potential number, fall back to symbol */
 Token
@@ -387,6 +518,8 @@ token(void)
 	return t;
 }
 
+/* Expressions */
+
 /* This holds an expression AST */
 typedef struct Expr Expr;
 struct Expr
@@ -449,8 +582,8 @@ eval(Expr *e, Sym **ext, int pass)
 		return v;
 
 	case 1:
-		if(pass == 1 && (e->s->type & Def) == 0 ||
-		   pass == 2 && e->s->type & Extern){
+		if(!pass2 && pass == 1 && (e->s->type & Def) == 0 ||
+		    pass2 && pass == 2 && e->s->type & Extern){
 			unsixbit(e->s->name, name);
 			err(1, "error: symbol %s must be defined", name);
 			return (Value){ 0, 0 };
@@ -629,7 +762,7 @@ printexpr(Expr *e)
 }
 
 Value
-expr(int pass)
+expr(int pass, Sym **s)
 {
 	/* -			5
 	 * ^D ^O ^B ^F ^L	4
@@ -645,20 +778,26 @@ expr(int pass)
 	Value v;
 	char name[8];
 
-	printf("EXP LINE: %s %o\n", lp, peekt.type);
+/*	printf("EXP LINE: %s %o\n", lp, peekt.type); */
 	ext = nil;
 	e = parseexpr(0);
-	printf("EXPR: ");
+/*	printf("EXPR: ");
 	printexpr(e);
-	printf("\n");
+	printf("\n");*/
 	v = eval(e, &ext, pass);
+	if(s)
+		*s = ext;
+/*
 	if(ext){
 		unsixbit(ext->name, name);
 		printf("SAW EXTERNAL: %s\n", name);
 	}
+*/
 	freeexpr(e);
 	return v;
 }
+
+/* Statements */
 
 /* split operands separated by ',' starting at lp; remove whitespace */
 void
@@ -710,6 +849,7 @@ void
 opline(word w, int io)
 {
 	char *acp, *ep;
+	Sym *ext;
 	Value ac, x, y;
 	Token t;
 	int i;
@@ -738,7 +878,7 @@ opline(word w, int io)
 	}
 
 	lp = acp;
-	ac = expr(2);
+	ac = expr(2, nil);
 
 	i = 0;
 	lp = ep;
@@ -746,13 +886,15 @@ opline(word w, int io)
 		lp++;
 		i = 1;
 	}
-	y = expr(0);
+	ext = nil;
+	y = expr(0, &ext);
+	updateext(ext, &y, 0);
 
 	x = (Value){ 0, 0 };
 	t = token();
 	if(t.type == '('){
 		/* TODO: this is probably a statement */
-		x = expr(2);
+		x = expr(2, nil);
 		t = token();
 		if(t.type != ')')
 			err(1, "error: ')' expected");
@@ -820,16 +962,22 @@ void
 xwd(void)
 {
 	Value l, r;
+	Sym *exl, *exr;
+
 	splitop();
 	l = (Value){ 0, 0 };
 	r = (Value){ 0, 0 };
 	if(numops != 2)
 		err(0, "warning: need two operands");
 	else{
+		exl = nil;
+		exr = nil;
 		lp = ops[0];
-		l = expr(2);
+		l = expr(0, &exl);
 		lp = ops[1];
-		r = expr(0);
+		r = expr(0, &exr);
+		updateext(exl, &l, 1);
+		updateext(exr, &r, 0);
 	}
 	putv(fw(right(l.val), right(r.val)), (l.rel<<1) | r.rel);
 }
@@ -837,17 +985,15 @@ xwd(void)
 void
 title(void)
 {
-	/* TODO */
 	skipwhite();
-	printf("TITLE: %s\n", lp);
+	strncpy(progtitle, lp, MAXLINE);
 }
 
 void
 subttl(void)
 {
-	/* TODO */
 	skipwhite();
-	printf("SUBTTL: %s\n", lp);
+	strncpy(progsubtitle, lp, MAXLINE);
 }
 
 void
@@ -857,7 +1003,7 @@ locOp(void)
 	if(dot->v.rel) reldot = dot->v;
 	else absdot = dot->v;
 	if(*lp && *lp != ';'){
-		dot->v = expr(1);
+		dot->v = expr(1, nil);
 		dot->v.val &= 0777777;
 		dot->v.rel = 0;
 	}else
@@ -871,7 +1017,7 @@ relocOp(void)
 	if(dot->v.rel) reldot = dot->v;
 	else absdot = dot->v;
 	if(*lp && *lp != ';'){
-		dot->v = expr(1);
+		dot->v = expr(1, nil);
 		dot->v.val &= 0777777;
 		dot->v.rel = 1;
 	}else
@@ -959,6 +1105,14 @@ sixbitOp(void)
 }
 
 void
+endOp(void)
+{
+	skipwhite();
+	start = expr(2, nil);
+	hadstart = 1;
+}
+
+void
 radixOp(void)
 {
 	int r;
@@ -969,7 +1123,7 @@ radixOp(void)
 		return;
 	r = radix;
 	radix = 10;
-	v = expr(1);
+	v = expr(1, nil);
 	radix = r;
 	if(v.val < 2 || v.val > 10)
 		err(1, "error: invalid radix %d", v.val);
@@ -977,17 +1131,13 @@ radixOp(void)
 		radix = v.val;
 }
 
-/*
- *
- */
-
 void
 statement(void)
 {
 	Token t;
 	Value val;
 	int type;
-	Sym *s;
+	Sym *s, *ext;
 	char name[8];
 
 	while(t = token(), t.type != Eol)
@@ -1017,7 +1167,7 @@ statement(void)
 						err(1, "error: redefinition of %s", name);
 						return;
 					}
-					s->type = type;
+					s->type = (s->type&(Intern|Extern|Hide)) | type;
 					s->v = dot->v;
 				}
 			}else if(*lp == '='){
@@ -1037,13 +1187,13 @@ statement(void)
 					lp++;
 					type |= Intern;
 				}
-				val = expr(1);
+				val = expr(1, nil);
 				if(!pass2){
 					if(s->type & Label){
 						err(1, "error: redefinition of %s", name);
 						return;
 					}
-					s->type = type;
+					s->type = (s->type&(Intern|Extern|Hide)) | type;
 					s->v = val;
 				}
 			}else if(s->type == Operator){
@@ -1066,7 +1216,9 @@ statement(void)
 		case Radix10: case Radix8: case Radix2:
 		case Minus:
 			peekt = t;
-			val = expr(0);
+			ext = nil;
+			val = expr(0, &ext);
+			updateext(ext, &val, 0);
 			putv(val.val, val.rel);
 			break;
 
@@ -1092,6 +1244,9 @@ resetdot(void)
 	absdot = (Value){ 0, 0 };
 	reldot = (Value){ 0, 1 };
 	dot->v = reldot;
+	lastdot = dot->v;
+	/* invalidate lastdot */
+	lastdot.val = 0777777777777;
 }
 
 void
@@ -1122,13 +1277,16 @@ symcmp(const void *a, const void *b)
 }
 
 void
-listsymtab(void)
+writesymtab(void)
 {
 	hword l, r;
 	char name[8];
 	Sym *s;
 	Sym *sortlist[MAXSYM];
+	Additive *add;
+	word rad;
 	int i, nsym;
+	int type;
 
 	nsym = 0;
 	for(s = symtab; s < &symtab[MAXSYM]; s++){
@@ -1140,9 +1298,21 @@ listsymtab(void)
 	qsort(sortlist, nsym, sizeof(Sym*), symcmp);
 
 
+	startitem(Symbols);
 	fprintf(lstfp, "\nSYMBOL TABLE\n\n");
 	for(i = 0; i < nsym; i++){
 		s = sortlist[i];
+
+		type = 0;
+		if(s->type & Intern)
+			type = SymGlobal;
+		else if(s->type & Local)
+			type = SymLocal;
+		if(s->type & Hide)
+			type |= 040;
+		if(s->type & Extern)
+			type = SymUndef;
+
 		unsixbit(s->name, name);
 		l = left(s->v.val);
 		r = right(s->v.val);
@@ -1158,9 +1328,22 @@ listsymtab(void)
 			fprintf(lstfp, "INT");
 		fprintf(lstfp, "\n");
 
+		rad = rad50(type, name);
+		putword(rad, 0);
+		putword(fw(0, right(s->v.val)), s->v.rel);
+
 		printf("%s %3o: %012lo %o\n", name, s->type, s->v.val, s->v.rel);
+		for(add = s->add; add; add = add->next){
+			printf(" %c %06o\n", "rl"[add->l], right(add->v.val));
+
+			putword(rad, 0);
+			putword(fw(0400000 | (add->l ? 0200000 : 0), right(add->v.val)),
+			        add->v.rel);
+		}
 	}
 }
+
+/* Basic program flow */
 
 void
 cleanup(void)
@@ -1176,12 +1359,17 @@ usage(void)
 
 void initsymtab(void);
 
+char *outfile = "a.rel";
+
 int
 main(int argc, char *argv[])
 {
 	int i;
 
 	ARGBEGIN{
+	case 'o':
+		outfile = EARGF(usage());
+		break;
 	default:
 		usage();
 		break;
@@ -1195,7 +1383,7 @@ main(int argc, char *argv[])
 
 	initsymtab();
 
-	{
+	if(0){
 	Sym *s;
 	s = getsym(sixbit("HELLO"));
 	s->type = Local | Def;
@@ -1214,7 +1402,7 @@ main(int argc, char *argv[])
 	s->v.val = 0;
 	s->v.rel = 0;
 	s = getsym(sixbit("QWERTY"));
-	s->type = Label | Def;
+	s->type = Label | Local | Def;
 	s->v.val = 010;
 	s->v.rel = 1;
 	s = getsym(sixbit("QWERTYUIOP"));
@@ -1253,17 +1441,32 @@ main(int argc, char *argv[])
 		panic("Error\n*****");
 
 	lstfp = mustopen("a.lst", "w");
+	relfp = mustopen(outfile, "w");
 	tmpfp = mustopen("a.tmp", "r");
 
 	resetdot();
 	pass2 = 1;
 	printf("\n   PASS2\n\n");
 
+	startitem(Name);
+	putword(rad50(0, progtitle), 0);
+
 	assemble();
 
-	listsymtab();
+	writesymtab();
+
+	if(hadstart){
+		startitem(Start);
+		putword(right(start.val), start.rel);
+	}
+
+	startitem(End);
+	putword(right(relbreak), 1);
+	putword(right(absbreak), 0);
+	startitem(Nothing);
 
 	fclose(tmpfp);
+	fclose(relfp);
 	fclose(lstfp);
 
 	return 0;
@@ -1323,6 +1526,7 @@ Ps pslist[] = {
 	{ "ASCIZ",    asciz },
 	{ "SIXBIT",   sixbitOp },
 	{ "RADIX",    radixOp },
+	{ "END",      endOp },
 /*
    " '
    RADIX50 SQUOZE

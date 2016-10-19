@@ -16,7 +16,7 @@ enum SymType
 	SymGlobal  = 004,
 	SymLocal   = 010,
 	SymBlock   = 014,
-	SymGlobalH = 044,	/* hidden
-	SymLocalH  = 050,	 */
+	SymGlobalH = 044,	/* hidden */
+	SymLocalH  = 050,	/* */
 	SymUndef   = 060,
 };

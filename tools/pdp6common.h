@@ -7,6 +7,8 @@ hword left(word w);
 hword right(word w);
 word negw(word w);
 int isneg(word w);
+void writew(word w, FILE *fp);
+word readw(FILE *fp);
 
 char ascii2rad(char c);
 char rad2ascii(char c);

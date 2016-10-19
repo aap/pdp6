@@ -1,17 +1,40 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include <assert.h>
 #include "pdp6common.h"
 #include "pdp6bin.h"
 #include "../args.h"
 
-char *argv0;
+#define nil NULL
 
 enum
 {
 	MAXSYM = 1000
 };
+
+typedef struct Add Add;
+struct Add
+{
+	word name;
+	int l;
+	hword addr;
+	Add *next;
+};
+
+
+char *argv0;
+FILE *in;
+hword itemsz;
+word mem[01000000];
+hword rel, loc;
+hword locmax, locmin;
+hword start;
+Add *addlist;
+int error;
+char **files;
+int nfiles;
 
 FILE*
 mustopen(const char *name, const char *mode)
@@ -24,16 +47,17 @@ mustopen(const char *name, const char *mode)
 	return f;
 }
 
-FILE *in;
-hword itemsz;
-
-word mem[01000000];
-hword rel, loc;
-
-int error;
-
-char **files;
-int nfiles;
+void
+err(int n, char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	fprintf(stderr, "error: ");
+	vfprintf(stderr, fmt, ap);
+	fprintf(stderr, "\n");
+	va_end(ap);
+	error |= n;
+}
 
 /*
  * debugging helpers
@@ -131,6 +155,28 @@ resolvereq(hword p, hword hw)
 	}while(next);
 }
 
+/* Perform additive external fixup */
+void
+fixadd(void)
+{
+	Add *a;
+	word *s;
+	char name[8];
+
+	for(a = addlist; a; a = a->next){
+		s = findsym(a->name);
+		if(s == nil){
+			unrad50(a->name, name);
+			fprintf(stderr, "Need symbol %s\n", name);
+			continue;
+		}
+		if(a->l)
+			mem[a->addr] += fw(right(s[1]), 0);
+		else
+			mem[a->addr] += fw(0, right(s[1]));
+	}
+}
+
 /* Insert a symbol into the symbol table. Handle linking. */
 void
 loadsym(word *newsym)
@@ -139,8 +185,20 @@ loadsym(word *newsym)
 	int type, newtype;
 	char name[8];
 
-	sym = findsym(newsym[0]);
 	newtype = (newsym[0]>>30)&074;
+	if(newtype == SymUndef && left(newsym[1]) & 0400000){
+		/* Additive fixup */
+		Add *a;
+		a = malloc(sizeof(Add));
+		a->name = newsym[0];
+		a->l = !!(left(newsym[1]) & 0200000);
+		a->addr = right(newsym[1]);
+		a->next = addlist;
+		addlist = a;
+		return;
+	}
+
+	sym = findsym(newsym[0]);
 	if(sym == NULL){
 		/* Symbol not in table yet.
 		 * TODO: ignore locals? */
@@ -171,8 +229,7 @@ loadsym(word *newsym)
 			if(newtype == type &&
 			   newsym[1] == sym[1])
 				return;
-			fprintf(stderr, "Error: multiple definitions: %s\n", name);
-			error = 1;
+			err(1, "multiple definitions: %s", name);
 		}else if(newtype == SymUndef)
 			/* just resolve request */
 			resolvereq(right(newsym[1]), right(sym[1]));
@@ -203,44 +260,28 @@ checkundef(void)
 		type = unrad50(symtab[p], name);
 		if(type != SymUndef)
 			continue;
-		error = 1;
-		printf(" Error: undefined: %s %012lo\n", name, symtab[p+1]);
+		err(1, "undefined: %s %012lo", name, symtab[p+1]);
 	}
 }
 
 word block[18];
 hword blocksz;
 
-word
-getword(FILE *f)
-{
-	int i, b;
-	word w;
-	w = 0;
-	for(i = 0; i < 6; i++){
-		if(b = getc(f), b == EOF)
-			return ~0;
-		w = (w << 6) | (b & 077);
-	}
-	return w;
-}
-
 void
-readblock(int mode)
+readblock(int doreloc)
 {
 	word reloc;
 	hword i;
-	hword l, r;
 	int bits;
 
 	blocksz = 0;
 	if(itemsz == 0)
 		return;
 
-	reloc = getword(in);
+	reloc = readw(in);
 	i = 18;
 	while(itemsz && i--){
-		block[blocksz++] = getword(in);
+		block[blocksz++] = readw(in);
 		itemsz--;
 	}
 
@@ -248,18 +289,71 @@ readblock(int mode)
 	for(i = 0; i < 18; i++){
 		bits = (reloc >> 34) & 03;
 		reloc <<= 2;
-		if(mode == 1){
-			l = left(block[i]);
-			r = right(block[i]);
-			if(bits & 1) r += rel;
-			if(bits & 2) l += rel;
-			block[i] = fw(l, r);
-		/* This is weird but necessary for full word reloc */
-		}else if(mode == 2){
+		if(doreloc){
 			if(bits & 1)
-				block[i] = (block[i] + rel) & 0777777777777;
+				block[i] += fw(0, rel);
+			if(bits & 2)
+				block[i] += fw(rel, 0);
 		}
 	}
+}
+
+void
+skipitem(void)
+{
+	while(itemsz)
+		readblock(0);
+}
+
+void
+handlecode(void)
+{
+	int i;
+
+	readblock(1);
+	loc = right(block[0]);
+	i = 1;
+	if(i < blocksz)	// hacky
+		goto loop;
+	while(itemsz){
+		readblock(1);
+		for(i = 0; i < blocksz; i++){
+	loop:
+			mem[loc] = block[i];
+			if(loc < locmin) locmin = loc;
+			if(loc > locmax) locmax = loc;
+			loc++;
+		}
+	}
+}
+
+void
+handlesym(void)
+{
+	int i;
+
+	while(itemsz){
+		readblock(1);
+		i = 0;
+		while(i < blocksz){
+			loadsym(&block[i]);
+			i += 2;
+		}
+	}
+}
+
+void
+handleend(void)
+{
+	word abs;
+	char name[8];
+
+	readblock(1);
+	rel = block[0];
+	/* not sure what to do with this... */
+	abs = block[1];
+	while(itemsz)
+		readblock(0);
 }
 
 void
@@ -278,62 +372,37 @@ handlename(void)
 }
 
 void
-handlecode(void)
-{
-	int i;
-
-	readblock(1);
-	loc = right(block[0]);
-	i = 1;
-	if(i < blocksz)	// hacky
-		goto loop;
-	while(itemsz){
-		readblock(1);
-		for(i = 0; i < blocksz; i++){
-	loop:
-			mem[loc] = block[i];
-			loc++;
-		}
-	}
-}
-
-void
 handlestart(void)
 {
-	word w;
 	readblock(1);
-	w = block[0];
+	start = right(block[0]);
 	while(itemsz)
 		readblock(1);
 }
 
-void
-handlesym(void)
-{
-	int i;
-
-	while(itemsz){
-		readblock(2);
-		i = 0;
-		while(i < blocksz){
-			loadsym(&block[i]);
-			i += 2;
-		}
-	}
-}
-
-void
-skipitem(void)
-{
-	while(itemsz)
-		readblock(0);
-}
-
+/* Saves in RIM format. Read with this:
+ *	LOC	20
+ *	CONO	PTR,60
+ * A:	CONSO	PTR,10
+ *	JRST	.-1
+ *	DATAI	PTR,B
+ *	CONSO	PTR,10
+ *	JRST	.-1
+ * B:	0
+ *	JRST	!
+ */
 void
 save(const char *filename)
 {
 	FILE *out;
+	hword i;
 	out = mustopen(filename, "wb");
+	for(i = locmin; i <= locmax; i++){
+		writew(fw(0710440, i), out);	/* DATAI PTR,i */
+		writew(mem[i], out);
+	}
+	writew(fw(0254200, start), out);	/* HALT start */
+	writew(0, out);
 	fclose(out);
 }
 
@@ -356,7 +425,7 @@ main(int argc, char *argv[])
 		handlesym,
 		skipitem,
 		skipitem,
-		skipitem,
+		handleend,
 		handlename,
 		handlestart,
 	};
@@ -372,23 +441,32 @@ main(int argc, char *argv[])
 	nfiles = argc;
 	files = argv;
 
+	locmax = 0;
+	locmin = 0777777;
+
 	for(i = 0; i < nfiles; i++){
 		in = mustopen(files[i], "rb");
-		while(w = getword(in), w != ~0){
+		while(w = readw(in), w != ~0){
 			type = left(w);
 			itemsz = right(w);
 			typesw[type]();
 		}
 		fclose(in);
 	}
+	fixadd();
+
+//	dumpsym();
 
 	checkundef();
 	if(error)
 		return 1;
 
+	printf("%06o %06o\n", locmin, locmax);
+
 //	disasmrange(findsym(rad50(0, "LINKSR"))[1],
 //	            findsym(rad50(0, "LINEP"))[1]);
 //	disasmrange(0600+rel, 0603+rel);
+//	disasmrange(0200+rel, 0212+rel);
 
 	save("a.dump");
 
