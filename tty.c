@@ -125,7 +125,7 @@ wake_tty(void)
 	}
 	if(IOB_DATAO_SET){
 		tty.tto = iobus0 & 0377;
-		if(tty.tto & 0200 && tty.fd >= 0){
+		if(/*tty.tto & 0200 &&*/ tty.fd >= 0){
 			tty.tto &= ~0200;
 			write(tty.fd, &tty.tto, 1);
 		}

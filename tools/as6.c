@@ -275,10 +275,10 @@ putv(word w, int rel)
 		}
 		putword(w, rel);
 	}else{
-		printf("\t%06o%c\t%06o%c%06o%c\n",
-			right(dot->v.val), dot->v.rel ? '\'' : ' ',
-			left(w), rel & 2 ? '\'' : ' ',
-			right(w), rel & 1 ? '\'' : ' ');
+//		printf("\t%06o%c\t%06o%c%06o%c\n",
+//			right(dot->v.val), dot->v.rel ? '\'' : ' ',
+//			left(w), rel & 2 ? '\'' : ' ',
+//			right(w), rel & 1 ? '\'' : ' ');
 	}
 	lastdot = dot->v;
 	dot->v.val++;
@@ -1041,21 +1041,35 @@ ascii(void)
 	}
 	w = 0;
 	i = 0;
-	for(; *lp && *lp != delim; lp++){
+	for(; *lp != delim; lp++){
+		/* This is a hack since LF is not part of the line
+		 * but we have to output it in multiline strings */
+		if(*lp == '\0')
+			*lp = '\n';
+
 		w = (w<<7) | *lp;
 		if(++i == 5){
+			w <<= 1;
 			putv(w, 0);
 			i = 0;
 			w = 0;
 		}
+
+		/* load the next line when we recognized EOL earlier */
+		if(*lp == '\n'){
+			lp = getln();
+			if(lp == nil){
+				err(1, "error: unexpected EOF");
+				break;
+			}
+			lp--;
+		}
 	}
-	if(*lp != delim)
-		err(1, "error: '%c' expected", delim);
 	if(asciiz){
 		i++;
 		w <<= 7;
 	}
-	w <<= 35-i*7;
+	w <<= 36-i*7;
 	if(w || asciiz)
 		putv(w, 0);
 }
@@ -1105,14 +1119,6 @@ sixbitOp(void)
 }
 
 void
-endOp(void)
-{
-	skipwhite();
-	start = expr(2, nil);
-	hadstart = 1;
-}
-
-void
 radixOp(void)
 {
 	int r;
@@ -1129,6 +1135,26 @@ radixOp(void)
 		err(1, "error: invalid radix %d", v.val);
 	else
 		radix = v.val;
+}
+
+void
+blockOp(void)
+{
+	Value v;
+	skipwhite();
+	v = expr(1, nil);
+	if(v.rel)
+		err(1, "error: non-absolute block size");
+	else
+		dot->v.val += v.val;
+}
+
+void
+endOp(void)
+{
+	skipwhite();
+	start = expr(2, nil);
+	hadstart = 1;
 }
 
 void
@@ -1240,7 +1266,7 @@ void
 resetdot(void)
 {
 	dot = getsym(sixbit("."));
-	dot->type = Local | Hide;
+	dot->type = Local | Def | Hide;
 	absdot = (Value){ 0, 0 };
 	reldot = (Value){ 0, 1 };
 	dot->v = reldot;
@@ -1359,16 +1385,23 @@ usage(void)
 
 void initsymtab(void);
 
-char *outfile = "a.rel";
-
 int
 main(int argc, char *argv[])
 {
 	int i;
+	char *outfile;
+	char *lstfile;
+
+
+	outfile = "a.rel";
+	lstfile = "/dev/null";
 
 	ARGBEGIN{
 	case 'o':
 		outfile = EARGF(usage());
+		break;
+	case 'l':
+		lstfile = EARGF(usage());
 		break;
 	default:
 		usage();
@@ -1440,13 +1473,13 @@ main(int argc, char *argv[])
 	if(error & 1)
 		panic("Error\n*****");
 
-	lstfp = mustopen("a.lst", "w");
+	lstfp = mustopen(lstfile, "w");
 	relfp = mustopen(outfile, "w");
 	tmpfp = mustopen("a.tmp", "r");
 
 	resetdot();
 	pass2 = 1;
-	printf("\n   PASS2\n\n");
+//	printf("\n   PASS2\n\n");
 
 	startitem(Name);
 	putword(rad50(0, progtitle), 0);
@@ -1526,6 +1559,7 @@ Ps pslist[] = {
 	{ "ASCIZ",    asciz },
 	{ "SIXBIT",   sixbitOp },
 	{ "RADIX",    radixOp },
+	{ "BLOCK",    blockOp },
 	{ "END",      endOp },
 /*
    " '
@@ -1538,8 +1572,6 @@ Ps pslist[] = {
    IOWD
     INTEGER
     ARRAY
-   BLOCK
-   END
    LIT
    ENTRY
    OPDEF

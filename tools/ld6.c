@@ -392,7 +392,7 @@ handlestart(void)
  *	JRST	A
  */
 void
-save(const char *filename)
+saverim(const char *filename)
 {
 	FILE *out;
 	hword i;
@@ -419,6 +419,7 @@ main(int argc, char *argv[])
 	word w;
 	hword type;
 	int i;
+	char *outfile;
 	void (*typesw[8])(void) = {
 		skipitem,
 		handlecode,
@@ -430,9 +431,14 @@ main(int argc, char *argv[])
 		handlestart,
 	};
 
+	outfile = "a.rim";
+
 	ARGBEGIN{
 	case 'r':
 		rel = strtol(EARGF(usage()), NULL, 8);
+		break;
+	case 'o':
+		outfile = EARGF(usage());
 		break;
 	default:
 		usage();
@@ -468,7 +474,7 @@ main(int argc, char *argv[])
 //	disasmrange(0600+rel, 0603+rel);
 //	disasmrange(0200+rel, 0212+rel);
 
-	save("a.dump");
+	saverim(outfile);
 
 	return 0;
 }

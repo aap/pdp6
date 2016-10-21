@@ -27,10 +27,18 @@ Otherwise you need SDL and pthread.
 ## Running
 
 The cpu and the console tty are implemented.
-There are no other external devices yet.
+The paper tape reader and punch are work in progress,
+there are no other external devices yet.
 The only things missing from the cpu are the clock to generate interrupts
 and the repeat key mechanism.
 The simulator reads `fmem` and `mem` to initialise the memory and fast memory.
+
+## File tree
+
+* `art` has everything graphical
+* `code` contains some test code for the PDP-6
+* `misc` contains some misc. and old stuff
+* `tools` has tools like an assembler and linker
 
 ## To do
 

@@ -742,8 +742,6 @@ main(int argc, char *argv[])
 //	void testinst(Apr*);
 //	testinst(&apr);
 
-	debugfp = stdout;
-
 	outfile = "/dev/null";
 	ARGBEGIN{
 	case 't':
@@ -774,55 +772,55 @@ error:
 		return 1;
 	}
 
-	op_surf = IMG_Load("op_panel.png");
+	op_surf = IMG_Load("art/op_panel.png");
 	if(op_surf == NULL){
 		fprintf(stderr, "Couldn't load op_panel.png\n");
 		return 1;
 	}
-	ind_surf = IMG_Load("ind_panel.png");
+	ind_surf = IMG_Load("art/ind_panel.png");
 	if(ind_surf == NULL){
 		fprintf(stderr, "Couldn't load ind_panel.png\n");
 		return 1;
 	}
-	extra_surf = IMG_Load("extra_panel.png");
+	extra_surf = IMG_Load("art/extra_panel.png");
 	if(extra_surf == NULL){
 		fprintf(stderr, "Couldn't load extra_panel.png\n");
 		return 1;
 	}
 
-	keysurf[0] = IMG_Load("key_n.png");
+	keysurf[0] = IMG_Load("art/key_n.png");
 	if(keysurf[0] == NULL){
 		fprintf(stderr, "Couldn't load key_n.png\n");
 		return 1;
 	}
-	keysurf[1] = IMG_Load("key_d.png");
+	keysurf[1] = IMG_Load("art/key_d.png");
 	if(keysurf[1] == NULL){
 		fprintf(stderr, "Couldn't load key_d.png\n");
 		return 1;
 	}
-	keysurf[2] = IMG_Load("key_u.png");
+	keysurf[2] = IMG_Load("art/key_u.png");
 	if(keysurf[2] == NULL){
 		fprintf(stderr, "Couldn't load key_u.png\n");
 		return 1;
 	}
 
-	lampsurf[0] = IMG_Load("lamp_off.png");
+	lampsurf[0] = IMG_Load("art/lamp_off.png");
 	if(lampsurf[0] == NULL){
 		fprintf(stderr, "Couldn't load lamp_off.png\n");
 		return 1;
 	}
-	lampsurf[1] = IMG_Load("lamp_on.png");
+	lampsurf[1] = IMG_Load("art/lamp_on.png");
 	if(lampsurf[1] == NULL){
 		fprintf(stderr, "Couldn't load lamp_on.png\n");
 		return 1;
 	}
 
-	switchsurf[0] = IMG_Load("switch_d.png");
+	switchsurf[0] = IMG_Load("art/switch_d.png");
 	if(switchsurf[0] == NULL){
 		fprintf(stderr, "Couldn't load switch_d.png\n");
 		return 1;
 	}
-	switchsurf[1] = IMG_Load("switch_u.png");
+	switchsurf[1] = IMG_Load("art/switch_u.png");
 	if(switchsurf[1] == NULL){
 		fprintf(stderr, "Couldn't load switch_u.png\n");
 		return 1;
