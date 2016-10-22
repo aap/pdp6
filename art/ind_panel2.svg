@@ -16,9 +16,9 @@
    version="1.1"
    inkscape:version="0.91 r13725"
    sodipodi:docname="ind_panel2.svg"
-   inkscape:export-filename="/home/aap/src/pdp6/art/op_panel_test.png"
-   inkscape:export-xdpi="34.700001"
-   inkscape:export-ydpi="34.700001">
+   inkscape:export-filename="/home/aap/src/pdp6/art/ind_panel2.svg.png"
+   inkscape:export-xdpi="35.520477"
+   inkscape:export-ydpi="35.520477">
   <defs
      id="defs4257" />
   <sodipodi:namedview
@@ -29,7 +29,7 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.5516539"
-     inkscape:cx="860.21166"
+     inkscape:cx="518.51191"
      inkscape:cy="245.66374"
      inkscape:document-units="mm"
      inkscape:current-layer="layer7"
@@ -131,7 +131,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
