@@ -113,17 +113,19 @@ usage(void)
 	exit(1);
 }
 
+int clear;
+int port = 6666;
+char const *host = "127.0.0.1";
+
 int
 main(int argc, char *argv[])
 {
 	int fd;
-	char const *host;
-	int port;
-
-	host = "127.0.0.1";
-	port = 6666;
 
 	ARGBEGIN{
+	case 'c':
+		clear = 1;
+		break;
 	case 'p':
 		port = atoi(EARGF(usage()));
 		break;
@@ -136,7 +138,9 @@ main(int argc, char *argv[])
 
 	fd = opentcp(host, port);
 
-	printf("\033[H\033[J");	// clear screen
+	if(clear)
+		printf("\033[H\033[J");	// clear screen
+
 	fflush(stdout);
 	if(raw())
 		return 1;

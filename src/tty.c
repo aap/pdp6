@@ -7,21 +7,6 @@
 #include <pthread.h>    
 #include <poll.h>
 
-/*
- * This device is not accurately modeled after the schematics.
- */
-
-#define TTY (0120>>2)
-
-typedef struct Tty Tty;
-struct Tty
-{
-	uchar tto, tti;
-	bool tto_busy, tto_flag;
-	bool tti_busy, tti_flag;
-	int pia;
-	int fd;
-};
 Tty tty;
 
 void
@@ -45,7 +30,7 @@ ttythread(void *arg)
 
 	sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if(sockfd < 0){
-		perror("ERROR opening socket");
+		perror("error: socket");
 		exit(1);
 	}
 	memset(&serv_addr, 0, sizeof(serv_addr));
@@ -54,7 +39,7 @@ ttythread(void *arg)
 	serv_addr.sin_addr.s_addr = INADDR_ANY;
 	serv_addr.sin_port = htons(portno);
 	if(bind(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0){
-		perror("ERROR on bind");
+		perror("error: bind");
 		exit(1);
 	}
 	listen(sockfd,5);
@@ -75,7 +60,7 @@ ttythread(void *arg)
 		close(newsockfd);
 	}
 	if(newsockfd < 0){
-		perror("ERROR on accept");
+		perror("error: accept");
 		exit(1);
 	}
 	return nil;
@@ -92,46 +77,47 @@ wake_tty(void)
 		tty.tti_busy = 0;
 		tty.tti_flag = 0;
 		tty.tti = 0;
-		ioreq[TTY] = 0;
 	}
-	if(IOB_STATUS){
-		if(tty.tti_busy) iobus0 |= F29;
-		if(tty.tti_flag) iobus0 |= F30;
-		if(tty.tto_busy) iobus0 |= F31;
-		if(tty.tto_flag) iobus0 |= F32;
-		iobus0 |= tty.pia & 7;
-	}
-	if(IOB_DATAI){
-		iobus0 |= tty.tti;
-		tty.tti_flag = 0;
-	}
-	if(IOB_CONO_CLEAR)
-		tty.pia = 0;
-	if(IOB_CONO_SET){
-		if(iobus0 & F25) tty.tti_busy = 0;
-		if(iobus0 & F26) tty.tti_flag = 0;
-		if(iobus0 & F27) tty.tto_busy = 0;
-		if(iobus0 & F28) tty.tto_flag = 0;
-		if(iobus0 & F29) tty.tti_busy = 1;
-		if(iobus0 & F30) tty.tti_flag = 1;
-		if(iobus0 & F31) tty.tto_busy = 1;
-		if(iobus0 & F32) tty.tto_flag = 1;
-		tty.pia |= iobus0 & 7;
-	}
-	if(IOB_DATAO_CLEAR){
-		tty.tto = 0;
-		tty.tto_busy = 1;
-		tty.tto_flag = 0;
-	}
-	if(IOB_DATAO_SET){
-		tty.tto = iobus0 & 0377;
-		if(/*tty.tto & 0200 &&*/ tty.fd >= 0){
-			tty.tto &= ~0200;
-			write(tty.fd, &tty.tto, 1);
+	if(iodev == TTY){
+		if(IOB_STATUS){
+			if(tty.tti_busy) iobus0 |= F29;
+			if(tty.tti_flag) iobus0 |= F30;
+			if(tty.tto_busy) iobus0 |= F31;
+			if(tty.tto_flag) iobus0 |= F32;
+			iobus0 |= tty.pia & 7;
 		}
-		// TTO DONE
-		tty.tto_busy = 0;
-		tty.tto_flag = 1;
+		if(IOB_DATAI){
+			iobus0 |= tty.tti;
+			tty.tti_flag = 0;
+		}
+		if(IOB_CONO_CLEAR)
+			tty.pia = 0;
+		if(IOB_CONO_SET){
+			if(iobus0 & F25) tty.tti_busy = 0;
+			if(iobus0 & F26) tty.tti_flag = 0;
+			if(iobus0 & F27) tty.tto_busy = 0;
+			if(iobus0 & F28) tty.tto_flag = 0;
+			if(iobus0 & F29) tty.tti_busy = 1;
+			if(iobus0 & F30) tty.tti_flag = 1;
+			if(iobus0 & F31) tty.tto_busy = 1;
+			if(iobus0 & F32) tty.tto_flag = 1;
+			tty.pia |= iobus0 & 7;
+		}
+		if(IOB_DATAO_CLEAR){
+			tty.tto = 0;
+			tty.tto_busy = 1;
+			tty.tto_flag = 0;
+		}
+		if(IOB_DATAO_SET){
+			tty.tto = iobus0 & 0377;
+			if(tty.fd >= 0){
+				tty.tto &= ~0200;
+				write(tty.fd, &tty.tto, 1);
+			}
+			// TTO DONE
+			tty.tto_busy = 0;
+			tty.tto_flag = 1;
+		}
 	}
 	recalc_tty_req();
 }

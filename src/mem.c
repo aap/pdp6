@@ -39,8 +39,8 @@ readmem(char *file, word *mem, word size)
 void
 initmem(void)
 {
-	readmem("mem", memory, maxmem);
-	readmem("fmem", fmem, 16);
+	readmem("../mem", memory, maxmem);
+	readmem("../fmem", fmem, 16);
 }
 
 void

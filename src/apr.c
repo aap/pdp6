@@ -2,6 +2,8 @@
 #include <unistd.h>
 
 word iobus0, iobus1;
+word iobus1_last, iobus1_pulse;
+int iodev;
 void (*iobusmap[128])(void);
 u8 ioreq[128];
 
@@ -345,8 +347,8 @@ recalc_cpa_req(Apr *apr)
 	   apr->ar_pc_chg_flag && apr->cpa_pc_chg_enable ||
 	   apr->ar_ov_flag && apr->cpa_arov_enable)
 		req = apr->cpa_pia;
-	if(ioreq[0] != req){
-		ioreq[0] = req;
+	if(ioreq[CPA] != req){
+		ioreq[CPA] = req;
 		recalc_req();
 	}
 }
@@ -635,7 +637,7 @@ pulse(mr_start){
 	apr->cpa_pdl_ov = 0;
 	apr->cpa_arov_enable = 0;
 	apr->cpa_pia = 0;
-	ioreq[0] = 0;
+	ioreq[CPA] = 0;
 
 	// PI
 	apr->pi_ov = 0;		// 8-4
@@ -664,6 +666,8 @@ pulse(mr_pwr_clr){
 void
 wake_cpa(void)
 {
+	if(iodev != CPA)
+		return;
 	// 8-5
 	if(IOB_STATUS){
 		if(apr.cpa_pdl_ov)        iobus0 |= F19;
@@ -710,6 +714,9 @@ wake_cpa(void)
 void
 wake_pi(void)
 {
+	if(iodev != PI)
+		return;
+
 	// 8-4, 8-5
 	if(IOB_STATUS){
 		trace("PI STATUS %llo\n", iobus0);
@@ -745,9 +752,10 @@ wake_pi(void)
  */
 
 pulse(iot_t4){
-	trace("IOT T3A\n");
+	trace("IOT T4\n");
 	/* Clear what was set in IOT T2 */
 	iobus1 &= ~(IOBUS_IOB_STATUS | IOBUS_IOB_DATAI);
+	/* and do something like IOB BUS RESET */
 	iobus0 = 0;
 }
 
@@ -775,7 +783,7 @@ pulse(iot_t2){
 	// 8-1
 	apr->iot_go = 0;
 	/* These are asserted during INIT SETUP, IOT T2 and FINAL SETUP.
-	 * We clear them in IOT T3A which happens after FINAL SETUP */
+	 * We clear them in IOT T4 which happens after FINAL SETUP */
 	if(IOT_OUTGOING)
 		iobus0 |= apr->ar;
 	if(IOT_STATUS)
@@ -3015,6 +3023,13 @@ nextpulse(Apr *apr, Pulse *p)
 	apr->nlist[apr->nnextpulses++] = p;
 }
 
+void
+initapr(void)
+{
+	iobusmap[CPA] = wake_cpa;
+	iobusmap[PI] = wake_pi;
+}
+
 void*
 aprmain(void *p)
 {
@@ -3029,9 +3044,8 @@ aprmain(void *p)
 	apr->nnextpulses = 0;
 	apr->ia_inh = 0;
 
-	// TODO: move this somewhere else
-	iobusmap[0] = wake_cpa;
-	iobusmap[1] = wake_pi;
+	iobus0 = 0;
+	iobus1 = 0;
 
 	nextpulse(apr, mr_pwr_clr);
 	while(apr->sw_power){
@@ -3045,52 +3059,57 @@ aprmain(void *p)
 				if(c == 'x')
 					pulsestepping = 0;
 		}
-		//usleep(50000);
 
+		iobus1_last = iobus1;
 		for(i = 0; i < apr->ncurpulses; i++)
 			apr->clist[i](apr);
+		/* find out which bits were turned on */
+		iobus1_pulse = (iobus1_last ^ iobus1) & iobus1;
+		iobus1_pulse &= ~037777000177LL;
 
-		/* KEY MANUAL */
+
+		/* This is simplified, we have no IOT RESET,
+		 * IOT INIT SET UP or IOT FINAL SETUP really.
+		 * normally we'd have to wait for IOT RESET to clear here */
+		if(apr->iot_go)
+			nextpulse(apr, iot_t2);
+
+
+		/* Key pulses */
 		if(apr->extpulse & EXT_KEY_MANUAL){
 			apr->extpulse &= ~EXT_KEY_MANUAL;
 			nextpulse(apr, key_manual);
 		}
-		/* KEY INST STOP */
-		if(apr->extpulse & EXT_KEY_STOP){
-			apr->extpulse &= ~EXT_KEY_STOP;
+		if(apr->extpulse & EXT_KEY_INST_STOP){
+			apr->extpulse &= ~EXT_KEY_INST_STOP;
 			apr->run = 0;
 			// hack: cleared when the pulse list was empty
 			apr->ia_inh = 1;
 		}
 
 
-		/* This is simplified, we have no IOT RESET,
-		 * IOT INIT SET UP or IOT FINAL SETUP really */
-		if(apr->iot_go)
-			nextpulse(apr, iot_t2);
-		/* pulses and signals through IO bus */
-		if(iobus1 & (IOBUS_PULSES | IOBUS_IOB_STATUS | IOBUS_IOB_DATAI)){
-			int dev = 0;
-			if(iobus1 & IOBUS_IOS3_1) dev |= 0100;
-			if(iobus1 & IOBUS_IOS4_1) dev |= 0040;
-			if(iobus1 & IOBUS_IOS5_1) dev |= 0020;
-			if(iobus1 & IOBUS_IOS6_1) dev |= 0010;
-			if(iobus1 & IOBUS_IOS7_1) dev |= 0004;
-			if(iobus1 & IOBUS_IOS8_1) dev |= 0002;
-			if(iobus1 & IOBUS_IOS9_1) dev |= 0001;
-			//debug("bus active for %o\n", dev<<2);
-			if(iobusmap[dev])
-				iobusmap[dev]();
-			// TODO: clear IOB STATUS and IOB DATAI too?
-			iobus1 &= ~IOBUS_PULSES;
+		/* Pulses and signals through IO bus */
+		iodev = -1;
+		if(iobus1_pulse & (IOBUS_PULSES | IOBUS_IOB_STATUS | IOBUS_IOB_DATAI)){
+			iodev = 0;
+			if(iobus1 & IOBUS_IOS3_1) iodev |= 0100;
+			if(iobus1 & IOBUS_IOS4_1) iodev |= 0040;
+			if(iobus1 & IOBUS_IOS5_1) iodev |= 0020;
+			if(iobus1 & IOBUS_IOS6_1) iodev |= 0010;
+			if(iobus1 & IOBUS_IOS7_1) iodev |= 0004;
+			if(iobus1 & IOBUS_IOS8_1) iodev |= 0002;
+			if(iobus1 & IOBUS_IOS9_1) iodev |= 0001;
+			if(iobusmap[iodev])
+				iobusmap[iodev]();
 		}
-		if(iobus1 & IOBUS_IOB_RESET){
+		if(iobus1_pulse & IOBUS_IOB_RESET){
 			int d;
 			for(d = 0; d < nelem(iobusmap); d++)
 				if(iobusmap[d])
 					iobusmap[d]();
-			iobus1 &= ~IOBUS_IOB_RESET;
 		}
+		iobus1 &= ~(IOBUS_PULSES | IOBUS_IOB_RESET);
+
 
 		/* Pulses to memory */
 		if(membus0 & (MEMBUS_WR_RS | MEMBUS_RQ_CYC)){
@@ -3116,17 +3135,15 @@ aprmain(void *p)
 			if(apr->mc_rq && !apr->mc_stop)
 				nextpulse(apr, mc_non_exist_mem);	// 7-9
 		}
-		if(i){
-		//	wakepanel();
+
+		if(i)
 			trace("--------------\n");
-		}else{
+		else
 			/* no longer needed */
 			apr->ia_inh = 0;
-		}
-
 	}
 	debug("power off\n");
-	return NULL;
+	return nil;
 }
 
 

@@ -1329,6 +1329,10 @@ writesymtab(void)
 	for(i = 0; i < nsym; i++){
 		s = sortlist[i];
 
+		if(s->type & Extern &&
+		   s->v.val == 0 && s->v.rel == 0)
+			continue;
+
 		type = 0;
 		if(s->type & Intern)
 			type = SymGlobal;

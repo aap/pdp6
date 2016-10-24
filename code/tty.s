@@ -11,6 +11,8 @@ PUTC:
 	CONSZ	TTY,20		; wait until not busy
 	 JRST	.-1
 	DATAO	TTY,AC1		; transfer character
+	POPJ	PDP,
+
 ;	CAIE	AC1,12		; return unless LF
 ;	 POPJ	PDP,
 ;	MOVEI	AC1,15		; put CR and two DEL
@@ -18,7 +20,7 @@ PUTC:
 ;	MOVEI	AC1,177
 ;	PUSHJ	PDP,PUTC
 ;	PUSHJ	PDP,PUTC
-	POPJ	PDP,
+;	POPJ	PDP,
 
 PUTS:
 	ILDB	AC1,AC2

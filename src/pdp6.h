@@ -56,9 +56,9 @@ enum FullwordBits {
 
 /* external pulses, bits of Apr.extpulse */
 enum Extpulse {
-	EXT_KEY_MANUAL  = 1,
-	EXT_KEY_STOP    = 2,
-	EXT_NONEXIT_MEM = 4
+	EXT_KEY_MANUAL       = 1,
+	EXT_KEY_INST_STOP    = 2,
+	EXT_NONEXIT_MEM      = 4
 };
 
 enum Opcode {
@@ -126,7 +126,8 @@ struct Apr {
 	u8 pr, rlr, rla;
 	bool run;
 	bool sw_addr_stop, sw_repeat, sw_mem_disable, sw_power;
-	bool sw_rim_maint;
+	/* maint switches */
+	bool sw_rim_maint, sw_rpt_bypass, sw_art3_maint, sw_sct_maint, sw_spltcyc_override;
 	/* keys */
 	bool key_start, key_readin;
 	bool key_mem_cont, key_inst_cont;
@@ -283,6 +284,10 @@ enum {
 };
 /* 0 is cable 1 & 2 (data); 1 is cable 3 & 4 (above bits) */
 extern word iobus0, iobus1;
+/* record the state of iobus1 of the last pulse step
+ * to recognize pulses or edges */
+extern word iobus1_last, iobus1_pulse;
+extern int iodev;
 
 #define IOB_RESET       (iobus1 & IOBUS_IOB_RESET)
 #define IOB_DATAO_CLEAR (iobus1 & IOBUS_DATAO_CLEAR)
@@ -299,11 +304,56 @@ extern void (*iobusmap[128])(void);
 extern u8 ioreq[128];
 void recalc_req(void);
 
+/*
+ * Devices
+ */
+
+void initapr(void);
+
+#define CPA (0000>>2)
+#define PI (0004>>2)
+
+/* TTY */
+#define TTY (0120>>2)
+typedef struct Tty Tty;
+struct Tty
+{
+	uchar tto, tti;
+	bool tto_busy, tto_flag;
+	bool tti_busy, tti_flag;
+	int pia;
+	int fd;
+};
+extern Tty tty;
 void inittty(void);
+
+/* Paper tape */
+#define PTP (0100>>2)
+typedef struct Ptp Ptp;
+struct Ptp
+{
+	FILE *fp;
+	uchar ptp;
+	bool busy, flag, b;
+	int pia;
+};
+#define PTR (0104>>2)
+typedef struct Ptr Ptr;
+struct Ptr
+{
+	FILE *fp;
+	int motor_on;
+	word sr;
+	word ptr;
+	bool busy, flag, b;
+	int pia;
+};
+extern Ptp ptp;
+extern Ptr ptr;
 void initpt(void);
 void ptr_setmotor(int m);
 
-//void wakepanel(void);
+
 
 // for debugging
 char *names[0700];

@@ -6,6 +6,8 @@ The maintenance manual has flow charts, schematics and explanations:
 [Volume1](http://bitsavers.trailing-edge.com/pdf/dec/pdp6/F-67_166instrManVol1_Sep65.pdf)
 [Volume2](http://bitsavers.trailing-edge.com/pdf/dec/pdp6/F-67_166instrManVol2_Sep65.pdf)
 
+![Screenshot of the front panel](https://raw.githubusercontent.com/aap/pdp6/master/art/screenshot.png)
+
 ## Code
 
 The code is more or less a transcription of the schematics into C.
@@ -35,14 +37,15 @@ The simulator reads `fmem` and `mem` to initialise the memory and fast memory.
 
 ## File tree
 
-* `art` has everything graphical
-* `code` contains some test code for the PDP-6
-* `misc` contains some misc. and old stuff
-* `tools` has tools like an assembler and linker
+* `src` source for the emulator
+* `art` everything graphical
+* `code` some test code for the PDP-6
+* `misc` some misc. and old stuff
+* `tools` tools like an assembler and linker
 
 ## To do
 
-- clock and repeat
+- clock, repeat and maint. switches
 - test thoroughly!
 - devices
 - timing
