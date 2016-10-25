@@ -246,6 +246,9 @@ enum {
 };
 /* 0 is cable 1 & 2 (above bits); 1 is cable 3 & 4 (data) */
 extern word membus0, membus1;
+/* record the state of membus0 of the last pulse step
+ * to recognize pulses or edges */
+extern word membus0_last, membus0_pulse;
 
 // 7-10
 enum {

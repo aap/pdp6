@@ -7,6 +7,8 @@
 #include <pthread.h>    
 #include <poll.h>
 
+/* TODO? implement motor delays */
+
 Ptp ptp;
 Ptr ptr;
 
@@ -21,54 +23,6 @@ recalc_ptp_req(void)
 	}
 }
 
-static void
-wake_ptp(void)
-{
-	if(IOB_RESET){
-		ptp.pia = 0;
-		ptp.busy = 0;
-		ptp.flag = 0;
-		ptp.b = 0;
-	}
-	if(iodev == PTP){
-		if(IOB_STATUS){
-			if(ptp.b) iobus0 |= F30;
-			if(ptp.busy) iobus0 |= F31;
-			if(ptp.flag) iobus0 |= F32;
-			iobus0 |= ptp.pia & 7;
-		}
-		if(IOB_CONO_SET){
-			if(iobus0 & F30) ptp.b = 1;
-			if(iobus0 & F31) ptp.busy = 1;
-			if(iobus0 & F32) ptp.flag = 1;
-			ptp.pia |= iobus0 & 7;
-		}
-		if(IOB_CONO_CLEAR){
-			ptp.pia = 0;
-			ptp.busy = 0;
-			ptp.flag = 0;
-			ptp.b = 0;
-		}
-		if(IOB_DATAO_CLEAR){
-			ptp.ptp = 0;
-			ptp.busy = 1;
-			ptp.flag = 0;
-		}
-		if(IOB_DATAO_SET){
-			ptp.ptp = iobus0 & 0377;
-			if(ptp.fp){
-				if(ptp.b)
-					putc((ptp.ptp & 077) | 0200, ptp.fp);
-				else
-					putc(ptp.ptp, ptp.fp);
-			}
-			ptp.busy = 0;
-			ptp.flag = 1;
-		}
-	}
-	recalc_ptp_req();
-}
-
 void
 recalc_ptr_req(void)
 {
@@ -80,16 +34,32 @@ recalc_ptr_req(void)
 	}
 }
 
+/* We have to punch after DATAO SET has happened. But BUSY is set by
+ * DATAO CLEAR. So we use this to record when SET has happened */
+int waitdatao;
+
 void*
-ptrthread(void *arg)
+ptthread(void *arg)
 {
 	int c;
 	for(;;){
+		if(ptp.busy && waitdatao){
+			if(ptp.fp){
+				if(ptp.b)
+					putc((ptp.ptp & 077) | 0200, ptp.fp);
+				else
+					putc(ptp.ptp, ptp.fp);
+				fflush(ptp.fp);
+			}
+			ptp.busy = 0;
+			ptp.flag = 1;
+			recalc_ptp_req();
+		}
+
 		if(ptr.busy && ptr.motor_on){
 			// PTR CLR
 			ptr.sr = 0;
 			ptr.ptr = 0;
-
 	next:
 			if(ptr.fp)
 				c = getc(ptr.fp);
@@ -118,6 +88,48 @@ ptrthread(void *arg)
 }
 
 static void
+wake_ptp(void)
+{
+	if(IOB_RESET){
+		ptp.pia = 0;
+		ptp.busy = 0;
+		ptp.flag = 0;
+		ptp.b = 0;
+	}
+	if(iodev == PTP){
+		if(IOB_STATUS){
+			if(ptp.b) iobus0 |= F30;
+			if(ptp.busy) iobus0 |= F31;
+			if(ptp.flag) iobus0 |= F32;
+			iobus0 |= ptp.pia & 7;
+		}
+		if(IOB_CONO_CLEAR){
+			ptp.pia = 0;
+			ptp.busy = 0;
+			ptp.flag = 0;
+			ptp.b = 0;
+		}
+		if(IOB_CONO_SET){
+			if(iobus0 & F30) ptp.b = 1;
+			if(iobus0 & F31) ptp.busy = 1;
+			if(iobus0 & F32) ptp.flag = 1;
+			ptp.pia |= iobus0 & 7;
+		}
+		if(IOB_DATAO_CLEAR){
+			ptp.ptp = 0;
+			ptp.busy = 1;
+			ptp.flag = 0;
+			waitdatao = 0;
+		}
+		if(IOB_DATAO_SET){
+			ptp.ptp = iobus0 & 0377;
+			waitdatao = 1;
+		}
+	}
+	recalc_ptp_req();
+}
+
+static void
 wake_ptr(void)
 {
 	if(IOB_RESET){
@@ -137,7 +149,6 @@ wake_ptr(void)
 		}
 		if(IOB_DATAI){
 			iobus0 |= ptr.ptr;
-debug(" PTR: %012lo\n", iobus0);
 			ptr.flag = 0;
 			// actually when DATAI is negated again
 			ptr.busy = 1;
@@ -178,7 +189,7 @@ initpt(void)
 	iobusmap[PTP] = wake_ptp;
 	ioreq[PTR] = 0;
 	iobusmap[PTR] = wake_ptr;
-	pthread_create(&thread_id, nil, ptrthread, nil);
+	pthread_create(&thread_id, nil, ptthread, nil);
 
 	ptr.fp = fopen("../code/test.rim", "rb");
 	ptp.fp = fopen("../code/ptp.out", "wb");

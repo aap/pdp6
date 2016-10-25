@@ -79,7 +79,7 @@ mustloadimg(const char *path)
 {
 	SDL_Surface *s;
 	s = IMG_Load(path);
-	if(s == NULL)
+	if(s == nil)
 		err("Couldn't load %s", path);
 	return s;
 }
@@ -146,7 +146,7 @@ poweron(void)
 {
 	pthread_t apr_thread;
 	apr.sw_power = 1;
-	pthread_create(&apr_thread, NULL, aprmain, &apr);
+	pthread_create(&apr_thread, nil, aprmain, &apr);
 }
 
 #define KEYPULSE(k) (apr.k && !oldapr.k)

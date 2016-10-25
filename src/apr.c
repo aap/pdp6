@@ -3061,12 +3061,15 @@ aprmain(void *p)
 		}
 
 		iobus1_last = iobus1;
+		membus0_last = membus0;
+
 		for(i = 0; i < apr->ncurpulses; i++)
 			apr->clist[i](apr);
+
 		/* find out which bits were turned on */
 		iobus1_pulse = (iobus1_last ^ iobus1) & iobus1;
 		iobus1_pulse &= ~037777000177LL;
-
+		membus0_pulse = (membus0_last ^ membus0) & membus0;
 
 		/* This is simplified, we have no IOT RESET,
 		 * IOT INIT SET UP or IOT FINAL SETUP really.
@@ -3112,15 +3115,12 @@ aprmain(void *p)
 
 
 		/* Pulses to memory */
-		if(membus0 & (MEMBUS_WR_RS | MEMBUS_RQ_CYC)){
+		if(membus0_pulse & (MEMBUS_WR_RS | MEMBUS_RQ_CYC)){
 			wakemem();
-			/* Normally this should still be asserted but it
-			 * is interpreted as a pulse every loop iteration here.
-			 * Clearing it is a hack */
-			membus0 &= ~MEMBUS_RQ_CYC;
+			membus0 &= ~MEMBUS_WR_RS;
 		}
 
-		/* Pulses from memory */
+		/* Pulses from memory  */
 		if(membus0 & MEMBUS_MAI_ADDR_ACK){
 			membus0 &= ~MEMBUS_MAI_ADDR_ACK;
 			apr->extpulse &= ~EXT_NONEXIT_MEM;

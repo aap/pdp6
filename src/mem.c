@@ -6,6 +6,7 @@ word memory[256*1024];
 hword maxmem = 64*1024;
 word fmem[16];
 word membus0, membus1;
+word membus0_last, membus0_pulse;
 word *hold;
 
 void
@@ -71,7 +72,7 @@ void
 wakemem(void)
 {
 	hword a;
-	if(membus0 & MEMBUS_RQ_CYC){
+	if(membus0_pulse & MEMBUS_RQ_CYC){
 		a = membus0>>4 & 037777;
 		if(membus0 & MEMBUS_MA21_1) a |= 0040000;
 		if(membus0 & MEMBUS_MA20_1) a |= 0100000;
@@ -87,12 +88,11 @@ wakemem(void)
 			membus1 = *hold & FW;
 			membus0 |= MEMBUS_MAI_RD_RS;
 			if(!(membus0 & MEMBUS_WR_RQ))
-				hold = NULL;
+				hold = nil;
 		}
 	}
 	if(membus0 & MEMBUS_WR_RS && hold){
 		*hold = membus1 & FW;
-		membus0 &= ~MEMBUS_WR_RS;
-		hold = NULL;
+		hold = nil;
 	}
 }
