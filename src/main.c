@@ -5,6 +5,8 @@
 #include <pthread.h>
 #include "args.h"
 
+Busdev iobus[128];
+
 typedef struct Point Point;
 struct Point
 {
@@ -142,222 +144,230 @@ getswitches(Element *sw, int n)
 }
 
 void
-poweron(void)
+poweron(Apr *apr)
 {
 	pthread_t apr_thread;
-	apr.sw_power = 1;
-	pthread_create(&apr_thread, nil, aprmain, &apr);
+	apr->sw_power = 1;
+	pthread_create(&apr_thread, nil, aprmain, apr);
 }
 
-#define KEYPULSE(k) (apr.k && !oldapr.k)
+#define KEYPULSE(k) (apr->k && !oldapr.k)
 
 void
-update(void)
+updateapr(Apr *apr, Ptr *ptr)
 {
 	Apr oldapr;
 
-	oldapr = apr;
-	setlights(apr.ir, ir_l, 18);
-	setlights(apr.mi, mi_l, 36);
-	setlights(apr.pc, pc_l, 18);
-	setlights(apr.ma, ma_l, 18);
-	setlights(apr.pih, pih_l, 7);
-	setlights(apr.pir, pir_l, 7);
-	setlights(apr.pio, pio_l, 7);
-	misc_l[0].state = apr.pi_active;
-	misc_l[1].state = apr.mc_stop;
-	misc_l[2].state = apr.run;
-	misc_l[3].state = apr.sw_repeat = misc_sw[0].state;
-	misc_l[4].state = apr.sw_addr_stop = misc_sw[1].state;
-	misc_l[5].state = apr.sw_power = misc_sw[2].state;
-	if(apr.sw_power && !oldapr.sw_power)
-		poweron();
-	misc_l[6].state = apr.sw_mem_disable = misc_sw[3].state;
-	apr.data = getswitches(data_sw, 36);
-	apr.mas = getswitches(ma_sw, 18);
+	oldapr = *apr;
+	setlights(apr->ir, ir_l, 18);
+	setlights(apr->mi, mi_l, 36);
+	setlights(apr->pc, pc_l, 18);
+	setlights(apr->ma, ma_l, 18);
+	setlights(apr->pih, pih_l, 7);
+	setlights(apr->pir, pir_l, 7);
+	setlights(apr->pio, pio_l, 7);
+	misc_l[0].state = apr->pi_active;
+	misc_l[1].state = apr->mc_stop;
+	misc_l[2].state = apr->run;
+	misc_l[3].state = apr->sw_repeat = misc_sw[0].state;
+	misc_l[4].state = apr->sw_addr_stop = misc_sw[1].state;
+	misc_l[5].state = apr->sw_power = misc_sw[2].state;
+	if(apr->sw_power && !oldapr.sw_power)
+		poweron(apr);
+	misc_l[6].state = apr->sw_mem_disable = misc_sw[3].state;
+	apr->data = getswitches(data_sw, 36);
+	apr->mas = getswitches(ma_sw, 18);
 
-	apr.sw_rim_maint = extra_sw[0].state;
-	if(apr.sw_rim_maint)
-		apr.key_rim_sbr = 1;
-	apr.sw_rpt_bypass = extra_sw[1].state;
-	apr.sw_art3_maint = extra_sw[2].state;
-	apr.sw_sct_maint = extra_sw[3].state;
-	apr.sw_spltcyc_override  = extra_sw[4].state;
+	apr->sw_rim_maint = extra_sw[0].state;
+	if(apr->sw_rim_maint)
+		apr->key_rim_sbr = 1;
+	apr->sw_rpt_bypass = extra_sw[1].state;
+	apr->sw_art3_maint = extra_sw[2].state;
+	apr->sw_sct_maint = extra_sw[3].state;
+	apr->sw_spltcyc_override  = extra_sw[4].state;
 
-	apr.key_start     = keys[0].state == 1;
-	apr.key_readin    = keys[0].state == 2;
-	apr.key_inst_cont = keys[1].state == 1;
-	apr.key_mem_cont  = keys[1].state == 2;
-	apr.key_inst_stop = keys[2].state == 1;
-	apr.key_mem_stop  = keys[2].state == 2;
-	apr.key_io_reset  = keys[3].state == 1;
-	apr.key_exec      = keys[3].state == 2;
-	apr.key_dep       = keys[4].state == 1;
-	apr.key_dep_nxt   = keys[4].state == 2;
-	apr.key_ex        = keys[5].state == 1;
-	apr.key_ex_nxt    = keys[5].state == 2;
-	apr.key_rd_off    = keys[6].state == 1;
-	apr.key_rd_on     = keys[6].state == 2;
-	apr.key_pt_rd     = keys[7].state == 1;
-	apr.key_pt_wr     = keys[7].state == 2;
-	if(apr.sw_power){
+	apr->key_start     = keys[0].state == 1;
+	apr->key_readin    = keys[0].state == 2;
+	apr->key_inst_cont = keys[1].state == 1;
+	apr->key_mem_cont  = keys[1].state == 2;
+	apr->key_inst_stop = keys[2].state == 1;
+	apr->key_mem_stop  = keys[2].state == 2;
+	apr->key_io_reset  = keys[3].state == 1;
+	apr->key_exec      = keys[3].state == 2;
+	apr->key_dep       = keys[4].state == 1;
+	apr->key_dep_nxt   = keys[4].state == 2;
+	apr->key_ex        = keys[5].state == 1;
+	apr->key_ex_nxt    = keys[5].state == 2;
+	apr->key_rd_off    = keys[6].state == 1;
+	apr->key_rd_on     = keys[6].state == 2;
+	apr->key_pt_rd     = keys[7].state == 1;
+	apr->key_pt_wr     = keys[7].state == 2;
+	if(apr->sw_power){
 		if(KEYPULSE(key_start) || KEYPULSE(key_readin) ||
 		   KEYPULSE(key_inst_cont) || KEYPULSE(key_mem_cont) ||
 		   KEYPULSE(key_io_reset) || KEYPULSE(key_exec) ||
 		   KEYPULSE(key_dep) || KEYPULSE(key_dep_nxt) ||
 		   KEYPULSE(key_ex) || KEYPULSE(key_ex_nxt))
-			apr.extpulse |= EXT_KEY_MANUAL;
+			apr->extpulse |= EXT_KEY_MANUAL;
 		if(KEYPULSE(key_inst_stop))
-			apr.extpulse |= EXT_KEY_INST_STOP;
-		if(KEYPULSE(key_rd_on))
-			ptr_setmotor(1);
-		if(KEYPULSE(key_rd_off))
-			ptr_setmotor(0);
+			apr->extpulse |= EXT_KEY_INST_STOP;
+		if(ptr){
+			if(KEYPULSE(key_rd_on))
+				ptr_setmotor(ptr, 1);
+			if(KEYPULSE(key_rd_off))
+				ptr_setmotor(ptr, 0);
+		}
 	}
 
-	setlights(apr.mb, mb_l, 36);
-	setlights(apr.ar, ar_l, 36);
-	setlights(apr.mq, mq_l, 36);
+	setlights(apr->mb, mb_l, 36);
+	setlights(apr->ar, ar_l, 36);
+	setlights(apr->mq, mq_l, 36);
 
-	ff_l[0].state = apr.key_ex_st;
-	ff_l[1].state = apr.key_ex_sync;
-	ff_l[2].state = apr.key_dep_st;
-	ff_l[3].state = apr.key_dep_sync;
-	ff_l[4].state = apr.key_rd_wr;
-	ff_l[5].state = apr.mc_rd;
-	ff_l[6].state = apr.mc_wr;
-	ff_l[7].state = apr.mc_rq;
+	ff_l[0].state = apr->key_ex_st;
+	ff_l[1].state = apr->key_ex_sync;
+	ff_l[2].state = apr->key_dep_st;
+	ff_l[3].state = apr->key_dep_sync;
+	ff_l[4].state = apr->key_rd_wr;
+	ff_l[5].state = apr->mc_rd;
+	ff_l[6].state = apr->mc_wr;
+	ff_l[7].state = apr->mc_rq;
 
-	ff_l[8].state = apr.if1a;
-	ff_l[9].state = apr.af0;
-	ff_l[10].state = apr.af3;
-	ff_l[11].state = apr.af3a;
-	ff_l[12].state = apr.et4_ar_pse;
-	ff_l[13].state = apr.f1a;
-	ff_l[14].state = apr.f4a;
-	ff_l[15].state = apr.f6a;
+	ff_l[8].state = apr->if1a;
+	ff_l[9].state = apr->af0;
+	ff_l[10].state = apr->af3;
+	ff_l[11].state = apr->af3a;
+	ff_l[12].state = apr->et4_ar_pse;
+	ff_l[13].state = apr->f1a;
+	ff_l[14].state = apr->f4a;
+	ff_l[15].state = apr->f6a;
 
-	ff_l[16].state = apr.sf3;
-	ff_l[17].state = apr.sf5a;
-	ff_l[18].state = apr.sf7;
-	ff_l[19].state = apr.ar_com_cont;
-	ff_l[20].state = apr.blt_f0a;
-	ff_l[21].state = apr.blt_f3a;
-	ff_l[22].state = apr.blt_f5a;
-	ff_l[23].state = apr.iot_f0a;
+	ff_l[16].state = apr->sf3;
+	ff_l[17].state = apr->sf5a;
+	ff_l[18].state = apr->sf7;
+	ff_l[19].state = apr->ar_com_cont;
+	ff_l[20].state = apr->blt_f0a;
+	ff_l[21].state = apr->blt_f3a;
+	ff_l[22].state = apr->blt_f5a;
+	ff_l[23].state = apr->iot_f0a;
 
-	ff_l[24].state = apr.fpf1;
-	ff_l[25].state = apr.fpf2;
-	ff_l[26].state = apr.faf1;
-	ff_l[27].state = apr.faf2;
-	ff_l[28].state = apr.faf3;
-	ff_l[29].state = apr.faf4;
-	ff_l[30].state = apr.fmf1;
-	ff_l[31].state = apr.fmf2;
+	ff_l[24].state = apr->fpf1;
+	ff_l[25].state = apr->fpf2;
+	ff_l[26].state = apr->faf1;
+	ff_l[27].state = apr->faf2;
+	ff_l[28].state = apr->faf3;
+	ff_l[29].state = apr->faf4;
+	ff_l[30].state = apr->fmf1;
+	ff_l[31].state = apr->fmf2;
 
-	ff_l[32].state = apr.fdf1;
-	ff_l[33].state = apr.fdf2;
-	ff_l[34].state = apr.ir & H6 && apr.mq & F1 && !apr.nrf3;
-	ff_l[35].state = apr.nrf1;
-	ff_l[36].state = apr.nrf2;
-	ff_l[37].state = apr.nrf3;
-	ff_l[38].state = apr.fsf1;
-	ff_l[39].state = apr.chf7;
+	ff_l[32].state = apr->fdf1;
+	ff_l[33].state = apr->fdf2;
+	ff_l[34].state = apr->ir & H6 && apr->mq & F1 && !apr->nrf3;
+	ff_l[35].state = apr->nrf1;
+	ff_l[36].state = apr->nrf2;
+	ff_l[37].state = apr->nrf3;
+	ff_l[38].state = apr->fsf1;
+	ff_l[39].state = apr->chf7;
 
-	ff_l[40].state = apr.dsf1;
-	ff_l[41].state = apr.dsf2;
-	ff_l[42].state = apr.dsf3;
-	ff_l[43].state = apr.dsf4;
-	ff_l[44].state = apr.dsf5;
-	ff_l[45].state = apr.dsf6;
-	ff_l[46].state = apr.dsf7;
-	ff_l[47].state = apr.dsf8;
+	ff_l[40].state = apr->dsf1;
+	ff_l[41].state = apr->dsf2;
+	ff_l[42].state = apr->dsf3;
+	ff_l[43].state = apr->dsf4;
+	ff_l[44].state = apr->dsf5;
+	ff_l[45].state = apr->dsf6;
+	ff_l[46].state = apr->dsf7;
+	ff_l[47].state = apr->dsf8;
 
-	ff_l[48].state = apr.dsf9;
-	ff_l[49].state = apr.msf1;
-	ff_l[50].state = apr.mpf1;
-	ff_l[51].state = apr.mpf2;
-	ff_l[52].state = apr.mc_split_cyc_sync;
-	ff_l[53].state = apr.mc_stop_sync;
-	ff_l[54].state = apr.shf1;
-	ff_l[55].state = apr.sc == 0777;
+	ff_l[48].state = apr->dsf9;
+	ff_l[49].state = apr->msf1;
+	ff_l[50].state = apr->mpf1;
+	ff_l[51].state = apr->mpf2;
+	ff_l[52].state = apr->mc_split_cyc_sync;
+	ff_l[53].state = apr->mc_stop_sync;
+	ff_l[54].state = apr->shf1;
+	ff_l[55].state = apr->sc == 0777;
 
-	ff_l[56].state = apr.chf1;
-	ff_l[57].state = apr.chf2;
-	ff_l[58].state = apr.chf3;
-	ff_l[59].state = apr.chf4;
-	ff_l[60].state = apr.chf5;
-	ff_l[61].state = apr.chf6;
-	ff_l[62].state = apr.lcf1;
-	ff_l[63].state = apr.dcf1;
+	ff_l[56].state = apr->chf1;
+	ff_l[57].state = apr->chf2;
+	ff_l[58].state = apr->chf3;
+	ff_l[59].state = apr->chf4;
+	ff_l[60].state = apr->chf5;
+	ff_l[61].state = apr->chf6;
+	ff_l[62].state = apr->lcf1;
+	ff_l[63].state = apr->dcf1;
 
-	ff_l[64].state = apr.pi_ov;
-	ff_l[65].state = apr.pi_cyc;
-	ff_l[66].state = !!apr.pi_req;
-	ff_l[67].state = apr.iot_go;
-	ff_l[68].state = apr.a_long;
-	ff_l[69].state = apr.ma == apr.mas;
-	ff_l[70].state = apr.uuo_f1;
-	ff_l[71].state = apr.cpa_pdl_ov;
+	ff_l[64].state = apr->pi_ov;
+	ff_l[65].state = apr->pi_cyc;
+	ff_l[66].state = !!apr->pi_req;
+	ff_l[67].state = apr->iot_go;
+	ff_l[68].state = apr->a_long;
+	ff_l[69].state = apr->ma == apr->mas;
+	ff_l[70].state = apr->uuo_f1;
+	ff_l[71].state = apr->cpa_pdl_ov;
 
-	setlights(apr.fe, &ff_l[72], 8);
+	setlights(apr->fe, &ff_l[72], 8);
 
-	setlights(apr.sc, &ff_l[80], 8);
+	setlights(apr->sc, &ff_l[80], 8);
 
-	ff_l[88].state = !apr.ex_user;
-	ff_l[89].state = apr.cpa_illeg_op;
-	ff_l[90].state = apr.ex_ill_op;
-	ff_l[91].state = apr.ex_uuo_sync;
-	ff_l[92].state = apr.ex_pi_sync;
-	ff_l[93].state = apr.mq36;
-	ff_l[94].state = !!(apr.sc & 0400);
-	ff_l[95].state = !!(apr.fe & 0400);
+	ff_l[88].state = !apr->ex_user;
+	ff_l[89].state = apr->cpa_illeg_op;
+	ff_l[90].state = apr->ex_ill_op;
+	ff_l[91].state = apr->ex_uuo_sync;
+	ff_l[92].state = apr->ex_pi_sync;
+	ff_l[93].state = apr->mq36;
+	ff_l[94].state = !!(apr->sc & 0400);
+	ff_l[95].state = !!(apr->fe & 0400);
 
-	ff_l[96].state = apr.key_rim_sbr;
-	ff_l[97].state = apr.ar_cry0_xor_cry1;
-	ff_l[98].state = apr.ar_cry0;
-	ff_l[99].state = apr.ar_cry1;
-	ff_l[100].state = apr.ar_ov_flag;
-	ff_l[101].state = apr.ar_cry0_flag;
-	ff_l[102].state = apr.ar_cry1_flag;
-	ff_l[103].state = apr.ar_pc_chg_flag;
+	ff_l[96].state = apr->key_rim_sbr;
+	ff_l[97].state = apr->ar_cry0_xor_cry1;
+	ff_l[98].state = apr->ar_cry0;
+	ff_l[99].state = apr->ar_cry1;
+	ff_l[100].state = apr->ar_ov_flag;
+	ff_l[101].state = apr->ar_cry0_flag;
+	ff_l[102].state = apr->ar_cry1_flag;
+	ff_l[103].state = apr->ar_pc_chg_flag;
 
-	ff_l[104].state = apr.cpa_non_exist_mem;
-	ff_l[105].state = apr.cpa_clock_enable;
-	ff_l[106].state = apr.cpa_clock_flag;
-	ff_l[107].state = apr.cpa_pc_chg_enable;
-	ff_l[108].state = apr.cpa_arov_enable;
-	ff_l[109].state = !!(apr.cpa_pia&4);
-	ff_l[110].state = !!(apr.cpa_pia&2);
-	ff_l[111].state = !!(apr.cpa_pia&1);
+	ff_l[104].state = apr->cpa_non_exist_mem;
+	ff_l[105].state = apr->cpa_clock_enable;
+	ff_l[106].state = apr->cpa_clock_flag;
+	ff_l[107].state = apr->cpa_pc_chg_enable;
+	ff_l[108].state = apr->cpa_arov_enable;
+	ff_l[109].state = !!(apr->cpa_pia&4);
+	ff_l[110].state = !!(apr->cpa_pia&2);
+	ff_l[111].state = !!(apr->cpa_pia&1);
 
-	setlights(apr.pr, pr_l, 8);
-	setlights(apr.rlr, rlr_l, 8);
-	setlights(apr.rla, rla_l, 8);
+	setlights(apr->pr, pr_l, 8);
+	setlights(apr->rlr, rlr_l, 8);
+	setlights(apr->rla, rla_l, 8);
 	setlights(iobus0, iobus_l, 36);
+}
 
-	ptp_l[0].state = ptp.b;
-	ptp_l[1].state = ptp.busy;
-	ptp_l[2].state = ptp.flag;
-	setlights(ptp.pia, &ptp_l[3], 3);
-	setlights(ptp.ptp, ptpbuf_l, 8);
+void
+updatetty(Tty *tty)
+{
+	tty_l[0].state = tty->tti_busy;
+	tty_l[1].state = tty->tti_flag;
+	tty_l[2].state = tty->tto_busy;
+	tty_l[3].state = tty->tto_flag;
+	setlights(tty->pia, &tty_l[4], 3);
+	setlights(tty->tti, ttibuf_l, 8);
+}
 
-	ptr_l[0].state = ptr.b;
-	ptr_l[1].state = ptr.busy;
-	ptr_l[2].state = ptr.flag;
-	setlights(ptr.pia, &ptr_l[3], 3);
-	setlights(ptr.ptr, ptrbuf_l, 36);
+void
+updatept(Ptp *ptp, Ptr *ptr)
+{
+	ptp_l[0].state = ptp->b;
+	ptp_l[1].state = ptp->busy;
+	ptp_l[2].state = ptp->flag;
+	setlights(ptp->pia, &ptp_l[3], 3);
+	setlights(ptp->ptp, ptpbuf_l, 8);
 
-	tty_l[0].state = tty.tti_busy;
-	tty_l[1].state = tty.tti_flag;
-	tty_l[2].state = tty.tto_busy;
-	tty_l[3].state = tty.tto_flag;
-	setlights(tty.pia, &tty_l[4], 3);
-	setlights(tty.tti, ttibuf_l, 8);
+	ptr_l[0].state = ptr->b;
+	ptr_l[1].state = ptr->busy;
+	ptr_l[2].state = ptr->flag;
+	setlights(ptr->pia, &ptr_l[3], 3);
+	setlights(ptr->ptr, ptrbuf_l, 36);
 
-	setlights(iobus0, iobus_l, 36);
-
-	extra_l[0].state = ptr.motor_on;
+	extra_l[0].state = ptr->motor_on;
 }
 
 void
@@ -428,7 +438,7 @@ drawgrid(Grid *g, SDL_Surface *s, Uint32 col)
 }
 
 void
-drawelement(SDL_Surface *screen, Element *elt)
+drawelement(SDL_Surface *screen, Element *elt, int power)
 {
 	SDL_Rect r;
 	Point p;
@@ -438,7 +448,7 @@ drawelement(SDL_Surface *screen, Element *elt)
 	r.x = p.x+0.5;
 	r.y = p.y+0.5;
 	if(elt->surf == lampsurf)
-		s = elt->state && apr.sw_power;
+		s = elt->state && power;
 	else
 		s = elt->state;
 	SDL_BlitSurface(elt->surf[s], nil, screen, &r);
@@ -526,6 +536,11 @@ usage(void)
 	fprintf(stderr, "usage: %s [-td]\n", argv0);
 	exit(1);
 }
+
+Apr apr;
+Tty tty;
+Ptr ptr;
+Ptp ptp;
 
 int
 main(int argc, char *argv[])
@@ -646,12 +661,11 @@ main(int argc, char *argv[])
 
 	extra_l = e; e += 1;
 
-	initapr();
+	initapr(&apr);
 	initmem();
-	inittty();
-	initpt();
-//	memset(&apr, 0, sizeof apr);
-//	apr.extpulse = 0;
+	inittty(&tty);
+	initptr(&ptr);
+	initptp(&ptp);
 
 	for(;;){
 		start = SDL_GetTicks();
@@ -671,7 +685,9 @@ main(int argc, char *argv[])
 				return 0;
 			}
 
-		update();
+		updateapr(&apr, &ptr);
+		updatetty(&tty);
+		updatept(&ptp, &ptr);
 
 		SDL_FillRect(screen, nil, SDL_MapRGBA(screen->format, 0xe6, 0xe6, 0xe6, 0xff));
 		SDL_BlitSurface(indpanel1.surf, nil, screen, &indpanel1.pos);
@@ -681,11 +697,11 @@ main(int argc, char *argv[])
 		SDL_BlitSurface(oppanel.surf, nil, screen, &oppanel.pos);
 
 		for(i = 0, e = lamps; i < nelem(lamps); i++, e++)
-			drawelement(screen, e);
+			drawelement(screen, e, apr.sw_power);
 		for(i = 0, e = keys; i < nelem(keys); i++, e++)
-			drawelement(screen, e);
+			drawelement(screen, e, apr.sw_power);
 		for(i = 0, e = switches; i < nelem(switches); i++, e++)
-			drawelement(screen, e);
+			drawelement(screen, e, apr.sw_power);
 
 //		SDL_LockSurface(screen);
 //		drawgrid(&opgrid1, screen, 0xFFFFFF00);

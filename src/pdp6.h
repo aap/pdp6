@@ -215,7 +215,6 @@ struct Apr {
 	Pulse **clist, **nlist;
 	int ncurpulses, nnextpulses;
 };
-extern Apr apr;
 void nextpulse(Apr *apr, Pulse *p);
 void *aprmain(void *p);
 
@@ -300,23 +299,58 @@ extern int iodev;
 #define IOB_STATUS      (iobus1 & IOBUS_IOB_STATUS)
 #define IOB_DATAI       (iobus1 & IOBUS_IOB_DATAI)
 
-/* every entry is a function to wake up the device */
-/* TODO: how to handle multiple APRs? */
-extern void (*iobusmap[128])(void);
-/* current PI req for each device */
-extern u8 ioreq[128];
+typedef struct Busdev Busdev;
+struct Busdev
+{
+	void *dev;
+	void (*wake)(void *dev);
+	u8 pireq;
+};
+
+extern Busdev iobus[128];
 void recalc_req(void);
 
 /*
  * Devices
  */
 
-void initapr(void);
+/* Arithmetic Processor 166 */
 
 #define CPA (0000>>2)
 #define PI (0004>>2)
+void initapr(Apr *apr);
 
-/* TTY */
+/* Paper tape punch 761 */
+#define PTP (0100>>2)
+typedef struct Ptp Ptp;
+struct Ptp
+{
+	uchar ptp;
+	bool busy, flag, b;
+	int pia;
+
+	FILE *fp;
+	int waitdatao;
+};
+void initptp(Ptp *ptp);
+
+/* Paper tape reader 760 */
+#define PTR (0104>>2)
+typedef struct Ptr Ptr;
+struct Ptr
+{
+	int motor_on;
+	word sr;
+	word ptr;
+	bool busy, flag, b;
+	int pia;
+
+	FILE *fp;
+};
+void initptr(Ptr *ptr);
+void ptr_setmotor(Ptr *ptr, int m);
+
+/* Teletype 626 */
 #define TTY (0120>>2)
 typedef struct Tty Tty;
 struct Tty
@@ -327,34 +361,7 @@ struct Tty
 	int pia;
 	int fd;
 };
-extern Tty tty;
-void inittty(void);
-
-/* Paper tape */
-#define PTP (0100>>2)
-typedef struct Ptp Ptp;
-struct Ptp
-{
-	FILE *fp;
-	uchar ptp;
-	bool busy, flag, b;
-	int pia;
-};
-#define PTR (0104>>2)
-typedef struct Ptr Ptr;
-struct Ptr
-{
-	FILE *fp;
-	int motor_on;
-	word sr;
-	word ptr;
-	bool busy, flag, b;
-	int pia;
-};
-extern Ptp ptp;
-extern Ptr ptr;
-void initpt(void);
-void ptr_setmotor(int m);
+void inittty(Tty *tty);
 
 
 
