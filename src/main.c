@@ -5,8 +5,6 @@
 #include <pthread.h>
 #include "args.h"
 
-Busdev iobus[128];
-
 typedef struct Point Point;
 struct Point
 {
@@ -338,7 +336,7 @@ updateapr(Apr *apr, Ptr *ptr)
 	setlights(apr->pr, pr_l, 8);
 	setlights(apr->rlr, rlr_l, 8);
 	setlights(apr->rla, rla_l, 8);
-	setlights(iobus0, iobus_l, 36);
+	setlights(apr->iobus.c12, iobus_l, 36);
 }
 
 void
@@ -663,9 +661,9 @@ main(int argc, char *argv[])
 
 	initapr(&apr);
 	initmem();
-	inittty(&tty);
-	initptr(&ptr);
-	initptp(&ptp);
+	inittty(&tty, &apr.iobus);
+	initptr(&ptr, &apr.iobus);
+	initptp(&ptp, &apr.iobus);
 
 	for(;;){
 		start = SDL_GetTicks();

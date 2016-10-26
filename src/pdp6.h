@@ -21,6 +21,10 @@ extern int dotrace;
 void trace(char *fmt, ...);
 void debug(char *fmt, ...);
 
+enum {
+	MAXPULSE = 5
+};
+
 enum Mask {
 	FW   = 0777777777777,
 	RT   = 0000000777777,
@@ -102,16 +106,131 @@ enum Opcode {
 
 };
 
+/*
+ * Memory
+ */
+
+void initmem(void);
+void dumpmem(void);
+void wakemem(void);
+// 7-2, 7-10
 enum {
-	MAXPULSE = 5
+	MEMBUS_MA21         = 0000000000001,
+	MEMBUS_WR_RQ        = 0000000000004,
+	MEMBUS_RD_RQ        = 0000000000010,
+	MEMBUS_MA_FMC_SEL0  = 0000001000000,
+	MEMBUS_MA_FMC_SEL1  = 0000002000000,
+	MEMBUS_MA35_0       = 0000004000000,
+	MEMBUS_MA35_1       = 0000010000000,
+	MEMBUS_MA21_0       = 0000020000000,
+	MEMBUS_MA21_1       = 0000040000000,
+	MEMBUS_MA20_0       = 0000100000000,
+	MEMBUS_MA20_1       = 0000200000000,
+	MEMBUS_MA19_0       = 0000400000000,
+	MEMBUS_MA19_1       = 0001000000000,
+	MEMBUS_MA18_0       = 0002000000000,
+	MEMBUS_MA18_1       = 0004000000000,
+	MEMBUS_RQ_CYC       = 0020000000000,
+	MEMBUS_WR_RS        = 0100000000000,
+	MEMBUS_MAI_RD_RS    = 0200000000000,
+	MEMBUS_MAI_ADDR_ACK = 0400000000000,
+};
+/* 0 is cable 1 & 2 (above bits); 1 is cable 3 & 4 (data) */
+extern word membus0, membus1;
+/* record the state of membus0 of the last pulse step
+ * to recognize pulses or edges */
+extern word membus0_last, membus0_pulse;
+
+
+/*
+ * IO bus
+ */
+
+// 7-10
+enum {
+	IOBUS_PI_REQ_7    = F35,
+	IOBUS_PI_REQ_6    = F34,
+	IOBUS_PI_REQ_5    = F33,
+	IOBUS_PI_REQ_4    = F32,
+	IOBUS_PI_REQ_3    = F31,
+	IOBUS_PI_REQ_2    = F30,
+	IOBUS_PI_REQ_1    = F29,
+	IOBUS_IOB_STATUS  = F23,
+	IOBUS_IOB_DATAI   = F22,
+	IOBUS_CONO_SET    = F21,
+	IOBUS_CONO_CLEAR  = F20,
+	IOBUS_DATAO_SET   = F19,
+	IOBUS_DATAO_CLEAR = F18,
+	IOBUS_IOS9_1      = F17,
+	IOBUS_IOS9_0      = F16,
+	IOBUS_IOS8_1      = F15,
+	IOBUS_IOS8_0      = F14,
+	IOBUS_IOS7_1      = F13,
+	IOBUS_IOS7_0      = F12,
+	IOBUS_IOS6_1      = F11,
+	IOBUS_IOS6_0      = F10,
+	IOBUS_IOS5_1      = F9,
+	IOBUS_IOS5_0      = F8,
+	IOBUS_IOS4_1      = F7,
+	IOBUS_IOS4_0      = F6,
+	IOBUS_IOS3_1      = F5,
+	IOBUS_IOS3_0      = F4,
+	IOBUS_MC_DR_SPLIT = F3,
+	IOBUS_POWER_ON    = F1,
+	IOBUS_IOB_RESET   = F0,
+	IOBUS_PULSES = IOBUS_CONO_SET | IOBUS_CONO_CLEAR |
+	               IOBUS_DATAO_SET | IOBUS_DATAO_CLEAR
 };
 
+#define IOB_RESET       (bus->c34 & IOBUS_IOB_RESET)
+#define IOB_DATAO_CLEAR (bus->c34 & IOBUS_DATAO_CLEAR)
+#define IOB_DATAO_SET   (bus->c34 & IOBUS_DATAO_SET)
+#define IOB_CONO_CLEAR  (bus->c34 & IOBUS_CONO_CLEAR)
+#define IOB_CONO_SET    (bus->c34 & IOBUS_CONO_SET)
+#define IOB_STATUS      (bus->c34 & IOBUS_IOB_STATUS)
+#define IOB_DATAI       (bus->c34 & IOBUS_IOB_DATAI)
+
+/* A peripheral device connected to an IO bus */
+typedef struct Busdev Busdev;
+struct Busdev
+{
+	void *dev;
+	void (*wake)(void *dev);
+	u8 req;
+};
+
+typedef struct IOBus IOBus;
+struct IOBus
+{
+	/* c12 are cables 1 and 2, c34 3 and 4.
+	 * c??_prev records the previous state of the bus
+	 * and c??_pulse is used to detect leading edges. */
+	word c12, c12_prev, c12_pulse;
+	word c34, c34_prev, c34_pulse;
+	/* device code decoded from the cables */
+	int devcode;
+	/* All IO devices connected to this bus */
+	Busdev dev[128];
+};
+void recalc_req(IOBus *bus);
+
+
+/*
+ * Devices
+ */
+
+/* Arithmetic Processor 166 */
+#define CPA (0000>>2)
+#define PI (0004>>2)
 typedef struct Apr Apr;
 
 typedef void Pulse(Apr *apr);
 #define pulse(p) static void p(Apr *apr)
 
-struct Apr {
+struct Apr
+{
+	IOBus iobus;
+
 	hword ir;
 	word mi;
 	word data;
@@ -210,121 +329,23 @@ struct Apr {
 	/* needed for the emulation */
 	int extpulse;
 	bool ia_inh;	// this is asserted for some time
+	int pulsestepping;
 
 	Pulse *pulses1[MAXPULSE], *pulses2[MAXPULSE];
 	Pulse **clist, **nlist;
 	int ncurpulses, nnextpulses;
 };
+void initapr(Apr *apr);
 void nextpulse(Apr *apr, Pulse *p);
 void *aprmain(void *p);
 
-void initmem(void);
-void dumpmem(void);
-void wakemem(void);
-// 7-2, 7-10
-enum {
-	MEMBUS_MA21         = 0000000000001,
-	MEMBUS_WR_RQ        = 0000000000004,
-	MEMBUS_RD_RQ        = 0000000000010,
-	MEMBUS_MA_FMC_SEL0  = 0000001000000,
-	MEMBUS_MA_FMC_SEL1  = 0000002000000,
-	MEMBUS_MA35_0       = 0000004000000,
-	MEMBUS_MA35_1       = 0000010000000,
-	MEMBUS_MA21_0       = 0000020000000,
-	MEMBUS_MA21_1       = 0000040000000,
-	MEMBUS_MA20_0       = 0000100000000,
-	MEMBUS_MA20_1       = 0000200000000,
-	MEMBUS_MA19_0       = 0000400000000,
-	MEMBUS_MA19_1       = 0001000000000,
-	MEMBUS_MA18_0       = 0002000000000,
-	MEMBUS_MA18_1       = 0004000000000,
-	MEMBUS_RQ_CYC       = 0020000000000,
-	MEMBUS_WR_RS        = 0100000000000,
-	MEMBUS_MAI_RD_RS    = 0200000000000,
-	MEMBUS_MAI_ADDR_ACK = 0400000000000,
-};
-/* 0 is cable 1 & 2 (above bits); 1 is cable 3 & 4 (data) */
-extern word membus0, membus1;
-/* record the state of membus0 of the last pulse step
- * to recognize pulses or edges */
-extern word membus0_last, membus0_pulse;
-
-// 7-10
-enum {
-	IOBUS_PI_REQ_7    = F35,
-	IOBUS_PI_REQ_6    = F34,
-	IOBUS_PI_REQ_5    = F33,
-	IOBUS_PI_REQ_4    = F32,
-	IOBUS_PI_REQ_3    = F31,
-	IOBUS_PI_REQ_2    = F30,
-	IOBUS_PI_REQ_1    = F29,
-	IOBUS_IOB_STATUS  = F23,
-	IOBUS_IOB_DATAI   = F22,
-	IOBUS_CONO_SET    = F21,
-	IOBUS_CONO_CLEAR  = F20,
-	IOBUS_DATAO_SET   = F19,
-	IOBUS_DATAO_CLEAR = F18,
-	IOBUS_IOS9_1      = F17,
-	IOBUS_IOS9_0      = F16,
-	IOBUS_IOS8_1      = F15,
-	IOBUS_IOS8_0      = F14,
-	IOBUS_IOS7_1      = F13,
-	IOBUS_IOS7_0      = F12,
-	IOBUS_IOS6_1      = F11,
-	IOBUS_IOS6_0      = F10,
-	IOBUS_IOS5_1      = F9,
-	IOBUS_IOS5_0      = F8,
-	IOBUS_IOS4_1      = F7,
-	IOBUS_IOS4_0      = F6,
-	IOBUS_IOS3_1      = F5,
-	IOBUS_IOS3_0      = F4,
-	IOBUS_MC_DR_SPLIT = F3,
-	IOBUS_POWER_ON    = F1,
-	IOBUS_IOB_RESET   = F0,
-	IOBUS_PULSES = IOBUS_CONO_SET | IOBUS_CONO_CLEAR |
-	               IOBUS_DATAO_SET | IOBUS_DATAO_CLEAR
-};
-/* 0 is cable 1 & 2 (data); 1 is cable 3 & 4 (above bits) */
-extern word iobus0, iobus1;
-/* record the state of iobus1 of the last pulse step
- * to recognize pulses or edges */
-extern word iobus1_last, iobus1_pulse;
-extern int iodev;
-
-#define IOB_RESET       (iobus1 & IOBUS_IOB_RESET)
-#define IOB_DATAO_CLEAR (iobus1 & IOBUS_DATAO_CLEAR)
-#define IOB_DATAO_SET   (iobus1 & IOBUS_DATAO_SET)
-#define IOB_CONO_CLEAR  (iobus1 & IOBUS_CONO_CLEAR)
-#define IOB_CONO_SET    (iobus1 & IOBUS_CONO_SET)
-#define IOB_STATUS      (iobus1 & IOBUS_IOB_STATUS)
-#define IOB_DATAI       (iobus1 & IOBUS_IOB_DATAI)
-
-typedef struct Busdev Busdev;
-struct Busdev
-{
-	void *dev;
-	void (*wake)(void *dev);
-	u8 pireq;
-};
-
-extern Busdev iobus[128];
-void recalc_req(void);
-
-/*
- * Devices
- */
-
-/* Arithmetic Processor 166 */
-
-#define CPA (0000>>2)
-#define PI (0004>>2)
-void initapr(Apr *apr);
 
 /* Paper tape punch 761 */
 #define PTP (0100>>2)
 typedef struct Ptp Ptp;
 struct Ptp
 {
+	IOBus *bus;
 	uchar ptp;
 	bool busy, flag, b;
 	int pia;
@@ -332,13 +353,15 @@ struct Ptp
 	FILE *fp;
 	int waitdatao;
 };
-void initptp(Ptp *ptp);
+void initptp(Ptp *ptp, IOBus *bus);
+
 
 /* Paper tape reader 760 */
 #define PTR (0104>>2)
 typedef struct Ptr Ptr;
 struct Ptr
 {
+	IOBus *bus;
 	int motor_on;
 	word sr;
 	word ptr;
@@ -347,21 +370,23 @@ struct Ptr
 
 	FILE *fp;
 };
-void initptr(Ptr *ptr);
+void initptr(Ptr *ptr, IOBus *bus);
 void ptr_setmotor(Ptr *ptr, int m);
+
 
 /* Teletype 626 */
 #define TTY (0120>>2)
 typedef struct Tty Tty;
 struct Tty
 {
+	IOBus *bus;
 	uchar tto, tti;
 	bool tto_busy, tto_flag;
 	bool tti_busy, tti_flag;
 	int pia;
 	int fd;
 };
-void inittty(Tty *tty);
+void inittty(Tty *tty, IOBus *bus);
 
 
 

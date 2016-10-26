@@ -1,19 +1,11 @@
 #include "pdp6.h"
 #include <unistd.h>
 
-word iobus0, iobus1;
-word iobus1_last, iobus1_pulse;
-int iodev;
-
 #define DBG_AR debug("AR: %012llo\n", apr->ar)
 #define DBG_MB debug("MB: %012llo\n", apr->mb)
 #define DBG_MQ debug("MQ: %012llo\n", apr->mq)
 #define DBG_MA debug("MA: %06o\n", apr->ma)
 #define DBG_IR debug("IR: %06o\n", apr->ir)
-
-Apr apr;
-
-int pulsestepping = 0;
 
 #define SWAPLTRT(a) (a = (a)<<18 & LT | (a)>>18 & RT)
 #define CONS(a, b) ((a)&LT | (b)&RT)
@@ -163,14 +155,14 @@ decodeir(Apr *apr)
 	apr->io_inst = apr->ir & 0700340;
 
 	// 5-7
-	iobus1 &= ~037777000000LL;
-	iobus1 |= apr->ir & H3 ? IOBUS_IOS3_1 : IOBUS_IOS3_0;
-	iobus1 |= apr->ir & H4 ? IOBUS_IOS4_1 : IOBUS_IOS4_0;
-	iobus1 |= apr->ir & H5 ? IOBUS_IOS5_1 : IOBUS_IOS5_0;
-	iobus1 |= apr->ir & H6 ? IOBUS_IOS6_1 : IOBUS_IOS6_0;
-	iobus1 |= apr->ir & H7 ? IOBUS_IOS7_1 : IOBUS_IOS7_0;
-	iobus1 |= apr->ir & H8 ? IOBUS_IOS8_1 : IOBUS_IOS8_0;
-	iobus1 |= apr->ir & H9 ? IOBUS_IOS9_1 : IOBUS_IOS9_0;
+	apr->iobus.c34 &= ~037777000000LL;
+	apr->iobus.c34 |= apr->ir & H3 ? IOBUS_IOS3_1 : IOBUS_IOS3_0;
+	apr->iobus.c34 |= apr->ir & H4 ? IOBUS_IOS4_1 : IOBUS_IOS4_0;
+	apr->iobus.c34 |= apr->ir & H5 ? IOBUS_IOS5_1 : IOBUS_IOS5_0;
+	apr->iobus.c34 |= apr->ir & H6 ? IOBUS_IOS6_1 : IOBUS_IOS6_0;
+	apr->iobus.c34 |= apr->ir & H7 ? IOBUS_IOS7_1 : IOBUS_IOS7_0;
+	apr->iobus.c34 |= apr->ir & H8 ? IOBUS_IOS8_1 : IOBUS_IOS8_0;
+	apr->iobus.c34 |= apr->ir & H9 ? IOBUS_IOS9_1 : IOBUS_IOS9_0;
 
 	apr->ir_fp = (apr->inst & 0740) == 0140;
 
@@ -325,14 +317,14 @@ set_pih(Apr *apr, int pih)
 
 /* Recalculate the PI requests on the IO bus from each device */
 void
-recalc_req(void)
+recalc_req(IOBus *bus)
 {
 	int i;
 	int req;
 	req = 0;
 	for(i = 0; i < 128; i++)
-		req |= iobus[i].pireq;
-	iobus1 = iobus1&~0177LL | req&0177;
+		req |= bus->dev[i].req;
+	bus->c34 = bus->c34&~0177LL | req&0177;
 }
 
 void
@@ -345,9 +337,9 @@ recalc_cpa_req(Apr *apr)
 	   apr->ar_pc_chg_flag && apr->cpa_pc_chg_enable ||
 	   apr->ar_ov_flag && apr->cpa_arov_enable)
 		req = apr->cpa_pia;
-	if(iobus[CPA].pireq != req){
-		iobus[CPA].pireq = req;
-		recalc_req();
+	if(apr->iobus.dev[CPA].req != req){
+		apr->iobus.dev[CPA].req = req;
+		recalc_req(&apr->iobus);
 	}
 }
 
@@ -615,15 +607,15 @@ pulse(ex_clr){
 }
 
 pulse(ex_set){
-	apr->pr  = iobus0>>28 & 0377;	// 7-4
-	apr->rlr = iobus0>>10 & 0377;	// 7-5
+	apr->pr  = apr->iobus.c12>>28 & 0377;	// 7-4
+	apr->rlr = apr->iobus.c12>>10 & 0377;	// 7-5
 }
 
 pulse(mr_start){
 	trace("MR START\n");
 
 	// 8-1
-	iobus1 |= IOBUS_IOB_RESET;
+	apr->iobus.c34 |= IOBUS_IOB_RESET;
 
 	// 8-5
 	apr->cpa_iot_user = 0;
@@ -635,7 +627,7 @@ pulse(mr_start){
 	apr->cpa_pdl_ov = 0;
 	apr->cpa_arov_enable = 0;
 	apr->cpa_pia = 0;
-	iobus[CPA].pireq = 0;
+	apr->iobus.dev[CPA].req = 0;
 
 	// PI
 	apr->pi_ov = 0;		// 8-4
@@ -665,40 +657,42 @@ void
 wake_cpa(void *dev)
 {
 	Apr *apr;
+	IOBus *bus;
 
 	apr = dev;
-	if(iodev != CPA)
+	bus = &apr->iobus;
+	if(apr->iobus.devcode != CPA)
 		return;
 	// 8-5
 	if(IOB_STATUS){
-		if(apr->cpa_pdl_ov)        iobus0 |= F19;
-		if(apr->cpa_iot_user)      iobus0 |= F20;
-		if(apr->ex_user)           iobus0 |= F21;
-		if(apr->cpa_illeg_op)      iobus0 |= F22;
-		if(apr->cpa_non_exist_mem) iobus0 |= F23;
-		if(apr->cpa_clock_enable)  iobus0 |= F25;
-		if(apr->cpa_clock_flag)    iobus0 |= F26;
-		if(apr->cpa_pc_chg_enable) iobus0 |= F28;
-		if(apr->ar_pc_chg_flag)    iobus0 |= F29;
-		if(apr->cpa_arov_enable)   iobus0 |= F31;
-		if(apr->ar_ov_flag)        iobus0 |= F32;
-		iobus0 |= apr->cpa_pia & 7;
+		if(apr->cpa_pdl_ov)        bus->c12 |= F19;
+		if(apr->cpa_iot_user)      bus->c12 |= F20;
+		if(apr->ex_user)           bus->c12 |= F21;
+		if(apr->cpa_illeg_op)      bus->c12 |= F22;
+		if(apr->cpa_non_exist_mem) bus->c12 |= F23;
+		if(apr->cpa_clock_enable)  bus->c12 |= F25;
+		if(apr->cpa_clock_flag)    bus->c12 |= F26;
+		if(apr->cpa_pc_chg_enable) bus->c12 |= F28;
+		if(apr->ar_pc_chg_flag)    bus->c12 |= F29;
+		if(apr->cpa_arov_enable)   bus->c12 |= F31;
+		if(apr->ar_ov_flag)        bus->c12 |= F32;
+		bus->c12 |= apr->cpa_pia & 7;
 	}
 	if(IOB_CONO_SET){
-		if(iobus0 & F18) apr->cpa_pdl_ov = 0;
-		if(iobus0 & F19) iobus1 |= IOBUS_IOB_RESET;	// 8-1
-		if(iobus0 & F22) apr->cpa_illeg_op = 0;
-		if(iobus0 & F23) apr->cpa_non_exist_mem = 0;
-		if(iobus0 & F24) apr->cpa_clock_enable = 0;
-		if(iobus0 & F25) apr->cpa_clock_enable = 1;
-		if(iobus0 & F26) apr->cpa_clock_flag = 0;
-		if(iobus0 & F27) apr->cpa_pc_chg_enable = 0;
-		if(iobus0 & F28) apr->cpa_pc_chg_enable = 1;
-		if(iobus0 & F29) apr->ar_pc_chg_flag = 0;	// 6-10
-		if(iobus0 & F30) apr->cpa_arov_enable = 0;
-		if(iobus0 & F31) apr->cpa_arov_enable = 1;
-		if(iobus0 & F32) apr->ar_ov_flag = 0;		// 6-10
-		apr->cpa_pia = iobus0 & 7;
+		if(bus->c12 & F18) apr->cpa_pdl_ov = 0;
+		if(bus->c12 & F19) bus->c34 |= IOBUS_IOB_RESET;	// 8-1
+		if(bus->c12 & F22) apr->cpa_illeg_op = 0;
+		if(bus->c12 & F23) apr->cpa_non_exist_mem = 0;
+		if(bus->c12 & F24) apr->cpa_clock_enable = 0;
+		if(bus->c12 & F25) apr->cpa_clock_enable = 1;
+		if(bus->c12 & F26) apr->cpa_clock_flag = 0;
+		if(bus->c12 & F27) apr->cpa_pc_chg_enable = 0;
+		if(bus->c12 & F28) apr->cpa_pc_chg_enable = 1;
+		if(bus->c12 & F29) apr->ar_pc_chg_flag = 0;	// 6-10
+		if(bus->c12 & F30) apr->cpa_arov_enable = 0;
+		if(bus->c12 & F31) apr->cpa_arov_enable = 1;
+		if(bus->c12 & F32) apr->ar_ov_flag = 0;		// 6-10
+		apr->cpa_pia = bus->c12 & 7;
 		recalc_cpa_req(apr);
 	}
 
@@ -716,35 +710,37 @@ void
 wake_pi(void *dev)
 {
 	Apr *apr;
+	IOBus *bus;
 
 	apr = dev;
-	if(iodev != PI)
+	bus = &apr->iobus;
+	if(bus->devcode != PI)
 		return;
 	// 8-4, 8-5
 	if(IOB_STATUS){
-		trace("PI STATUS %llo\n", iobus0);
-		if(apr->pi_active) iobus0 |= F28;
-		iobus0 |= apr->pio;
+		trace("PI STATUS %llo\n", bus->c12);
+		if(apr->pi_active) bus->c12 |= F28;
+		bus->c12 |= apr->pio;
 	}
 
 	// 8-4, 8-3
 	if(IOB_CONO_CLEAR){
-		trace("PI CONO CLEAR %llo\n", iobus0);
-		if(iobus0 & F23)
+		trace("PI CONO CLEAR %llo\n", bus->c12);
+		if(bus->c12 & F23)
 			// can call directly
 			pi_reset(apr);
 	}
 	if(IOB_CONO_SET){
-		trace("PI CONO SET %llo\n", iobus0);
-		if(iobus0 & F24)
-			set_pir(apr, apr->pir | iobus0&0177);
-		if(iobus0 & F25)
-			apr->pio |= iobus0&0177;
-		if(iobus0 & F26)
-			apr->pio &= ~(iobus0&0177);
-		if(iobus0 & F27)
+		trace("PI CONO SET %llo\n", bus->c12);
+		if(bus->c12 & F24)
+			set_pir(apr, apr->pir | bus->c12&0177);
+		if(bus->c12 & F25)
+			apr->pio |= bus->c12&0177;
+		if(bus->c12 & F26)
+			apr->pio &= ~(bus->c12&0177);
+		if(bus->c12 & F27)
 			apr->pi_active = 0;
-		if(iobus0 & F28)
+		if(bus->c12 & F28)
 			apr->pi_active = 1;
 	}
 }
@@ -757,9 +753,9 @@ wake_pi(void *dev)
 pulse(iot_t4){
 	trace("IOT T4\n");
 	/* Clear what was set in IOT T2 */
-	iobus1 &= ~(IOBUS_IOB_STATUS | IOBUS_IOB_DATAI);
+	apr->iobus.c34 &= ~(IOBUS_IOB_STATUS | IOBUS_IOB_DATAI);
 	/* and do something like IOB BUS RESET */
-	iobus0 = 0;
+	apr->iobus.c12 = 0;
 }
 
 pulse(iot_t3a){
@@ -774,10 +770,10 @@ pulse(iot_t3){
 	// 8-1
 	/* Pulses, cleared in the main loop. */
 	if(IOT_DATAO)
-		iobus1 |= IOBUS_DATAO_SET;
+		apr->iobus.c34 |= IOBUS_DATAO_SET;
 	if(IOT_CONO)
-		iobus1 |= IOBUS_CONO_SET;
-	apr->ar |= iobus0;		// 6-8
+		apr->iobus.c34 |= IOBUS_CONO_SET;
+	apr->ar |= apr->iobus.c12;	// 6-8
 	nextpulse(apr, et5);		// 5-5
 }
 
@@ -788,16 +784,16 @@ pulse(iot_t2){
 	/* These are asserted during INIT SETUP, IOT T2 and FINAL SETUP.
 	 * We clear them in IOT T4 which happens after FINAL SETUP */
 	if(IOT_OUTGOING)
-		iobus0 |= apr->ar;
+		apr->iobus.c12 |= apr->ar;
 	if(IOT_STATUS)
-		iobus1 |= IOBUS_IOB_STATUS;
+		apr->iobus.c34 |= IOBUS_IOB_STATUS;
 	if(IOT_DATAI)
-		iobus1 |= IOBUS_IOB_DATAI;
+		apr->iobus.c34 |= IOBUS_IOB_DATAI;
 	/* Pulses, cleared in the main loop. */
 	if(IOT_DATAO)
-		iobus1 |= IOBUS_DATAO_CLEAR;
+		apr->iobus.c34 |= IOBUS_DATAO_CLEAR;
 	if(IOT_CONO)
-		iobus1 |= IOBUS_CONO_CLEAR;
+		apr->iobus.c34 |= IOBUS_CONO_CLEAR;
 	nextpulse(apr, iot_t3);
 	nextpulse(apr, iot_t3a);
 }
@@ -2066,7 +2062,7 @@ pulse(xct_t0){
 
 pulse(pir_stb){
 	trace("PIR STB\n");
-	set_pir(apr, apr->pir | apr->pio & iobus1);	// 8-3
+	set_pir(apr, apr->pir | apr->pio & apr->iobus.c34);	// 8-3
 }
 
 pulse(pi_sync){
@@ -3029,8 +3025,18 @@ nextpulse(Apr *apr, Pulse *p)
 void
 initapr(Apr *apr)
 {
-	iobus[CPA] = (Busdev){ apr, wake_cpa, 0 };
-	iobus[PI] = (Busdev){ apr, wake_pi, 0 };
+	apr->iobus.dev[CPA] = (Busdev){ apr, wake_cpa, 0 };
+	apr->iobus.dev[PI] = (Busdev){ apr, wake_pi, 0 };
+}
+
+/* find out which bits were turned on */
+void
+updatebus(void *bus)
+{
+	IOBus *b;
+	b = bus;
+	b->c12_pulse = (b->c12_prev ^ b->c12) & b->c12;
+	b->c34_pulse = (b->c34_prev ^ b->c34) & b->c34;
 }
 
 void*
@@ -3039,7 +3045,7 @@ aprmain(void *p)
 	Apr *apr;
 	Busdev *dev;
 	Pulse **tmp;
-	int i;
+	int i, devcode;
 
 	apr = (Apr*)p;
 	apr->clist = apr->pulses1;
@@ -3048,8 +3054,8 @@ aprmain(void *p)
 	apr->nnextpulses = 0;
 	apr->ia_inh = 0;
 
-	iobus0 = 0;
-	iobus1 = 0;
+	apr->iobus.c12 = 0;
+	apr->iobus.c34 = 0;
 
 	nextpulse(apr, mr_pwr_clr);
 	while(apr->sw_power){
@@ -3057,22 +3063,21 @@ aprmain(void *p)
 		apr->nnextpulses = 0;
 		tmp = apr->clist; apr->clist = apr->nlist; apr->nlist = tmp;
 
-		if(pulsestepping){
+		if(apr->pulsestepping){
 			int c;
 			while(c = getchar(), c != EOF && c != '\n')
 				if(c == 'x')
-					pulsestepping = 0;
+					apr->pulsestepping = 0;
 		}
 
-		iobus1_last = iobus1;
+		apr->iobus.c12_prev = apr->iobus.c12;
+		apr->iobus.c34_prev = apr->iobus.c34;
 		membus0_last = membus0;
 
 		for(i = 0; i < apr->ncurpulses; i++)
 			apr->clist[i](apr);
 
-		/* find out which bits were turned on */
-		iobus1_pulse = (iobus1_last ^ iobus1) & iobus1;
-		iobus1_pulse &= ~037777000177LL;
+		updatebus(&apr->iobus);
 		membus0_pulse = (membus0_last ^ membus0) & membus0;
 
 		/* This is simplified, we have no IOT RESET,
@@ -3096,29 +3101,30 @@ aprmain(void *p)
 
 
 		/* Pulses and signals through IO bus */
-		iodev = -1;
-		if(iobus1_pulse & (IOBUS_PULSES | IOBUS_IOB_STATUS | IOBUS_IOB_DATAI)){
-			iodev = 0;
-			if(iobus1 & IOBUS_IOS3_1) iodev |= 0100;
-			if(iobus1 & IOBUS_IOS4_1) iodev |= 0040;
-			if(iobus1 & IOBUS_IOS5_1) iodev |= 0020;
-			if(iobus1 & IOBUS_IOS6_1) iodev |= 0010;
-			if(iobus1 & IOBUS_IOS7_1) iodev |= 0004;
-			if(iobus1 & IOBUS_IOS8_1) iodev |= 0002;
-			if(iobus1 & IOBUS_IOS9_1) iodev |= 0001;
-			dev = &iobus[iodev];
+		apr->iobus.devcode = -1;
+		if(apr->iobus.c34_pulse & (IOBUS_PULSES | IOBUS_IOB_STATUS | IOBUS_IOB_DATAI)){
+			devcode = 0;
+			if(apr->iobus.c34 & IOBUS_IOS3_1) devcode |= 0100;
+			if(apr->iobus.c34 & IOBUS_IOS4_1) devcode |= 0040;
+			if(apr->iobus.c34 & IOBUS_IOS5_1) devcode |= 0020;
+			if(apr->iobus.c34 & IOBUS_IOS6_1) devcode |= 0010;
+			if(apr->iobus.c34 & IOBUS_IOS7_1) devcode |= 0004;
+			if(apr->iobus.c34 & IOBUS_IOS8_1) devcode |= 0002;
+			if(apr->iobus.c34 & IOBUS_IOS9_1) devcode |= 0001;
+			apr->iobus.devcode = devcode;
+			dev = &apr->iobus.dev[devcode];
 			if(dev->wake)
 				dev->wake(dev->dev);
 		}
-		if(iobus1_pulse & IOBUS_IOB_RESET){
+		if(apr->iobus.c34_pulse & IOBUS_IOB_RESET){
 			int d;
-			for(d = 0; d < nelem(iobus); d++){
-				dev = &iobus[d];
+			for(d = 0; d < 128; d++){
+				dev = &apr->iobus.dev[d];
 				if(dev->wake)
 					dev->wake(dev->dev);
 			}
 		}
-		iobus1 &= ~(IOBUS_PULSES | IOBUS_IOB_RESET);
+		apr->iobus.c34 &= ~(IOBUS_PULSES | IOBUS_IOB_RESET);
 
 
 		/* Pulses to memory */

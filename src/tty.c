@@ -7,18 +7,20 @@
 #include <pthread.h>    
 #include <poll.h>
 
-void
+static void
 recalc_tty_req(Tty *tty)
 {
 	u8 req;
+	IOBus *bus;
+	bus = tty->bus;
 	req = tty->tto_flag || tty->tti_flag ? tty->pia : 0;
-	if(req != iobus[TTY].pireq){
-		iobus[TTY].pireq = req;
-		recalc_req();
+	if(req != bus->dev[TTY].req){
+		bus->dev[TTY].req = req;
+		recalc_req(bus);
 	}
 }
 
-void*
+static void*
 ttythread(void *dev)
 {
 	int sockfd, newsockfd, portno, clilen;
@@ -70,8 +72,10 @@ static void
 wake_tty(void *dev)
 {
 	Tty *tty;
+	IOBus *bus;
 
 	tty = dev;
+	bus = tty->bus;
 	if(IOB_RESET){
 		tty->pia = 0;
 		tty->tto_busy = 0;
@@ -81,30 +85,30 @@ wake_tty(void *dev)
 		tty->tti_flag = 0;
 		tty->tti = 0;
 	}
-	if(iodev == TTY){
+	if(bus->devcode == TTY){
 		if(IOB_STATUS){
-			if(tty->tti_busy) iobus0 |= F29;
-			if(tty->tti_flag) iobus0 |= F30;
-			if(tty->tto_busy) iobus0 |= F31;
-			if(tty->tto_flag) iobus0 |= F32;
-			iobus0 |= tty->pia & 7;
+			if(tty->tti_busy) bus->c12 |= F29;
+			if(tty->tti_flag) bus->c12 |= F30;
+			if(tty->tto_busy) bus->c12 |= F31;
+			if(tty->tto_flag) bus->c12 |= F32;
+			bus->c12 |= tty->pia & 7;
 		}
 		if(IOB_DATAI){
-			iobus0 |= tty->tti;
+			bus->c12 |= tty->tti;
 			tty->tti_flag = 0;
 		}
 		if(IOB_CONO_CLEAR)
 			tty->pia = 0;
 		if(IOB_CONO_SET){
-			if(iobus0 & F25) tty->tti_busy = 0;
-			if(iobus0 & F26) tty->tti_flag = 0;
-			if(iobus0 & F27) tty->tto_busy = 0;
-			if(iobus0 & F28) tty->tto_flag = 0;
-			if(iobus0 & F29) tty->tti_busy = 1;
-			if(iobus0 & F30) tty->tti_flag = 1;
-			if(iobus0 & F31) tty->tto_busy = 1;
-			if(iobus0 & F32) tty->tto_flag = 1;
-			tty->pia |= iobus0 & 7;
+			if(bus->c12 & F25) tty->tti_busy = 0;
+			if(bus->c12 & F26) tty->tti_flag = 0;
+			if(bus->c12 & F27) tty->tto_busy = 0;
+			if(bus->c12 & F28) tty->tto_flag = 0;
+			if(bus->c12 & F29) tty->tti_busy = 1;
+			if(bus->c12 & F30) tty->tti_flag = 1;
+			if(bus->c12 & F31) tty->tto_busy = 1;
+			if(bus->c12 & F32) tty->tto_flag = 1;
+			tty->pia |= bus->c12 & 7;
 		}
 		if(IOB_DATAO_CLEAR){
 			tty->tto = 0;
@@ -112,7 +116,7 @@ wake_tty(void *dev)
 			tty->tto_flag = 0;
 		}
 		if(IOB_DATAO_SET){
-			tty->tto = iobus0 & 0377;
+			tty->tto = bus->c12 & 0377;
 			if(tty->fd >= 0){
 				tty->tto &= ~0200;
 				write(tty->fd, &tty->tto, 1);
@@ -126,10 +130,11 @@ wake_tty(void *dev)
 }
 
 void
-inittty(Tty *tty)
+inittty(Tty *tty, IOBus *bus)
 {
 	pthread_t thread_id;
 	tty->fd = -1;
-	iobus[TTY] = (Busdev){ tty, wake_tty, 0 };
+	tty->bus = bus;
+	bus->dev[TTY] = (Busdev){ tty, wake_tty, 0 };
 	pthread_create(&thread_id, nil, ttythread, tty);
 }

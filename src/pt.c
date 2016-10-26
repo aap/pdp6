@@ -9,32 +9,36 @@
 
 /* TODO? implement motor delays */
 
-void
+static void
 recalc_ptp_req(Ptp *ptp)
 {
 	u8 req;
+	IOBus *bus;
+	bus = ptp->bus;
 	req = ptp->flag ? ptp->pia : 0;
-	if(req != iobus[PTP].pireq){
-		iobus[PTP].pireq = req;
-		recalc_req();
+	if(req != bus->dev[PTP].req){
+		bus->dev[PTP].req = req;
+		recalc_req(bus);
 	}
 }
 
-void
+static void
 recalc_ptr_req(Ptr *ptr)
 {
 	u8 req;
+	IOBus *bus;
+	bus = ptr->bus;
 	req = ptr->flag ? ptr->pia : 0;
-	if(req != iobus[PTR].pireq){
-		iobus[PTR].pireq = req;
-		recalc_req();
+	if(req != bus->dev[PTR].req){
+		bus->dev[PTR].req = req;
+		recalc_req(bus);
 	}
 }
 
 /* We have to punch after DATAO SET has happened. But BUSY is set by
  * DATAO CLEAR. So we use waitdatao to record when SET has happened */
 
-void*
+static void*
 ptpthread(void *dev)
 {
 	Ptp *ptp;
@@ -57,7 +61,7 @@ ptpthread(void *dev)
 	return nil;
 }
 
-void*
+static void*
 ptrthread(void *dev)
 {
 	Ptr *ptr;
@@ -100,20 +104,22 @@ static void
 wake_ptp(void *dev)
 {
 	Ptp *ptp;
+	IOBus *bus;
 
 	ptp = dev;
+	bus = ptp->bus;
 	if(IOB_RESET){
 		ptp->pia = 0;
 		ptp->busy = 0;
 		ptp->flag = 0;
 		ptp->b = 0;
 	}
-	if(iodev == PTP){
+	if(bus->devcode == PTP){
 		if(IOB_STATUS){
-			if(ptp->b) iobus0 |= F30;
-			if(ptp->busy) iobus0 |= F31;
-			if(ptp->flag) iobus0 |= F32;
-			iobus0 |= ptp->pia & 7;
+			if(ptp->b) bus->c12 |= F30;
+			if(ptp->busy) bus->c12 |= F31;
+			if(ptp->flag) bus->c12 |= F32;
+			bus->c12 |= ptp->pia & 7;
 		}
 		if(IOB_CONO_CLEAR){
 			ptp->pia = 0;
@@ -122,10 +128,10 @@ wake_ptp(void *dev)
 			ptp->b = 0;
 		}
 		if(IOB_CONO_SET){
-			if(iobus0 & F30) ptp->b = 1;
-			if(iobus0 & F31) ptp->busy = 1;
-			if(iobus0 & F32) ptp->flag = 1;
-			ptp->pia |= iobus0 & 7;
+			if(bus->c12 & F30) ptp->b = 1;
+			if(bus->c12 & F31) ptp->busy = 1;
+			if(bus->c12 & F32) ptp->flag = 1;
+			ptp->pia |= bus->c12 & 7;
 		}
 		if(IOB_DATAO_CLEAR){
 			ptp->ptp = 0;
@@ -134,7 +140,7 @@ wake_ptp(void *dev)
 			ptp->waitdatao = 0;
 		}
 		if(IOB_DATAO_SET){
-			ptp->ptp = iobus0 & 0377;
+			ptp->ptp = bus->c12 & 0377;
 			ptp->waitdatao = 1;
 		}
 	}
@@ -145,8 +151,10 @@ static void
 wake_ptr(void *dev)
 {
 	Ptr *ptr;
+	IOBus *bus;
 
 	ptr = dev;
+	bus = ptr->bus;
 	if(IOB_RESET){
 		ptr->pia = 0;
 		ptr->busy = 0;
@@ -154,16 +162,16 @@ wake_ptr(void *dev)
 		ptr->b = 0;
 	}
 
-	if(iodev == PTR){
+	if(bus->devcode == PTR){
 		if(IOB_STATUS){
-			if(ptr->motor_on) iobus0 |= F27;
-			if(ptr->b) iobus0 |= F30;
-			if(ptr->busy) iobus0 |= F31;
-			if(ptr->flag) iobus0 |= F32;
-			iobus0 |= ptr->pia & 7;
+			if(ptr->motor_on) bus->c12 |= F27;
+			if(ptr->b) bus->c12 |= F30;
+			if(ptr->busy) bus->c12 |= F31;
+			if(ptr->flag) bus->c12 |= F32;
+			bus->c12 |= ptr->pia & 7;
 		}
 		if(IOB_DATAI){
-			iobus0 |= ptr->ptr;
+			bus->c12 |= ptr->ptr;
 			ptr->flag = 0;
 			// actually when DATAI is negated again
 			ptr->busy = 1;
@@ -175,10 +183,10 @@ wake_ptr(void *dev)
 			ptr->b = 0;
 		}
 		if(IOB_CONO_SET){
-			if(iobus0 & F30) ptr->b = 1;
-			if(iobus0 & F31) ptr->busy = 1;
-			if(iobus0 & F32) ptr->flag = 1;
-			ptr->pia |= iobus0 & 7;
+			if(bus->c12 & F30) ptr->b = 1;
+			if(bus->c12 & F31) ptr->busy = 1;
+			if(bus->c12 & F32) ptr->flag = 1;
+			ptr->pia |= bus->c12 & 7;
 		}
 	}
 	recalc_ptr_req(ptr);
@@ -197,20 +205,22 @@ ptr_setmotor(Ptr *ptr, int m)
 }
 
 void
-initptp(Ptp *ptp)
+initptp(Ptp *ptp, IOBus *bus)
 {
 	pthread_t thread_id;
-	iobus[PTP] = (Busdev){ ptp, wake_ptp, 0 };
+	ptp->bus = bus;
+	bus->dev[PTP] = (Busdev){ ptp, wake_ptp, 0 };
 	pthread_create(&thread_id, nil, ptpthread, ptp);
 
 	ptp->fp = fopen("../code/ptp.out", "wb");
 }
 
 void
-initptr(Ptr *ptr)
+initptr(Ptr *ptr, IOBus *bus)
 {
 	pthread_t thread_id;
-	iobus[PTR] = (Busdev){ ptr, wake_ptr, 0 };
+	ptr->bus = bus;
+	bus->dev[PTR] = (Busdev){ ptr, wake_ptr, 0 };
 	pthread_create(&thread_id, nil, ptrthread, ptr);
 
 	ptr->fp = fopen("../code/test.rim", "rb");
