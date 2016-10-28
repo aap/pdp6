@@ -661,7 +661,6 @@ main(int argc, char *argv[])
 	extra_l = e; e += 1;
 
 	initapr(&apr);
-//	initmem();
 	coremems[0] = makecoremem("mem_0");
 	coremems[1] = makecoremem("mem_1");
 	coremems[2] = makecoremem("mem_2");

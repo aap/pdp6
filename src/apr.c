@@ -2479,13 +2479,12 @@ pulse(et0){
 }
 
 pulse(et0a){
-	static int gen = 0;
 	trace("ET0A\n");
 	debug("%o: ", apr->pc);
 	if((apr->inst & 0700) != 0700)
-		debug("%d %s\n", gen++, names[apr->inst]);
+		debug("%s\n", names[apr->inst]);
 	else
-		debug("%d %s\n", gen++, ionames[apr->io_inst>>5 & 7]);
+		debug("%s\n", ionames[apr->io_inst>>5 & 7]);
 
 	if(PI_HOLD)
 		set_pih(apr, apr->pi_req);	// 8-3, 8-4

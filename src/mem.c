@@ -144,14 +144,14 @@ wakeff(Mem *mem, Membus *bus)
 	if(bus != mem->bus[ff->fmc_p_sel])
 		return 1;
 
+	fma = bus->c12>>4 & 017;
 	fma_rd_rq = !!(bus->c12 & MEMBUS_RD_RQ);
 	fma_wr_rq = !!(bus->c12 & MEMBUS_WR_RQ);
 	if(!ff->fmc_act && bus->c12 & MEMBUS_RQ_CYC){
 		//trace("	accepting memory cycle from proc %d\n", ff->fmc_p_sel);
 		ff->fmc_act = 1;
 
-		fma = bus->c12>>4 & 017;
-		//trace("	sending ADDR ACK\n");
+		//trace("	sending ADDR ACK %o\n", fma);
 		bus->c12 |= MEMBUS_MAI_ADDR_ACK;
 
 		if(fma_rd_rq){
@@ -168,7 +168,7 @@ wakeff(Mem *mem, Membus *bus)
 	}
 	fmc_wr_sel = ff->fmc_act && !fma_rd_rq;
 	if(fmc_wr_sel && ff->fmc_wr && bus->c34){
-		//trace("	writing\n");
+		//trace("	writing fmem %o %012lo\n", fma, bus->c34);
 		ff->ff[fma] |= bus->c34 & FW;
 		bus->c34 = 0;
 	}
