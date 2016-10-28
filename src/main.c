@@ -539,6 +539,7 @@ Apr apr;
 Tty tty;
 Ptr ptr;
 Ptp ptp;
+Mem *coremems[4];
 
 int
 main(int argc, char *argv[])
@@ -660,10 +661,20 @@ main(int argc, char *argv[])
 	extra_l = e; e += 1;
 
 	initapr(&apr);
-	initmem();
+//	initmem();
+	coremems[0] = makecoremem("mem_0");
+	coremems[1] = makecoremem("mem_1");
+	coremems[2] = makecoremem("mem_2");
+	coremems[3] = makecoremem("mem_3");
+	attachmem(makefastmem(0), 0, &apr.membus, -1);
+	attachmem(coremems[0], 0, &apr.membus, 0);
+	attachmem(coremems[1], 0, &apr.membus, 1);
+	attachmem(coremems[2], 0, &apr.membus, 2);
+	attachmem(coremems[3], 0, &apr.membus, 3);
 	inittty(&tty, &apr.iobus);
 	initptr(&ptr, &apr.iobus);
 	initptp(&ptp, &apr.iobus);
+	showmem(&apr.membus);
 
 	for(;;){
 		start = SDL_GetTicks();

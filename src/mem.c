@@ -1,16 +1,9 @@
 #include "pdp6.h"
-#include <ctype.h>
 
-word memory[256*1024];
-//hword maxmem = 256*1024;
-hword maxmem = 64*1024;
-word fmem[16];
-word membus0, membus1;
-word membus0_last, membus0_pulse;
-word *hold;
+Membus memterm;
 
 void
-readmem(char *file, word *mem, word size)
+readmem(const char *file, word *mem, word size)
 {
 	FILE *f;
 	char buf[100], *s;
@@ -37,62 +30,260 @@ readmem(char *file, word *mem, word size)
 	fclose(f);
 }
 
-void
-initmem(void)
+/* Both functions below are very confusing. I'm sorry.
+ * The schematics cannot be converted to C in a straightfoward way
+ * but I tried my best. */
+
+/* This is based on the 161C memory */
+static int
+wakecore(Mem *mem, Membus *bus)
 {
-	readmem("../mem", memory, maxmem);
-	readmem("../fmem", fmem, 16);
+	bool p2, p3;
+	CMem *core;
+	core = mem->module;
+
+	/* If not connected to a bus, find out which to connect to.
+	 * Lower numbers have higher priority but proc 2 and 3 have
+	 * the same priority and requests are alternated between them.
+	 * If no request is made, we should already be connected to a bus */
+	pthread_mutex_lock(&core->mutex);
+	if(core->cmc_p_act < 0){
+		if(mem->bus[0]->c12 & MEMBUS_RQ_CYC)
+			core->cmc_p_act = 0;
+		else if(mem->bus[1]->c12 & MEMBUS_RQ_CYC)
+			core->cmc_p_act = 1;
+		else{
+			p2 = !!(mem->bus[2]->c12 & MEMBUS_RQ_CYC);
+			p3 = !!(mem->bus[3]->c12 & MEMBUS_RQ_CYC);
+			if(p2 && p3){
+				if(core->cmc_last_proc == 2)
+					core->cmc_p_act = 3;
+				else if(core->cmc_last_proc == 3)
+					core->cmc_p_act = 2;
+			}else{
+				if(p2)
+					core->cmc_p_act = 2;
+				else if(p3)
+					core->cmc_p_act = 3;
+				else{
+					pthread_mutex_unlock(&core->mutex);
+					return 1;	/* no request at all? */
+				}
+			}
+			core->cmc_last_proc = core->cmc_p_act;
+		}
+	}
+	pthread_mutex_unlock(&core->mutex);
+
+	/* The executing thread can only service requests from its own processor
+	 * due to synchronization with the processor's pulse cycle. */
+	if(bus != mem->bus[core->cmc_p_act])
+		return 1;
+
+	if(core->cmc_aw_rq && bus->c12 & MEMBUS_RQ_CYC){
+		/* accept cycle request */
+		core->cmc_aw_rq = 0;
+		//trace("	accepting memory cycle from proc %d\n", core->cmc_p_act);
+
+		core->cmb = 0;
+		core->cma = 0;
+		core->cma_rd_rq = 0;
+		core->cma_wr_rq = 0;
+		core->cmc_pse_sync = 0;
+
+		/* strobe address and send acknowledge */
+		core->cma |= bus->c12>>4 & 037777;
+		core->cma_rd_rq |= !!(bus->c12 & MEMBUS_RD_RQ);
+		core->cma_wr_rq |= !!(bus->c12 & MEMBUS_WR_RQ);
+		//trace("	sending ADDR ACK\n");
+		bus->c12 |= MEMBUS_MAI_ADDR_ACK;
+
+		/* read and send read restart */
+		if(core->cma_rd_rq){
+			core->cmb |= core->core[core->cma];
+			bus->c34 |= core->cmb & FW;
+			bus->c12 |= MEMBUS_MAI_RD_RS;
+			//trace("	sending RD RS\n");
+			if(core->cma_wr_rq)
+				core->cmb = 0;
+			else
+				core->cmc_p_act = -1;
+		}
+		core->cmc_pse_sync = 1;
+		if(!core->cma_wr_rq)
+			goto end;
+	}
+	/* write restart */
+	if(core->cmc_pse_sync && bus->c12_pulse & MEMBUS_WR_RS){
+		//trace("	accepting WR RS\n");
+		core->cmc_p_act = -1;
+		core->cmb |= bus->c34 & FW;
+		bus->c34 = 0;
+end:
+		//trace("	writing\n");
+		core->core[core->cma] = core->cmb;
+		core->cmc_p_act = -1;	/* this seems unnecessary */
+		core->cmc_aw_rq = 1;
+	}
+	//if(core->cmc_p_act < 0)
+	//	trace("	now disconnected from proc\n");
+	return 0;
+}
+
+/* This is based on the 162 memory */
+static int
+wakeff(Mem *mem, Membus *bus)
+{
+	FMem *ff;
+	hword fma;
+	bool fma_rd_rq, fma_wr_rq;
+	bool fmc_wr_sel;
+	ff = mem->module;
+
+	/* Only respond to one processor */
+	if(bus != mem->bus[ff->fmc_p_sel])
+		return 1;
+
+	fma_rd_rq = !!(bus->c12 & MEMBUS_RD_RQ);
+	fma_wr_rq = !!(bus->c12 & MEMBUS_WR_RQ);
+	if(!ff->fmc_act && bus->c12 & MEMBUS_RQ_CYC){
+		//trace("	accepting memory cycle from proc %d\n", ff->fmc_p_sel);
+		ff->fmc_act = 1;
+
+		fma = bus->c12>>4 & 017;
+		//trace("	sending ADDR ACK\n");
+		bus->c12 |= MEMBUS_MAI_ADDR_ACK;
+
+		if(fma_rd_rq){
+			bus->c34 |= ff->ff[fma] & FW;
+			bus->c12 |= MEMBUS_MAI_RD_RS;
+			//trace("	sending RD RS\n");
+			if(!fma_wr_rq)
+				goto end;
+		}
+		if(fma_wr_rq){
+			ff->ff[fma] = 0;
+			ff->fmc_wr = 1;
+		}
+	}
+	fmc_wr_sel = ff->fmc_act && !fma_rd_rq;
+	if(fmc_wr_sel && ff->fmc_wr && bus->c34){
+		//trace("	writing\n");
+		ff->ff[fma] |= bus->c34 & FW;
+		bus->c34 = 0;
+	}
+	if(bus->c12_pulse & MEMBUS_WR_RS){
+		//trace("	accepting WR RS\n");
+end:
+		ff->fmc_act = 0;
+		ff->fmc_wr = 0;
+	}
+	//if(!ff->fmc_act)
+	//	trace("	now available again\n");
+	return 0;
 }
 
 void
-dumpmem(void)
+wakemem(Membus *bus)
 {
-	hword a;
-	FILE *f;
+	int sel;
+	int nxm;
 
-	if(f = fopen("memdump", "w"), f == nil)
-		return;
-	for(a = 0; a < 16; a++)
-		fprint(f, "%02o: %012llo\n", a, fmem[a]);
-	for(a = 0; a < maxmem; a++){
-		if(memory[a]){
-			fprint(f, "%06o: ", a);
-			fprint(f, "%012llo\n", memory[a]);
-		}
+	if(bus->c12 & MEMBUS_MA_FMC_SEL1){
+		nxm = bus->fmem->wake(bus->fmem, bus);
+		if(nxm)
+			goto core;
+	}else{
+	core:
+		sel = 0;
+		if(bus->c12 & MEMBUS_MA21_1) sel |= 001;
+		if(bus->c12 & MEMBUS_MA20_1) sel |= 002;
+		if(bus->c12 & MEMBUS_MA19_1) sel |= 004;
+		if(bus->c12 & MEMBUS_MA18_1) sel |= 010;
+		if(bus->cmem[sel])
+			nxm = bus->cmem[sel]->wake(bus->cmem[sel], bus);
+		else
+			nxm = 1;
 	}
-	fclose(f);
+	/* TODO: do something when memory didn't respond */
 }
 
-/* When a cycle is requested we acknowledge the address
- * by pulsing the processor through the bus.
- * A read is completed immediately and signalled by a second pulse.
- * A write is completed on a second call. */
-// TODO: implement this properly... according to the manual
-void
-wakemem(void)
+/* Allocate a 16k core memory module and
+ * a memory bus attachment. */
+Mem*
+makecoremem(const char *file)
 {
-	hword a;
-	if(membus0_pulse & MEMBUS_RQ_CYC){
-		a = membus0>>4 & 037777;
-		if(membus0 & MEMBUS_MA21_1) a |= 0040000;
-		if(membus0 & MEMBUS_MA20_1) a |= 0100000;
-		if(membus0 & MEMBUS_MA19_1) a |= 0200000;
-		if(membus0 & MEMBUS_MA18_1) a |= 0400000;
-		if(a >= maxmem ||
-		   membus0 & MEMBUS_MA_FMC_SEL1 && a >= 16)
-			return;
+	CMem *core;
+	Mem *mem;
 
-		membus0 |= MEMBUS_MAI_ADDR_ACK;
-		hold = membus0 & MEMBUS_MA_FMC_SEL1 ? &fmem[a] : &memory[a];
-		if(membus0 & MEMBUS_RD_RQ){
-			membus1 = *hold & FW;
-			membus0 |= MEMBUS_MAI_RD_RS;
-			if(!(membus0 & MEMBUS_WR_RQ))
-				hold = nil;
+	core = malloc(sizeof(CMem));
+	memset(core, 0, sizeof(CMem));
+	core->filename = file;
+	pthread_mutex_init(&core->mutex, nil);
+	core->cmc_aw_rq = 1;
+	core->cmc_p_act = -1;
+	core->cmc_last_proc = 2;
+	readmem(core->filename, core->core, 040000);
+
+	mem = malloc(sizeof(Mem));
+	mem->module = core;
+	mem->bus[0] = &memterm;
+	mem->bus[1] = &memterm;
+	mem->bus[2] = &memterm;
+	mem->bus[3] = &memterm;
+	mem->wake = wakecore;
+
+	return mem;
+}
+
+Mem*
+makefastmem(int p)
+{
+	FMem *ff;
+	Mem *mem;
+
+	ff = malloc(sizeof(FMem));
+	memset(ff, 0, sizeof(FMem));
+	ff->fmc_p_sel = p;
+
+	mem = malloc(sizeof(Mem));
+	mem->module = ff;
+	mem->bus[0] = &memterm;
+	mem->bus[1] = &memterm;
+	mem->bus[2] = &memterm;
+	mem->bus[3] = &memterm;
+	mem->wake = wakeff;
+
+	return mem;
+}
+
+/* Attach mem to bus for processor p.
+ * If n < 0, it is attached as fast memory,
+ * else at addresses starting at n<<14. */
+void
+attachmem(Mem *mem, int p, Membus *bus, int n)
+{
+	if(n < 0)
+		bus->fmem = mem;
+	else
+		bus->cmem[n] = mem;
+	mem->bus[p] = bus;
+}
+
+void
+showmem(Membus *bus)
+{
+	int i;
+	CMem *core;
+	FMem *ff;
+
+	if(bus->fmem){
+		ff = bus->fmem->module;
+		printf("fastmem: proc %d\n", ff->fmc_p_sel);
+	}
+	for(i = 0; i < 16; i++)
+		if(bus->cmem[i]){
+			core = bus->cmem[i]->module;
+			printf("%06o %06o %s\n", i<<14, (i+1 << 14)-1, core->filename);
 		}
-	}
-	if(membus0 & MEMBUS_WR_RS && hold){
-		*hold = membus1 & FW;
-		hold = nil;
-	}
 }

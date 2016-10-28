@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <string.h>
+#include <assert.h>
+#include <pthread.h>
 
 #define nelem(a) (sizeof(a)/sizeof(a[0]))
 #define nil NULL
@@ -12,6 +15,7 @@ typedef uint64_t word;
 typedef uint32_t hword;
 typedef uint32_t u32;
 typedef uint16_t u16;
+typedef int8_t   i8;
 typedef uint8_t  u8;
 typedef unsigned char uchar;
 typedef uchar bool;
@@ -106,13 +110,18 @@ enum Opcode {
 
 };
 
+typedef struct Mem Mem;
+typedef struct Membus Membus;
+typedef struct FMem FMem;
+typedef struct CMem CMem;
+typedef struct Busdev Busdev;
+typedef struct IOBus IOBus;
+typedef struct Apr Apr;
+
 /*
  * Memory
  */
 
-void initmem(void);
-void dumpmem(void);
-void wakemem(void);
 // 7-2, 7-10
 enum {
 	MEMBUS_MA21         = 0000000000001,
@@ -135,12 +144,61 @@ enum {
 	MEMBUS_MAI_RD_RS    = 0200000000000,
 	MEMBUS_MAI_ADDR_ACK = 0400000000000,
 };
-/* 0 is cable 1 & 2 (above bits); 1 is cable 3 & 4 (data) */
-extern word membus0, membus1;
-/* record the state of membus0 of the last pulse step
- * to recognize pulses or edges */
-extern word membus0_last, membus0_pulse;
 
+/* A memory module connected to up to 4 Membuses */
+struct Mem
+{
+	void *module;
+	Membus *bus[4];
+	int (*wake)(Mem *mem, Membus *bus);
+};
+
+struct Membus
+{
+	/* c12 are cables 1 and 2, c34 3 and 4.
+	 * c??_prev records the previous state of the bus
+	 * and c??_pulse is used to detect leading edges. */
+	word c12, c12_prev, c12_pulse;
+	word c34, c34_prev, c34_pulse;
+	/* cycle counter to implement NXM timeout  */
+	int numcyc;
+
+	Mem *fmem;	/* fast memory */
+	Mem *cmem[16];	/* 16 16k core modules */
+};
+extern Membus memterm;	/* terminator */
+void wakemem(Membus *bus);
+
+/* Fast memory 162, 16 words */
+struct FMem
+{
+	word ff[16];
+	i8 fmc_p_sel;
+	bool fmc_act;
+	bool fmc_wr;
+};
+Mem *makefastmem(int p);
+
+/* Core memory 161C, 16k words */
+struct CMem
+{
+	const char *filename;
+	pthread_mutex_t mutex;
+
+	word core[040000];
+	word cmb;
+	hword cma;
+	bool cma_rd_rq, cma_wr_rq;
+	bool cmc_aw_rq;
+	i8 cmc_p_act;
+	u8 cmc_last_proc;
+	bool cmc_pse_sync;
+};
+Mem *makecoremem(const char *file);
+
+void attachmem(Mem *mem, int p, Membus *bus, int n);
+void readmem(const char *file, word *mem, word size);
+void showmem(Membus *bus);
 
 /*
  * IO bus
@@ -191,7 +249,6 @@ enum {
 #define IOB_DATAI       (bus->c34 & IOBUS_IOB_DATAI)
 
 /* A peripheral device connected to an IO bus */
-typedef struct Busdev Busdev;
 struct Busdev
 {
 	void *dev;
@@ -199,7 +256,6 @@ struct Busdev
 	u8 req;
 };
 
-typedef struct IOBus IOBus;
 struct IOBus
 {
 	/* c12 are cables 1 and 2, c34 3 and 4.
@@ -222,7 +278,6 @@ void recalc_req(IOBus *bus);
 /* Arithmetic Processor 166 */
 #define CPA (0000>>2)
 #define PI (0004>>2)
-typedef struct Apr Apr;
 
 typedef void Pulse(Apr *apr);
 #define pulse(p) static void p(Apr *apr)
@@ -230,6 +285,7 @@ typedef void Pulse(Apr *apr);
 struct Apr
 {
 	IOBus iobus;
+	Membus membus;
 
 	hword ir;
 	word mi;
@@ -336,6 +392,7 @@ struct Apr
 	int ncurpulses, nnextpulses;
 };
 void initapr(Apr *apr);
+void curpulse(Apr *apr, Pulse *p);
 void nextpulse(Apr *apr, Pulse *p);
 void *aprmain(void *p);
 

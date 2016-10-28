@@ -348,9 +348,9 @@ set_mc_rq(Apr *apr, bool value)
 {
 	apr->mc_rq = value;		// 7-9
 	if(value && (apr->mc_rd || apr->mc_wr))
-		membus0 |= MEMBUS_RQ_CYC;
+		apr->membus.c12 |= MEMBUS_RQ_CYC;
 	else
-		membus0 &= ~MEMBUS_RQ_CYC;
+		apr->membus.c12 &= ~MEMBUS_RQ_CYC;
 }
 
 void
@@ -358,9 +358,9 @@ set_mc_wr(Apr *apr, bool value)
 {
 	apr->mc_wr = value;		// 7-9
 	if(value)
-		membus0 |= MEMBUS_WR_RQ;
+		apr->membus.c12 |= MEMBUS_WR_RQ;
 	else
-		membus0 &= ~MEMBUS_WR_RQ;
+		apr->membus.c12 &= ~MEMBUS_WR_RQ;
 	set_mc_rq(apr, apr->mc_rq);	// 7-9
 }
 
@@ -369,9 +369,9 @@ set_mc_rd(Apr *apr, bool value)
 {
 	apr->mc_rd = value;		// 7-9
 	if(value)
-		membus0 |= MEMBUS_RD_RQ;
+		apr->membus.c12 |= MEMBUS_RD_RQ;
 	else
-		membus0 &= ~MEMBUS_RD_RQ;
+		apr->membus.c12 &= ~MEMBUS_RD_RQ;
 	set_mc_rq(apr, apr->mc_rq);	// 7-9
 }
 
@@ -404,15 +404,15 @@ relocate(Apr *apr)
 		apr->rla += apr->rlr;
 
 	// 7-2, 7-10
-	membus0 &= ~0007777777761LL;
-	membus0 |= ma_fmc_select ? MEMBUS_MA_FMC_SEL1 : MEMBUS_MA_FMC_SEL0;
-	membus0 |= (apr->ma&01777) << 4;
-	membus0 |= ((word)apr->rla&017) << 14;
-	membus0 |= apr->rla & 0020 ? MEMBUS_MA21_1|MEMBUS_MA21 : MEMBUS_MA21_0;
-	membus0 |= apr->rla & 0040 ? MEMBUS_MA20_1 : MEMBUS_MA20_0;
-	membus0 |= apr->rla & 0100 ? MEMBUS_MA19_1 : MEMBUS_MA19_0;
-	membus0 |= apr->rla & 0200 ? MEMBUS_MA18_1 : MEMBUS_MA18_0;
-	membus0 |= apr->ma & 01 ? MEMBUS_MA35_1 : MEMBUS_MA35_0;
+	apr->membus.c12 &= ~0007777777761LL;
+	apr->membus.c12 |= ma_fmc_select ? MEMBUS_MA_FMC_SEL1 : MEMBUS_MA_FMC_SEL0;
+	apr->membus.c12 |= (apr->ma&01777) << 4;
+	apr->membus.c12 |= ((word)apr->rla&017) << 14;
+	apr->membus.c12 |= apr->rla & 0020 ? MEMBUS_MA21_1|MEMBUS_MA21 : MEMBUS_MA21_0;
+	apr->membus.c12 |= apr->rla & 0040 ? MEMBUS_MA20_1 : MEMBUS_MA20_0;
+	apr->membus.c12 |= apr->rla & 0100 ? MEMBUS_MA19_1 : MEMBUS_MA19_0;
+	apr->membus.c12 |= apr->rla & 0200 ? MEMBUS_MA18_1 : MEMBUS_MA18_0;
+	apr->membus.c12 |= apr->ma & 01 ? MEMBUS_MA35_1 : MEMBUS_MA35_0;
 	return ma_ok;
 }
 
@@ -2748,13 +2748,11 @@ pulse(it0){
 
 pulse(mai_addr_ack){
 	trace("MAI ADDR ACK\n");
-	nextpulse(apr, mc_addr_ack);	// 7-8
+	curpulse(apr, mc_addr_ack);	// 7-8
 }
 
 pulse(mai_rd_rs){
 	trace("MAI RD RS\n");
-	/* we do this here instead of whenever MC RD is set; 7-6, 7-9 */
-	apr->mb = membus1;
 	if(apr->ma == apr->mas)
 		apr->mi = apr->mb;		// 7-7
 	if(!apr->mc_stop)
@@ -2795,8 +2793,8 @@ pulse(mc_wr_rs){
 	trace("MC WR RS\n");
 	if(apr->ma == apr->mas)
 		apr->mi = apr->mb;	// 7-7
-	membus1 = apr->mb;		// 7-8
-	membus0 |= MEMBUS_WR_RS;	// 7-8
+	apr->membus.c34 |= apr->mb;		// 7-8
+	apr->membus.c12 |= MEMBUS_WR_RS;	// 7-8
 	if(!apr->mc_stop)
 		nextpulse(apr, mc_rs_t0);	// 7-8
 }
@@ -3013,6 +3011,16 @@ pulse(key_manual){
 }
 
 void
+curpulse(Apr *apr, Pulse *p)
+{
+	if(apr->ncurpulses >= MAXPULSE){
+		fprint(stderr, "error: too many current pulses\n");
+		exit(1);
+	}
+	apr->clist[apr->ncurpulses++] = p;
+}
+
+void
 nextpulse(Apr *apr, Pulse *p)
 {
 	if(apr->nnextpulses >= MAXPULSE){
@@ -3072,13 +3080,14 @@ aprmain(void *p)
 
 		apr->iobus.c12_prev = apr->iobus.c12;
 		apr->iobus.c34_prev = apr->iobus.c34;
-		membus0_last = membus0;
+		apr->membus.c12_prev = apr->membus.c12;
+		apr->membus.c34_prev = apr->membus.c34;
 
 		for(i = 0; i < apr->ncurpulses; i++)
 			apr->clist[i](apr);
 
 		updatebus(&apr->iobus);
-		membus0_pulse = (membus0_last ^ membus0) & membus0;
+		updatebus(&apr->membus);
 
 		/* This is simplified, we have no IOT RESET,
 		 * IOT INIT SET UP or IOT FINAL SETUP really.
@@ -3126,23 +3135,30 @@ aprmain(void *p)
 		}
 		apr->iobus.c34 &= ~(IOBUS_PULSES | IOBUS_IOB_RESET);
 
-
 		/* Pulses to memory */
-		if(membus0_pulse & (MEMBUS_WR_RS | MEMBUS_RQ_CYC)){
-			wakemem();
-			membus0 &= ~MEMBUS_WR_RS;
+		if(apr->membus.c12_pulse & (MEMBUS_WR_RS | MEMBUS_RQ_CYC)){
+			wakemem(&apr->membus);
+			apr->membus.c12 &= ~MEMBUS_WR_RS;
 		}
 
 		/* Pulses from memory  */
-		if(membus0 & MEMBUS_MAI_ADDR_ACK){
-			membus0 &= ~MEMBUS_MAI_ADDR_ACK;
+		if(apr->membus.c12 & MEMBUS_MAI_ADDR_ACK){
+			apr->membus.c12 &= ~MEMBUS_MAI_ADDR_ACK;
 			apr->extpulse &= ~EXT_NONEXIT_MEM;
 			nextpulse(apr, mai_addr_ack);
 		}
-		if(membus0 & MEMBUS_MAI_RD_RS){
-			membus0 &= ~MEMBUS_MAI_RD_RS;
+		if(apr->membus.c12 & MEMBUS_MAI_RD_RS){
+			apr->membus.c12 &= ~MEMBUS_MAI_RD_RS;
 			nextpulse(apr, mai_rd_rs);
 		}
+		if(apr->mc_rd && apr->membus.c34){
+			/* 7-6, 7-9 */
+			apr->mb |= apr->membus.c34;
+			apr->membus.c34 = 0;
+		}
+
+		/* TODO: do this differently because the
+		 * memory might have been busy. */
 		if(apr->extpulse & EXT_NONEXIT_MEM){
 			apr->extpulse &= ~EXT_NONEXIT_MEM;
 			if(apr->mc_rq && !apr->mc_stop)
