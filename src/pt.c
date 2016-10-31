@@ -12,27 +12,13 @@
 static void
 recalc_ptp_req(Ptp *ptp)
 {
-	u8 req;
-	IOBus *bus;
-	bus = ptp->bus;
-	req = ptp->flag ? ptp->pia : 0;
-	if(req != bus->dev[PTP].req){
-		bus->dev[PTP].req = req;
-		recalc_req(bus);
-	}
+	setreq(ptp->bus, PTP, ptp->flag ? ptp->pia : 0);
 }
 
 static void
 recalc_ptr_req(Ptr *ptr)
 {
-	u8 req;
-	IOBus *bus;
-	bus = ptr->bus;
-	req = ptr->flag ? ptr->pia : 0;
-	if(req != bus->dev[PTR].req){
-		bus->dev[PTR].req = req;
-		recalc_req(bus);
-	}
+	setreq(ptr->bus, PTR, ptr->flag ? ptr->pia : 0);
 }
 
 /* We have to punch after DATAO SET has happened. But BUSY is set by

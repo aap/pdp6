@@ -118,6 +118,9 @@ typedef struct Busdev Busdev;
 typedef struct IOBus IOBus;
 typedef struct Apr Apr;
 
+u32 getms(void);
+
+
 /*
  * Memory
  */
@@ -269,7 +272,7 @@ struct IOBus
 	/* All IO devices connected to this bus */
 	Busdev dev[128];
 };
-void recalc_req(IOBus *bus);
+void setreq(IOBus *bus, int dev, u8 pia);
 
 
 /*

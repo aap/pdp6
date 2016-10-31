@@ -6,7 +6,7 @@
 #include <stdarg.h>
 #include "pdp6common.h"
 #include "pdp6bin.h"
-#include "../args.h"
+#include "../src/args.h"
 
 #define nil NULL
 
@@ -1586,6 +1586,9 @@ Ps pslist[] = {
 Op oplist[] = {
 	{ "Z",   Operator, 0 },
 
+	{ "UUO1",   Operator, 0001000000000 },
+	{ "UUO2",   Operator, 0002000000000 },
+
 	{ "FSC",   Operator, 0132000000000 },
 	{ "IBP",   Operator, 0133000000000 },
 	{ "ILDB",  Operator, 0134000000000 },
@@ -1962,14 +1965,14 @@ Op oplist[] = {
 	{ "CONSZ", IoOperator, 0700300000000 },
 	{ "CONSO", IoOperator, 0700340000000 },
 
-	{ "JEN",   Operator, 0254500000000 },
-	{ "HALT",  Operator, 0254200000000 },
-	{ "JRSTF", Operator, 0254100000000 },
-	{ "JOV",   Operator, 0255400000000 },
-	{ "JCRY0", Operator, 0255200000000 },
-	{ "JCRY1", Operator, 0255100000000 },
-	{ "JCRY",  Operator, 0255300000000 },
-	{ "JFOV",  Operator, 0255040000000 },
+	{ "JEN",   Operator, 0254500000000 },	/* JRST 12, */
+	{ "HALT",  Operator, 0254200000000 },	/* JRST 4, */
+	{ "JRSTF", Operator, 0254100000000 },	/* JRST 2, */
+	{ "JOV",   Operator, 0255400000000 },	/* JFCL 10, */
+	{ "JCRY0", Operator, 0255200000000 },	/* JFCL 4, */
+	{ "JCRY1", Operator, 0255100000000 },	/* JFCL 2, */
+	{ "JCRY",  Operator, 0255300000000 },	/* JFCL 6, */
+	{ "JFOV",  Operator, 0255040000000 },	/* JFCL 1, */
 	{ "RSW", IoOperator, 0700040000000 },
 
 	{ "", 0, 0 }

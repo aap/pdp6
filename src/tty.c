@@ -10,14 +10,7 @@
 static void
 recalc_tty_req(Tty *tty)
 {
-	u8 req;
-	IOBus *bus;
-	bus = tty->bus;
-	req = tty->tto_flag || tty->tti_flag ? tty->pia : 0;
-	if(req != bus->dev[TTY].req){
-		bus->dev[TTY].req = req;
-		recalc_req(bus);
-	}
+	setreq(tty->bus, TTY, tty->tto_flag || tty->tti_flag ? tty->pia : 0);
 }
 
 static void*

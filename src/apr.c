@@ -327,20 +327,29 @@ recalc_req(IOBus *bus)
 	bus->c34 = bus->c34&~0177LL | req&0177;
 }
 
+/* Decode pia into req and place it onto the bus */
+void
+setreq(IOBus *bus, int dev, u8 pia)
+{
+	u8 req;
+	req = (0200>>pia) & 0177;
+	if(bus->dev[dev].req != req){
+		bus->dev[dev].req = req;
+		recalc_req(bus);
+	}
+}
+
 void
 recalc_cpa_req(Apr *apr)
 {
-	u8 req = 0;
+	u8 pia = 0;
 	// 8-5
 	if(apr->cpa_illeg_op || apr->cpa_non_exist_mem || apr->cpa_pdl_ov ||
 	   apr->cpa_clock_flag && apr->cpa_clock_enable ||
 	   apr->ar_pc_chg_flag && apr->cpa_pc_chg_enable ||
 	   apr->ar_ov_flag && apr->cpa_arov_enable)
-		req = apr->cpa_pia;
-	if(apr->iobus.dev[CPA].req != req){
-		apr->iobus.dev[CPA].req = req;
-		recalc_req(&apr->iobus);
-	}
+		pia = apr->cpa_pia;
+	setreq(&apr->iobus, CPA, pia);
 }
 
 void
@@ -742,6 +751,7 @@ wake_pi(void *dev)
 			apr->pi_active = 0;
 		if(bus->c12 & F28)
 			apr->pi_active = 1;
+printf("%o %o\n", apr->pir, apr->pio);
 	}
 }
 
@@ -2638,7 +2648,7 @@ pulse(ft0){
 
 pulse(at5){
 	trace("AT5\n");
-//	apr->a_long = 1;		// ?? nowhere to be found
+	apr->a_long = 1;		// ?? nowhere to be found
 	apr->af0 = 1;			// 5-3
 	apr->ma |= apr->mb & RT;	// 7-3
 	apr->ir &= ~037;		// 5-7
@@ -2671,7 +2681,7 @@ pulse(at3){
 
 pulse(at2){
 	trace("AT2\n");
-//	apr->a_long = 1;		// ?? nowhere to be found
+	apr->a_long = 1;		// ?? nowhere to be found
 	apr->ma |= apr->ir & 017;	// 7-3
 	apr->af3 = 1;			// 5-3
 	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
@@ -3046,6 +3056,8 @@ updatebus(void *bus)
 	b->c34_pulse = (b->c34_prev ^ b->c34) & b->c34;
 }
 
+#define TIMESTEP (1000.0/60.0)
+
 void*
 aprmain(void *p)
 {
@@ -3053,6 +3065,7 @@ aprmain(void *p)
 	Busdev *dev;
 	Pulse **tmp;
 	int i, devcode;
+	double lasttick, tick;
 
 	apr = (Apr*)p;
 	apr->clist = apr->pulses1;
@@ -3072,6 +3085,7 @@ aprmain(void *p)
 			apr->membus.cmem[i]->poweron(apr->membus.cmem[i]);
 
 	nextpulse(apr, mr_pwr_clr);
+	lasttick = getms();
 	while(apr->sw_power){
 		apr->ncurpulses = apr->nnextpulses;
 		apr->nnextpulses = 0;
@@ -3082,6 +3096,13 @@ aprmain(void *p)
 			while(c = getchar(), c != EOF && c != '\n')
 				if(c == 'x')
 					apr->pulsestepping = 0;
+		}
+
+		tick = getms();
+		if(tick-lasttick >= TIMESTEP){
+			lasttick = lasttick+TIMESTEP;
+			apr->cpa_clock_flag = 1;
+			recalc_cpa_req(apr);
 		}
 
 		apr->iobus.c12_prev = apr->iobus.c12;

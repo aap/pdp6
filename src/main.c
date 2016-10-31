@@ -528,6 +528,12 @@ findlayout(int *w, int *h)
 	*h = oppanel.pos.y + oppanel.surf->h;
 }
 
+u32
+getms(void)
+{
+	return SDL_GetTicks();
+}
+
 void
 usage(void)
 {
