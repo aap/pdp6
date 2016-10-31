@@ -151,6 +151,7 @@ struct Mem
 	void *module;
 	Membus *bus[4];
 	int (*wake)(Mem *mem, Membus *bus);
+	void (*poweron)(Mem *mem);
 };
 
 struct Membus

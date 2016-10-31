@@ -3061,8 +3061,15 @@ aprmain(void *p)
 	apr->nnextpulses = 0;
 	apr->ia_inh = 0;
 
+	apr->membus.c12 = 0;
+	apr->membus.c34 = 0;
 	apr->iobus.c12 = 0;
 	apr->iobus.c34 = 0;
+	if(apr->membus.fmem)
+		apr->membus.fmem->poweron(apr->membus.fmem);
+	for(i = 0; i < 16; i++)
+		if(apr->membus.cmem[i])
+			apr->membus.cmem[i]->poweron(apr->membus.cmem[i]);
 
 	nextpulse(apr, mr_pwr_clr);
 	while(apr->sw_power){

@@ -130,6 +130,18 @@ end:
 	return 0;
 }
 
+static void
+powercore(Mem *mem)
+{
+	CMem *core;
+
+	core = mem->module;
+	readmem(core->filename, core->core, 040000);
+	core->cmc_aw_rq = 1;
+	core->cmc_p_act = -1;
+	core->cmc_last_proc = 2;	/* not reset by the hardware :/ */
+}
+
 /* This is based on the 162 memory */
 static int
 wakeff(Mem *mem, Membus *bus)
@@ -183,6 +195,16 @@ end:
 	return 0;
 }
 
+static void
+powerff(Mem *mem)
+{
+	FMem *ff;
+
+	ff = mem->module;
+	ff->fmc_act = 0;
+	ff->fmc_wr = 0;
+}
+
 void
 wakemem(Membus *bus)
 {
@@ -217,13 +239,8 @@ makecoremem(const char *file)
 	Mem *mem;
 
 	core = malloc(sizeof(CMem));
-	memset(core, 0, sizeof(CMem));
 	core->filename = file;
 	pthread_mutex_init(&core->mutex, nil);
-	core->cmc_aw_rq = 1;
-	core->cmc_p_act = -1;
-	core->cmc_last_proc = 2;
-	readmem(core->filename, core->core, 040000);
 
 	mem = malloc(sizeof(Mem));
 	mem->module = core;
@@ -232,6 +249,7 @@ makecoremem(const char *file)
 	mem->bus[2] = &memterm;
 	mem->bus[3] = &memterm;
 	mem->wake = wakecore;
+	mem->poweron = powercore;
 
 	return mem;
 }
@@ -253,6 +271,7 @@ makefastmem(int p)
 	mem->bus[2] = &memterm;
 	mem->bus[3] = &memterm;
 	mem->wake = wakeff;
+	mem->poweron = powerff;
 
 	return mem;
 }
