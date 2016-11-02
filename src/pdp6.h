@@ -448,6 +448,7 @@ struct Tty
 	int fd;
 };
 void inittty(Tty *tty, IOBus *bus);
+void attachdevtty(Tty *tty, const char *path);
 
 
 

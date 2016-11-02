@@ -12,7 +12,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <poll.h>
-#include "../args.h"
+#include "../src/args.h"
 
 char *argv0;
 struct termios tiosaved;

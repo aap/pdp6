@@ -537,7 +537,7 @@ getms(void)
 void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-td]\n", argv0);
+	fprintf(stderr, "usage: %s [-t] [-d debugfile] [-c ttyfile]\n", argv0);
 	exit(1);
 }
 
@@ -559,15 +559,19 @@ main(int argc, char *argv[])
 	int delay;
 	int i;
 	int w, h;
-	const char *outfile;
+	const char *outfile, *ttyfile;
 
 	outfile = "/dev/null";
+	ttyfile = "/tmp/6tty";
 	ARGBEGIN{
 	case 't':
 		dotrace = 1;
 		break;
 	case 'd':
 		outfile = EARGF(usage());
+		break;
+	case 'c':
+		ttyfile = EARGF(usage());
 		break;
 	default:
 		usage();
@@ -679,6 +683,8 @@ main(int argc, char *argv[])
 	inittty(&tty, &apr.iobus);
 	initptr(&ptr, &apr.iobus);
 	initptp(&ptp, &apr.iobus);
+	if(ttyfile)
+		attachdevtty(&tty, ttyfile);
 	showmem(&apr.membus);
 
 	for(;;){

@@ -751,7 +751,6 @@ wake_pi(void *dev)
 			apr->pi_active = 0;
 		if(bus->c12 & F28)
 			apr->pi_active = 1;
-printf("%o %o\n", apr->pir, apr->pio);
 	}
 }
 
