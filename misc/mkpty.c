@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <poll.h>
 #include <errno.h>
+#include <time.h>
 
 struct termios tiosaved;
 
@@ -32,6 +33,10 @@ reset(int fd)
 	if(tcsetattr(0, TCSAFLUSH, &tiosaved) < 0) return -1;
 	return 0;
 }
+
+#define BAUD 30
+
+struct timespec slp = { 0, 1000*1000*1000 / BAUD };
 
 void
 readwrite(int ttyin, int ttyout, int ptyin, int ptyout)
@@ -56,8 +61,10 @@ readwrite(int ttyin, int ttyout, int ptyin, int ptyout)
 		if(pfd[0].revents & POLLIN){
 			if(n = read(ptyin, &c, 1), n <= 0)
 				return;
-			else
+			else{
 				write(ttyout, &c, 1);
+				nanosleep(&slp, NULL);
+			}
 		}
 		/* read from tty, write to pty */
 		if(pfd[1].revents & POLLIN){
@@ -67,6 +74,7 @@ readwrite(int ttyin, int ttyout, int ptyin, int ptyout)
 				if(c == 035)
 					return;
 				write(ptyout, &c, 1);
+				nanosleep(&slp, NULL);
 			}
 		}
 	}

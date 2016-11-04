@@ -2410,7 +2410,7 @@ pulse(et1){
 		apr->mb &= RT;			// 6-3
 	}
 	if(apr->ir_jrst && apr->ir & H12)
-		apr->ex_mode_sync = 1;		// 5-13
+		set_ex_mode_sync(apr, 1);	// 5-13
 	if(apr->ir_jrst && apr->ir & H11)
 		ar_flag_set(apr);		// 6-10
 	if(PI_RST)
