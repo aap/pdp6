@@ -252,14 +252,6 @@ ar_cry_in(Apr *apr, word c)
 }
 
 void
-set_ex_mode_sync(Apr *apr, bool value)
-{
-	apr->ex_mode_sync = value;
-	if(apr->ex_mode_sync)
-		apr->ex_user = 1;	// 5-13
-}
-
-void
 set_pi_cyc(Apr *apr, bool value)
 {
 	apr->pi_cyc = value;
@@ -509,7 +501,7 @@ pulse(ar_flag_set){
 	apr->ar_pc_chg_flag = !!(apr->mb & F3); // 6-10
 	apr->chf7           = !!(apr->mb & F4); // 6-19
 	if(apr->mb & F5)
-		set_ex_mode_sync(apr, 1);	// 5-13
+		apr->ex_mode_sync = 1;	// 5-13
 	recalc_cpa_req(apr);
 }
 
@@ -574,9 +566,11 @@ pulse(mr_clr){
 	apr->mc_stop_sync = 0;	// 7-9
 	apr->mc_split_cyc_sync = 0;	// 7-9
 
-	set_ex_mode_sync(apr, 0);	// 5-13
+	if(apr->ex_mode_sync)
+		apr->ex_user = 1;	// 5-13
+	apr->ex_mode_sync = 0;
 	apr->ex_uuo_sync = 0;	// 5-13
-	apr->ex_pi_sync = 0;	// 5-13
+	apr->ex_pi_sync = apr->pi_cyc;	// 5-13
 
 	apr->a_long = 0;	// ?? nowhere to be found
 	apr->ar_com_cont = 0;	// 6-9
@@ -653,9 +647,8 @@ pulse(mr_start){
 pulse(mr_pwr_clr){
 	trace("MR PWR CLR\n");
 	apr->run = 0;	// 5-1
-	/* order matters because of EX PI SYNC,
+	/* order seems to matter.
 	 * better call directly before external pulses can trigger stuff */
-	// TODO: is this correct then?
 	mr_start(apr);	// 5-2
 	mr_clr(apr);	// 5-2
 }
@@ -2410,7 +2403,7 @@ pulse(et1){
 		apr->mb &= RT;			// 6-3
 	}
 	if(apr->ir_jrst && apr->ir & H12)
-		set_ex_mode_sync(apr, 1);	// 5-13
+		apr->ex_mode_sync = 1;		// 5-13
 	if(apr->ir_jrst && apr->ir & H11)
 		ar_flag_set(apr);		// 6-10
 	if(PI_RST)
@@ -3072,6 +3065,9 @@ aprmain(void *p)
 	apr->ncurpulses = 0;
 	apr->nnextpulses = 0;
 	apr->ia_inh = 0;
+
+	// must clear lest EX USER be set by MR CLR after MR START
+	apr->ex_mode_sync = 0;
 
 	apr->membus.c12 = 0;
 	apr->membus.c34 = 0;

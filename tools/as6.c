@@ -1972,7 +1972,7 @@ Op oplist[] = {
 	{ "JCRY0", Operator, 0255200000000 },	/* JFCL 4, */
 	{ "JCRY1", Operator, 0255100000000 },	/* JFCL 2, */
 	{ "JCRY",  Operator, 0255300000000 },	/* JFCL 6, */
-	{ "JFOV",  Operator, 0255040000000 },	/* JFCL 1, */
+	{ "JPC",   Operator, 0255040000000 },	/* JFCL 1, */
 	{ "RSW", IoOperator, 0700040000000 },
 
 	{ "", 0, 0 }
