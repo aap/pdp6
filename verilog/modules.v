@@ -1,173 +1,209 @@
-module syncpulse(
+module pg(
 	input clk,
+	input reset,
 	input in,
-	output out
+	output p
 );
-	reg x0, x1;
-	initial begin
-		x0 <= 0;
-		x1 <= 0;
-	end
-	always @(posedge clk) begin
-		x0 <= in;
-		x1 <= x0;
-	end
-	assign out = x0 && !x1;
+	reg [1:0] x;
+	always @(posedge clk or posedge reset)
+		if(reset)
+			x <= 0;
+		else
+			x <= { x[0], in };
+	assign p = x[0] & !x[1];
 endmodule
 
-module sbr(
-	input clk,
-	input clr,
-	input set,
-	input from,
-	output ret
-);
-	reg ff;
-	always @(posedge clk) begin
-		if(clr | from)
-			ff <= 0;
-		if(set)
-			ff <= 1;
-	end
-	assign ret = ff & from;
+module pa(input clk, input reset, input in, output p);
+	reg p;
+	always @(posedge clk or posedge reset)
+		if(reset)
+			p <= 0;
+		else
+			p <= in;
 endmodule
 
-module pa100ns(
-	input clk,
-	input in,
-	output out
-);
-	reg [1:0] r;
-	initial
-		r <= 0;
-	always @(posedge clk) begin
-		r = r << 1;
-		if(in)
-			r = 4'b11;
-	end
-	assign out = r[1];
-endmodule
-
-module dly50ns(
-	input clk,
-	input in,
-	output out
-);
-	reg r;
-	initial
-		r <= 0;
-	always @(posedge clk)
-		r <= {r, in};
-	assign out = r;
-endmodule
-
-module dly100ns(
-	input clk,
-	input in,
-	output out
-);
-	reg [1:0] r;
-	initial
-		r <= 0;
-	always @(posedge clk)
-		r <= {r, in};
-	assign out = r[1];
-endmodule
-
-module dly150ns(
-	input clk,
-	input in,
-	output out
-);
-	reg [2:0] r;
-	initial
-		r <= 0;
-	always @(posedge clk)
-		r <= {r, in};
-	assign out = r[2];
-endmodule
-
-module dly200ns(
-	input clk,
-	input in,
-	output out,
-	output level
-);
+/*
+module pa100ns(input clk, input reset, input in, output p);
 	reg [3:0] r;
-	initial
-		r <= 0;
-	always @(posedge clk)
-		r <= {r, in};
-	assign out = r[3];
-	assign level = (|r[2:0]);
-endmodule
-
-module dly250ns(
-	input clk,
-	input in,
-	output out
-);
-	reg [4:0] r;
-	initial
-		r <= 0;
-	always @(posedge clk)
-		r <= {r, in};
-	assign out = r[4];
-endmodule
-
-module dly400ns(
-	input clk,
-	input in,
-	output out
-);
-	reg [7:0] r;
-	initial
-		r <= 0;
-	always @(posedge clk)
-		r <= {r, in};
-	assign out = r[7];
-endmodule
-
-module dly800ns(
-	input clk,
-	input in,
-	output out
-);
-	reg [15:0] r;
-	initial
-		r <= 0;
-	always @(posedge clk)
-		r <= {r, in};
-	assign out = r[15];
-endmodule
-
-
-module dly1000ns(
-	input clk,
-	input in,
-	output out
-);
-	reg [19:0] r;
-	initial
-		r <= 0;
-	always @(posedge clk)
-		r <= {r, in};
-	assign out = r[19];
-endmodule
-
-module dly100us(
-	input clk,
-	input in,
-	output out
-);
-	reg [15:0] r;
-	initial
-		r <= 0;
-	always @(posedge clk) begin
-		if(r)
-			r = r + 1;
-		if(in)
-			r = 1;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 1;
+			if(in)
+				r <= 1;
+		end
 	end
-	assign out = r == 2000;
+	assign p = r && r <= 10;
+endmodule
+*/
+
+/* "bus driver", 40ns delayed pulse */
+module bd(input clk, input reset, input in, output p);
+	reg [2:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 4;
+endmodule
+
+/* Same as above but with longer pulse. Used to pulse mb
+ * because one more clock cycle is needed to get the data
+ * after the pulse has been synchronizes. */
+module bd2(input clk, input reset, input in, output p);
+	reg [2:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 4 || r == 5;
+endmodule
+
+module dly50ns(input clk, input reset, input in, output p);
+	reg [2:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 7;
+endmodule
+
+module dly100ns(input clk, input reset, input in, output p);
+	reg [3:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 12;
+endmodule
+
+module dly150ns(input clk, input reset, input in, output p);
+	reg [4:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 17;
+endmodule
+
+module dly200ns(input clk, input reset, input in, output p);
+	reg [4:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 22;
+endmodule
+
+module dly250ns(input clk, input reset, input in, output p);
+	reg [4:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 27;
+endmodule
+
+module dly400ns(input clk, input reset, input in, output p);
+	reg [5:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 42;
+endmodule
+
+module dly800ns(input clk, input reset, input in, output p);
+	reg [6:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 82;
+endmodule
+
+module dly1us(input clk, input reset, input in, output p);
+	reg [6:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 102;
+endmodule
+
+module dly100us(input clk, input reset, input in, output p);
+	reg [15:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 10002;
 endmodule

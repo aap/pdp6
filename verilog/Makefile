@@ -1,5 +1,5 @@
-a.out: test.v apr.v coremem.v fastmem.v modules.v
-	iverilog test.v apr.v coremem.v fastmem.v modules.v
+a.out: test.v pdp6.v apr.v core161c.v fast162.v modules.v
+	iverilog test.v pdp6.v apr.v core161c.v fast162.v modules.v
 
 run: a.out
 	vvp a.out
