@@ -8,10 +8,10 @@ module clock(output reg clk);
 endmodule
 
 //`define TESTKEY pdp6.key_inst_stop
-//`define TESTKEY pdp6.key_read_in
+`define TESTKEY pdp6.key_read_in
 //`define TESTKEY pdp6.key_start
 //`define TESTKEY pdp6.key_exec
-`define TESTKEY pdp6.key_ex
+//`define TESTKEY pdp6.key_ex
 //`define TESTKEY pdp6.key_dep
 //`define TESTKEY pdp6.key_mem_cont
 
@@ -24,15 +24,28 @@ module test;
 
 	initial
 //		#110000 $finish;
-		#10000 $finish;
+		#20000 $finish;
 
 	initial begin
 		#100 `TESTKEY = 1;
 		#1000 `TESTKEY = 0;
 
-	//	#3000 pdp6.key_dep = 1;
-	//	#1000 pdp6.key_dep = 0;
+//		#3000 pdp6.key_dep = 1;
+//		#1000 pdp6.key_dep = 0;
+
+//		#3000 pdp6.key_inst_stop = 1;
+//		#1000 pdp6.key_inst_stop = 0;
 	end
+
+/*
+	initial begin
+		#400 pdp6.apr0.pio = 7'b1111111;
+		pdp6.apr0.pih = 7'b0000100;
+		pdp6.apr0.pi_active = 1;
+	end
+	assign pdp6.apr0.iobus_pi_req = 7'b0010000;
+*/
+	assign pdp6.apr0.iobus_pi_req = 0;
 
 /*	initial begin
 		#100;
@@ -108,9 +121,10 @@ module test;
 		//pdp6.mas = 18'o777777;
 
 		pdp6.fmem0.ff['o0] = 36'o000000010000;
-		pdp6.fmem0.ff['o4] = 36'o000000010004;
+		pdp6.fmem0.ff['o4] = 36'o000000010304;
 		pdp6.mem0.core['o4] = 36'o222333111666;
-		pdp6.mem0.core['o20] = 36'o777000777000;
+		pdp6.mem0.core['o20] = 36'o200_024_000104;
+		pdp6.mem0.core['o10410] = 36'o000_000_000333;
 	end
 
 	initial begin

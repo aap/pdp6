@@ -91,7 +91,7 @@ module pdp6(
 	wire [3:9]  iobus_ios;
 	wire [0:35] iobus_iob_out;
 	wire [1:7]  iobus_pi_req;
-	wire [0:35] iobus_iob_in;
+	wire [0:35] iobus_iob_in = iobus_iob_out;
 
 
 	assign membus_mb_in_p0 = membus_mb_out_p0_p | membus_mb_out_p0_0 | membus_mb_out_p0_1;

@@ -1,3 +1,15 @@
+/*module pireq(
+	input wire piok_in,
+	input wire pih,
+	input wire pir,
+	output wire pireq,
+	output wire piok_out
+);
+	wire a = piok_in & ~pih;
+	assign pireq = a & pir;
+	assign piok_out = a & ~pir;
+endmodule*/
+
 module pg(
 	input clk,
 	input reset,
@@ -21,23 +33,6 @@ module pa(input clk, input reset, input in, output p);
 		else
 			p <= in;
 endmodule
-
-/*
-module pa100ns(input clk, input reset, input in, output p);
-	reg [3:0] r;
-	always @(posedge clk or posedge reset) begin
-		if(reset)
-			r <= 0;
-		else begin
-			if(r)
-				r <= r + 1;
-			if(in)
-				r <= 1;
-		end
-	end
-	assign p = r && r <= 10;
-endmodule
-*/
 
 /* "bus driver", 40ns delayed pulse */
 module bd(input clk, input reset, input in, output p);
@@ -207,3 +202,20 @@ module dly100us(input clk, input reset, input in, output p);
 	end
 	assign p = r == 10002;
 endmodule
+
+module ldly100us(input clk, input reset, input in, output p, output l);
+	reg [15:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 10002;
+	assign l = r != 0 && r < 10002;
+endmodule
+
