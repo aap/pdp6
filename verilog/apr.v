@@ -405,163 +405,187 @@ module apr(
 			ir[12] <= 1;
 	end
 
-	wire ir_uuo_a = 0;
-	wire ir_fpch = 0;
-	wire ir_2xx = 0;
-	wire ir_accp_OR_memac = 0;
-	wire ir_boole = 0;
-	wire ir_hwt = 0;
-	wire ir_acbm = 0;
-	wire ir_iot_a = 0;
+	wire ir_uuo_a = ir[0:2] == 0;
+	wire ir_fpch = ir[0:2] == 1;
+	wire ir_2xx = ir[0:2] == 2;
+	wire ir_accp_OR_memac = ir[0:2] == 3;
+	wire ir_boole = ir[0:2] == 4;
+	wire ir_hwt = ir[0:2] == 5;
+	wire ir_acbm = ir[0:2] == 6;
+	wire ir_iot_a = ir[0:2] == 7;
 
-	wire ir_130 = 0;
-	wire ir_131 = 0;
-	wire ir_fsc = 0;
-	wire ir_cao = 0;
-	wire ir_ldci = 0;
-	wire ir_ldc = 0;
-	wire ir_dpci = 0;
-	wire ir_dpc = 0;
+	wire ir_130 = ir[0:8] == 9'o130;
+	wire ir_131 = ir[0:8] == 9'o131;
+	wire ir_fsc = ir[0:8] == 9'o132;
+	wire ir_cao = ir[0:8] == 9'o133;
+	wire ir_ldci = ir[0:8] == 9'o134;
+	wire ir_ldc = ir[0:8] == 9'o135;
+	wire ir_dpci = ir[0:8] == 9'o136;
+	wire ir_dpc = ir[0:8] == 9'o137;
 
-	wire ir_fwt_mov_s = 0;
-	wire ir_fwt_movn_m = 0;
-	wire ir_fwt = 0;
-	wire ir_mul = 0;
-	wire ir_div = 0;
-	wire ir_sh = 0;
-	wire ir_25x = 0;
-	wire ir_jp = 0;
-	wire ir_as = 0;
+	wire ir_fwt_mov_s = ir_2xx & ir[3:5] == 0;
+	wire ir_fwt_movn_m = ir_2xx & ir[3:5] == 1;
+	wire ir_fwt = ir_fwt_mov_s | ir_fwt_movn_m;
+	wire ir_mul = ir_2xx & ir[3:5] == 2;
+	wire ir_div = ir_2xx & ir[3:5] == 3;
+	wire ir_sh = ir_2xx & ir[3:5] == 4;
+	wire ir_25x = ir_2xx & ir[3:5] == 5;
+	wire ir_jp = ir_2xx & ir[3:5] == 6;
+	wire ir_as = ir_2xx & ir[3:5] == 7;
 
-	wire ir_ash = 0;
-	wire ir_rot = 0;
-	wire ir_lsh = 0;
-	wire ir_243 = 0;
-	wire ir_ashc = 0;
-	wire ir_rotc = 0;
-	wire ir_lshc = 0;
-	wire ir_247 = 0;
+	wire ir_ash = ir_sh & ir[6:8] == 0;
+	wire ir_rot = ir_sh & ir[6:8] == 1;
+	wire ir_lsh = ir_sh & ir[6:8] == 2;
+	wire ir_243 = ir_sh & ir[6:8] == 3;
+	wire ir_ashc = ir_sh & ir[6:8] == 4;
+	wire ir_rotc = ir_sh & ir[6:8] == 5;
+	wire ir_lshc = ir_sh & ir[6:8] == 6;
+	wire ir_247 = ir_sh & ir[6:8] == 7;
 
-	wire ir_exch = 0;
-	wire ir_blt = 0;
-	wire ir_aobjp = 0;
-	wire ir_aobjn = 0;
-	wire ir_jrst_a = 0;
-	wire ir_jfcl = 0;
-	wire ir_xct = 0;
-	wire ir_257 = 0;
+	wire ir_exch = ir_25x & ir[6:8] == 0;
+	wire ir_blt = ir_25x & ir[6:8] == 1;
+	wire ir_aobjp = ir_25x & ir[6:8] == 2;
+	wire ir_aobjn = ir_25x & ir[6:8] == 3;
+	wire ir_jrst_a = ir_25x & ir[6:8] == 4;
+	wire ir_jfcl = ir_25x & ir[6:8] == 5;
+	wire ir_xct = ir_25x & ir[6:8] == 6;
+	wire ir_257 = ir_25x & ir[6:8] == 7;
 
-	wire ir_ash_OR_ashc = 0;
-	wire ir_md = 0;
-	wire ir_md_s_c_e = 0;
-	wire ir_md_f_c_e = 0;
-	wire ir_md_sac_inh = 0;
-	wire ir_254_7 = 0;
-	wire ir_md_f_ac_2 = 0;
-	wire ir_md_s_ac_2 = 0;
-	wire ir_iot = 0;
-	wire ir_jrst = 0;
-	wire ir_9_OR_10_1 = 0;
-	wire ir_fp = 0;
-	wire ir_fp_dir = 0;
-	wire ir_fp_rem = 0;
-	wire ir_fp_mem = 0;
-	wire ir_fp_both = 0;
-	wire ir_fad = 0;
-	wire ir_fsb = 0;
-	wire ir_fmp = 0;
-	wire ir_fdv = 0;
+	wire ir_ash_OR_ashc = ir_ash | ir_ashc;
+	wire ir_md = ir_2xx & ir[3:4] == 1;
+	wire ir_md_s_c_e = ir_md & ir[7];
+	wire ir_md_f_c_e = ir_md & (ir[7] | ~ir[8]);
+	wire ir_md_sac_inh = ir_md & ir[7:8] == 2;
+	wire ir_md_f_ac_2 = ir_div & ir[6];
+	wire ir_md_s_ac_2 = (ir_div | ir_mul & ir[6]) & ~ir_md_sac_inh;
+	wire ir_254_7 = ir_25x & ir[6];
+	wire ir_iot = ir_iot_a & ~ex_ir_uuo;
+	wire ir_jrst = ir_jrst_a & ~ex_ir_uuo;
+	wire ir_9_OR_10 = ir[9] | ir[10];
+	wire ir_fp = ir_fpch & ir[3];
+	wire ir_fp_dir = ir_fp & ir[7:8] == 0;
+	wire ir_fp_rem = ir_fp & ir[7:8] == 1;
+	wire ir_fp_mem = ir_fp & ir[7:8] == 2;
+	wire ir_fp_both = ir_fp & ir[7:8] == 3;
+	wire ir_fad = ir_fp & ir[4:5] == 0;
+	wire ir_fsb = ir_fp & ir[4:5] == 1;
+	wire ir_fmp = ir_fp & ir[4:5] == 2;
+	wire ir_fdv = ir_fp & ir[4:5] == 3;
 	wire ir14_17_eq_0 = ir[14:17] == 0;
 
 	/* ACCP V MEM AC */
-	wire accp = 0;
-	wire memac_tst = 0;
-	wire memac_inc = 0;
-	wire memac_dec = 0;
-	wire memac = 0;
-	wire memac_mem = 0;
-	wire memac_ac = 0;
-	wire accp_etc_cond = 0;
-	wire accp_etal_test = 0;
-	wire accp_dir = 0;
+	wire accp = ir_accp_OR_memac & ir[3:4] == 0;
+	wire memac_tst = ir_accp_OR_memac & ir[3:4] == 1;
+	wire memac_inc = ir_accp_OR_memac & ir[3:4] == 2;
+	wire memac_dec = ir_accp_OR_memac & ir[3:4] == 3;
+	wire memac = memac_tst | memac_inc | memac_dec;
+	wire memac_mem = memac & ir[5];
+	wire memac_ac = memac & ~ir[5];
+	wire accp_etc_cond = ir_accp_OR_memac & ir[8] & ar0_xor_ar_ov |
+		ir[7] & ar_eq_0;
+	// simplifies to: accp_etc_cond != ir[6]
+	wire accp_etal_test = (accp_etc_cond | ir[6]) & (~accp_etc_cond | ~ir[6]);
+	wire accp_dir = accp & ir[5];
 
 	/* ACBM */
-	wire acbm_swap = 0;
-	wire acbm_dir = 0;
-	wire acbm_cl = 0;
-	wire acbm_dn = 0;
-	wire acbm_com = 0;
-	wire acbm_set = 0;
+	wire acbm_swap = ir_acbm & ir[8];
+	wire acbm_dir = ir_acbm & ir[5];
+	wire acbm_dn = ir_acbm & ir[3:4] == 0;
+	wire acbm_cl = ir_acbm & ir[3:4] == 1;
+	wire acbm_com = ir_acbm & ir[3:4] == 2;
+	wire acbm_set = ir_acbm & ir[3:4] == 3;
 
 	/* FWT */
-	wire fwt_swap = 0;
-	wire fwt_negate = 0;
-	wire fwt_00 = 0;
-	wire fwt_01 = 0;
-	wire fwt_10 = 0;
-	wire fwt_11 = 0;
+	wire fwt_swap = ir_fwt & ir[5:6] == 1;
+	wire fwt_negate = ir_fwt_movn_m & (ir[6] | ar[0]);
+	wire fwt_00 = ir_fwt & ir[7:8] == 0;
+	wire fwt_01 = ir_fwt & ir[7:8] == 1;
+	wire fwt_10 = ir_fwt & ir[7:8] == 2;
+	wire fwt_11 = ir_fwt & ir[7:8] == 3;
 
 	/* HWT */
-	wire hwt_lt_set = 0;
-	wire hwt_rt_set = 0;
-	wire hwt_lt = 0;
-	wire hwt_rt = 0;
-	wire hwt_swap = 0;
-	wire hwt_ar_clr = 0;
-	wire hwt_00 = 0;
-	wire hwt_01 = 0;
-	wire hwt_10 = 0;
-	wire hwt_11 = 0;
+	wire hwt_lt_set = hwt_rt & ir[4] | (~ir[5] | mb[18]);
+	wire hwt_rt_set = hwt_lt & ir[4] | (~ir[5] | mb[0]);
+	wire hwt_lt = ir_hwt & ~ir[3];
+	wire hwt_rt = ir_hwt & ir[3];
+	wire hwt_swap = ir_hwt & ir[6];
+	wire hwt_ar_clr = ir_hwt & (ir[4] | ir[5]);
+	wire hwt_00 = ir_hwt & ir[7:8] == 0;
+	wire hwt_01 = ir_hwt & ir[7:8] == 1;
+	wire hwt_10 = ir_hwt & ir[7:8] == 2;
+	wire hwt_11 = ir_hwt & ir[7:8] == 3;
 
 	/* BOOLE */
-	wire boole_as_00 = 0;
-	wire boole_as_01 = 0;
-	wire boole_as_10 = 0;
-	wire boole_as_11 = 0;
-	wire boole_0 = 0;
-	wire boole_1 = 0;
-	wire boole_2 = 0;
-	wire boole_3 = 0;
-	wire boole_4 = 0;
-	wire boole_5 = 0;
-	wire boole_6 = 0;
-	wire boole_7 = 0;
-	wire boole_10 = 0;
-	wire boole_11 = 0;
-	wire boole_12 = 0;
-	wire boole_13 = 0;
-	wire boole_14 = 0;
-	wire boole_15 = 0;
-	wire boole_16 = 0;
-	wire boole_17 = 0;
+	wire boole_as_00 = (ir_boole | ir_as) & ir[7:8] == 0;
+	wire boole_as_01 = (ir_boole | ir_as) & ir[7:8] == 1;
+	wire boole_as_10 = (ir_boole | ir_as) & ir[7:8] == 2;
+	wire boole_as_11 = (ir_boole | ir_as) & ir[7:8] == 3;
+	wire boole_0 = ir_boole & ir[3:6] == 0;
+	wire boole_1 = ir_boole & ir[3:6] == 1;
+	wire boole_2 = ir_boole & ir[3:6] == 2;
+	wire boole_3 = ir_boole & ir[3:6] == 3;
+	wire boole_4 = ir_boole & ir[3:6] == 4;
+	wire boole_5 = ir_boole & ir[3:6] == 5;
+	wire boole_6 = ir_boole & ir[3:6] == 6;
+	wire boole_7 = ir_boole & ir[3:6] == 7;
+	wire boole_10 = ir_boole & ir[3:6] == 8;
+	wire boole_11 = ir_boole & ir[3:6] == 9;
+	wire boole_12 = ir_boole & ir[3:6] == 10;
+	wire boole_13 = ir_boole & ir[3:6] == 11;
+	wire boole_14 = ir_boole & ir[3:6] == 12;
+	wire boole_15 = ir_boole & ir[3:6] == 13;
+	wire boole_16 = ir_boole & ir[3:6] == 14;
+	wire boole_17 = ir_boole & ir[3:6] == 15;
 
 	/* JUMP V PUSH */
-	wire jp_flag_stor = 0;
-	wire jp_AND_NOT_jsr = 0;
-	wire jp_AND_ir6_0 = 0;
-	wire jp_jmp = 0;
-	wire jp_pushj = 0;
-	wire jp_push = 0;
-	wire jp_pop = 0;
-	wire jp_popj = 0;
-	wire jp_jsr = 0;
-	wire jp_jsp = 0;
-	wire jp_jsa = 0;
-	wire jp_jra = 0;
+	wire jp_pushj = ir_jp & ir[6:8] == 0;
+	wire jp_push = ir_jp & ir[6:8] == 1;
+	wire jp_pop = ir_jp & ir[6:8] == 2;
+	wire jp_popj = ir_jp & ir[6:8] == 3;
+	wire jp_jsr = ir_jp & ir[6:8] == 4;
+	wire jp_jsp = ir_jp & ir[6:8] == 5;
+	wire jp_jsa = ir_jp & ir[6:8] == 6;
+	wire jp_jra = ir_jp & ir[6:8] == 7;
+	wire jp_flag_stor = jp_pushj | jp_jsr | jp_jsp;
+	wire jp_AND_NOT_jsr = ir_jp & ~jp_jsr;
+	wire jp_AND_ir6_0 = ir_jp & ~ir[6];
+	wire jp_jmp = ir_jp & ~jp_push & ~jp_pop;
 
 	/* AS */
-	wire as_plus = 0;
-	wire as_minus = 0;
+	wire as_plus = ir_as & ~ir[6];
+	wire as_minus = ir_as & ir[6];
 
 	/* XCT */
-	wire xct_t0 = 0;
+	wire xct_t0;
+	pa xct_pa0(.clk(clk), .reset(reset),
+		.in(et3 & ir_xct),
+		.p(xct_t0));
 
 	/*
 	 * UUO
 	 */
 	reg uuo_f1;
-	wire uuo_t1 = 0;
-	wire uuo_t2 = 0;
+	wire uuo_t1;
+	wire uuo_t2;
+
+	pa uuo_pa0(.clk(clk), .reset(reset),
+		.in(uuo_f1 & mc_rs_t1),
+		.p(uuo_t1));
+	pa uuo_pa1(.clk(clk), .reset(reset),
+		.in(uuo_t1_D),
+		.p(uuo_t2));
+
+	wire uuo_t1_D;
+	dly100ns uuo_dly0(.clk(clk), .reset(reset),
+		.in(uuo_t1),
+		.p(uuo_t1_D));
+
+	always @(posedge clk) begin
+		if(mr_clr | uuo_t1)
+			uuo_f1 <= 0;
+		if(mblt_fm_ir1_uuo_t0)
+			uuo_f1 <= 1;
+	end
 
 	/*
 	 * PC
@@ -594,7 +618,9 @@ module apr(
 	reg ex_ill_op;
 	wire ex_clr = mr_start | cpa & iobus_datao_clear;
 	wire ex_set = mr_start | cpa & iobus_datao_set;
-	wire ex_ir_uuo = 0;
+	wire ex_ir_uuo = ir_jrst_a & ir_9_OR_10 & ex_user |
+		ir_iot_a & ~ex_pi_sync & ex_user & ~cpa_iot_user |
+		ex_uuo_sync & ir_uuo_a;
 	wire ex_inh_rel = ~ex_user | ex_pi_sync | ma18_31_eq_0 | ex_ill_op;
 
 	always @(posedge clk) begin
@@ -771,7 +797,7 @@ module apr(
 	wire ar_as_t2;
 	wire ar_t3;
 	wire ar_eq_fp_half = 0;
-	wire ar_eq_0 = 0;
+	wire ar_eq_0 = ar == 0;
 	wire ar0_xor_ar1 = 0;
 	wire ar_ov_set = 0;
 	wire ar_cry0_xor_cry1 = 0;
@@ -1162,7 +1188,7 @@ module apr(
 	reg nrf2;
 	reg nrf3;
 	wire nr_ar9_eq_ar0 = 0;
-	wire nr_round = 0;
+	wire nr_round = ~nrf3 & mq[1] & ir[6];
 	wire nr_ar_eq_0_AND_mq1_0;
 
 	wire nrt05 = 0;
@@ -1428,19 +1454,19 @@ module apr(
 	reg iot_go;
 	reg iot_f0a;
 
-	wire iot_blki = 0;
-	wire iot_datai = 0;
-	wire iot_blko = 0;
-	wire iot_datao = 0;
-	wire iot_cono = 0;
-	wire iot_coni = 0;
-	wire iot_consz = 0;
-	wire iot_conso = 0;
+	wire iot_blki = ir_iot & ir[10:12] == 0;
+	wire iot_datai = ir_iot & ir[10:12] == 1;
+	wire iot_blko = ir_iot & ir[10:12] == 2;
+	wire iot_datao = ir_iot & ir[10:12] == 3;
+	wire iot_cono = ir_iot & ir[10:12] == 4;
+	wire iot_coni = ir_iot & ir[10:12] == 5;
+	wire iot_consz = ir_iot & ir[10:12] == 6;
+	wire iot_conso = ir_iot & ir[10:12] == 7;
 
-	wire iot_blk = 0;
-	wire iot_outgoing = 0;
-	wire iot_status = 0;
-	wire iot_datai_o = 0;
+	wire iot_blk = iot_blki | iot_blko;
+	wire iot_outgoing = iot_datao | iot_cono;
+	wire iot_status = iot_coni | iot_consz | iot_conso;
+	wire iot_datai_o = iot_datai | iot_datao;
 	wire iot_init_setup = 0;
 	wire iot_final_setup = 0;
 
@@ -1534,9 +1560,10 @@ module apr(
 	wire pi_enc_32 = pi_req[4] | pi_req[5] | pi_req[6] | pi_req[7];
 	wire pi_enc_33 = pi_req[2] | pi_req[3] | pi_req[6] | pi_req[7];
 	wire pi_enc_34 = pi_req[1] | pi_req[3] | pi_req[5] | pi_req[7];
-	wire pi_blk_rst = ~pi_ov & iot_datai_o;
-	wire pi_hold = pi_cyc & (~ir_iot | pi_blk_rst);
+	// rst (= restore) means the request is to be dismissed
+	wire pi_blk_rst = ~pi_ov & iot_datai_o;		// BLK hasn't completed
 	wire pi_rst = (ir_jrst & ir[9]) | (pi_cyc & pi_blk_rst);
+	wire pi_hold = pi_cyc & (~ir_iot | pi_blk_rst);
 	wire pi_sync;
 	wire pi_reset;
 

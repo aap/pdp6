@@ -1,5 +1,8 @@
-a.out: test.v pdp6.v apr.v core161c.v fast162.v modules.v
-	iverilog test.v pdp6.v apr.v core161c.v fast162.v modules.v
+test: test.v pdp6.v apr.v core161c.v fast162.v modules.v
+	iverilog -o test test.v pdp6.v apr.v core161c.v fast162.v modules.v
 
-run: a.out
-	vvp a.out
+test_dec: test_dec.v pdp6.v apr.v core161c.v fast162.v modules.v
+	iverilog -o test_dec test_dec.v pdp6.v apr.v core161c.v fast162.v modules.v
+
+run: test
+	vvp test

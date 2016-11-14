@@ -1,0 +1,195 @@
+[*]
+[*] GTKWave Analyzer v3.3.76 (w)1999-2016 BSI
+[*] Mon Nov 14 22:43:38 2016
+[*]
+[dumpfile] "/home/aap/src/pdp6/verilog/inst.vcd"
+[dumpfile_mtime] "Mon Nov 14 22:43:33 2016"
+[dumpfile_size] 102150
+[savefile] "/home/aap/src/pdp6/verilog/inst.gtkw"
+[timestart] 4438
+[size] 1424 1076
+[pos] -1 -1
+*-4.849143 4467 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] test.
+[treeopen] test.pdp6.
+[sst_width] 240
+[signals_width] 223
+[sst_expanded] 1
+[sst_vpaned_height] 318
+@30
+test.pdp6.apr0.ir[0:17]
+@28
+test.pdp6.apr0.ir_uuo_a
+@c00200
+-IR_FPCH
+@28
+test.pdp6.apr0.ir_fpch
+test.pdp6.apr0.ir_130
+test.pdp6.apr0.ir_131
+test.pdp6.apr0.ir_fsc
+test.pdp6.apr0.ir_cao
+test.pdp6.apr0.ir_ldci
+test.pdp6.apr0.ir_ldc
+test.pdp6.apr0.ir_dpci
+test.pdp6.apr0.ir_dpc
+test.pdp6.apr0.ir_fp
+test.pdp6.apr0.ir_fp_dir
+test.pdp6.apr0.ir_fp_rem
+test.pdp6.apr0.ir_fp_mem
+test.pdp6.apr0.ir_fp_both
+test.pdp6.apr0.ir_fad
+test.pdp6.apr0.ir_fsb
+test.pdp6.apr0.ir_fmp
+test.pdp6.apr0.ir_fdv
+test.pdp6.apr0.nr_round
+@1401200
+-IR_FPCH
+@c00200
+>4063
+-IR 2XX
+@28
+>0
+test.pdp6.apr0.ir_2xx
+test.pdp6.apr0.ir_fwt
+test.pdp6.apr0.ir_fwt_mov_s
+test.pdp6.apr0.ir_fwt_movn_m
+test.pdp6.apr0.fwt_swap
+test.pdp6.apr0.fwt_negate
+test.pdp6.apr0.fwt_00
+test.pdp6.apr0.fwt_01
+test.pdp6.apr0.fwt_10
+test.pdp6.apr0.fwt_11
+test.pdp6.apr0.ir_md
+test.pdp6.apr0.ir_mul
+test.pdp6.apr0.ir_div
+test.pdp6.apr0.ir_md_s_c_e
+test.pdp6.apr0.ir_md_f_c_e
+test.pdp6.apr0.ir_md_s_ac_2
+test.pdp6.apr0.ir_md_f_ac_2
+test.pdp6.apr0.ir_sh
+test.pdp6.apr0.ir_ash
+test.pdp6.apr0.ir_rot
+test.pdp6.apr0.ir_lsh
+test.pdp6.apr0.ir_243
+test.pdp6.apr0.ir_ashc
+test.pdp6.apr0.ir_rotc
+test.pdp6.apr0.ir_lshc
+test.pdp6.apr0.ir_247
+test.pdp6.apr0.ir_25x
+test.pdp6.apr0.ir_exch
+test.pdp6.apr0.ir_blt
+test.pdp6.apr0.ir_aobjp
+test.pdp6.apr0.ir_aobjn
+test.pdp6.apr0.ir_jrst_a
+test.pdp6.apr0.ir_jrst
+test.pdp6.apr0.ir_jfcl
+test.pdp6.apr0.ir_xct
+test.pdp6.apr0.ir_257
+test.pdp6.apr0.ir_jp
+test.pdp6.apr0.jp_pushj
+test.pdp6.apr0.jp_push
+test.pdp6.apr0.jp_pop
+test.pdp6.apr0.jp_popj
+test.pdp6.apr0.jp_jsr
+test.pdp6.apr0.jp_jsp
+test.pdp6.apr0.jp_jsa
+test.pdp6.apr0.jp_jra
+test.pdp6.apr0.jp_jmp
+test.pdp6.apr0.jp_flag_stor
+test.pdp6.apr0.jp_AND_ir6_0
+test.pdp6.apr0.jp_AND_NOT_jsr
+test.pdp6.apr0.ir_as
+test.pdp6.apr0.as_plus
+test.pdp6.apr0.as_minus
+@1401200
+>4063
+-IR 2XX
+@c00200
+>0
+-ACCP V MEMAC
+@28
+test.pdp6.apr0.ir_accp_OR_memac
+test.pdp6.apr0.accp
+test.pdp6.apr0.accp_etc_cond
+test.pdp6.apr0.accp_etal_test
+test.pdp6.apr0.accp_dir
+test.pdp6.apr0.memac
+test.pdp6.apr0.memac_tst
+test.pdp6.apr0.memac_inc
+test.pdp6.apr0.memac_dec
+test.pdp6.apr0.memac_mem
+test.pdp6.apr0.memac_ac
+@1401200
+-ACCP V MEMAC
+@c00200
+-BOOLE
+@28
+test.pdp6.apr0.ir_boole
+test.pdp6.apr0.boole_0
+test.pdp6.apr0.boole_1
+test.pdp6.apr0.boole_2
+test.pdp6.apr0.boole_3
+test.pdp6.apr0.boole_4
+test.pdp6.apr0.boole_5
+test.pdp6.apr0.boole_6
+test.pdp6.apr0.boole_7
+test.pdp6.apr0.boole_10
+test.pdp6.apr0.boole_11
+test.pdp6.apr0.boole_12
+test.pdp6.apr0.boole_13
+test.pdp6.apr0.boole_14
+test.pdp6.apr0.boole_15
+test.pdp6.apr0.boole_16
+test.pdp6.apr0.boole_17
+test.pdp6.apr0.boole_as_00
+test.pdp6.apr0.boole_as_01
+test.pdp6.apr0.boole_as_10
+test.pdp6.apr0.boole_as_11
+@1401200
+-BOOLE
+@c00200
+-HWT
+@28
+test.pdp6.apr0.ir_hwt
+test.pdp6.apr0.hwt_lt_set
+test.pdp6.apr0.hwt_rt_set
+test.pdp6.apr0.hwt_lt
+test.pdp6.apr0.hwt_rt
+test.pdp6.apr0.hwt_swap
+test.pdp6.apr0.hwt_ar_clr
+test.pdp6.apr0.hwt_00
+test.pdp6.apr0.hwt_01
+test.pdp6.apr0.hwt_10
+test.pdp6.apr0.hwt_11
+@1401200
+-HWT
+@c00200
+-ACBM
+@28
+test.pdp6.apr0.ir_acbm
+test.pdp6.apr0.acbm_dir
+test.pdp6.apr0.acbm_dn
+test.pdp6.apr0.acbm_cl
+test.pdp6.apr0.acbm_com
+test.pdp6.apr0.acbm_set
+@1401200
+-ACBM
+@28
+test.pdp6.apr0.ir_iot_a
+test.pdp6.apr0.ir_iot
+test.pdp6.apr0.iot_blk
+test.pdp6.apr0.iot_datai_o
+test.pdp6.apr0.iot_status
+@29
+test.pdp6.apr0.iot_outgoing
+@28
+test.pdp6.apr0.iot_blki
+test.pdp6.apr0.iot_datai
+test.pdp6.apr0.iot_blko
+test.pdp6.apr0.iot_datao
+test.pdp6.apr0.iot_cono
+test.pdp6.apr0.iot_coni
+test.pdp6.apr0.iot_consz
+test.pdp6.apr0.iot_conso
+[pattern_trace] 1
+[pattern_trace] 0
