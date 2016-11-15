@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.76 (w)1999-2016 BSI
-[*] Mon Nov 14 05:59:33 2016
+[*] Tue Nov 15 22:56:56 2016
 [*]
 [dumpfile] "/home/aap/src/pdp6/verilog/dump.vcd"
-[dumpfile_mtime] "Mon Nov 14 05:58:30 2016"
-[dumpfile_size] 194794
+[dumpfile_mtime] "Tue Nov 15 22:28:51 2016"
+[dumpfile_size] 232808
 [savefile] "/home/aap/src/pdp6/verilog/test.gtkw"
-[timestart] 6579
+[timestart] 12060
 [size] 1920 1080
 [pos] -1 -1
-*-9.885984 8305 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-8.125873 12925 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] test.
 [treeopen] test.pdp6.
 [treeopen] test.pdp6.mem0.
@@ -34,7 +34,7 @@ test.pdp6.apr0.sw_art3_maint
 test.pdp6.apr0.sw_sct_maint
 @1401200
 -sw
-@800200
+@c00200
 -keys
 @28
 test.pdp6.key_start
@@ -49,7 +49,7 @@ test.pdp6.key_dep
 test.pdp6.key_dep_nxt
 test.pdp6.key_ex
 test.pdp6.key_ex_nxt
-@1000200
+@1401200
 -keys
 @800200
 -regs
@@ -166,22 +166,47 @@ test.pdp6.apr0.at4
 test.pdp6.apr0.at5
 @1401200
 -I A
-@800200
+@c00200
 -F
 @28
+test.pdp6.apr0.f_ac_inh
+test.pdp6.apr0.f_c_e
+test.pdp6.apr0.f_c_e_pse
+test.pdp6.apr0.f_c_c_aclt
+test.pdp6.apr0.f_c_c_acrt
+test.pdp6.apr0.f_ac_2
+test.pdp6.apr0.f_ac_2_etc
 test.pdp6.apr0.ft0
 test.pdp6.apr0.ft1
+test.pdp6.apr0.f1a
 test.pdp6.apr0.ft1a
 test.pdp6.apr0.ft3
 test.pdp6.apr0.ft4
+test.pdp6.apr0.f4a
 test.pdp6.apr0.ft4a
 test.pdp6.apr0.ft5
 test.pdp6.apr0.ft6
+test.pdp6.apr0.f6a
 test.pdp6.apr0.ft6a
-@29
 test.pdp6.apr0.ft7
-@1000200
+@1401200
 -F
+@800200
+-E
+@28
+test.pdp6.apr0.et0a
+test.pdp6.apr0.et0
+test.pdp6.apr0.et1
+test.pdp6.apr0.et3
+test.pdp6.apr0.et4
+test.pdp6.apr0.et5
+test.pdp6.apr0.et6
+test.pdp6.apr0.et7
+test.pdp6.apr0.et8
+test.pdp6.apr0.et9
+test.pdp6.apr0.et10
+@1000200
+-E
 @c00200
 -iobus
 @28
@@ -311,5 +336,17 @@ test.pdp6.apr0.ar_as_t2
 test.pdp6.apr0.ar_cry_comp
 test.pdp6.apr0.ar_t3
 test.pdp6.apr0.cfac_ar_add
+@200
+-
+@28
+>14181
+test.pdp6.apr0.pc_inc
+>0
+test.pdp6.apr0.ar_pc_chg_flag
+test.pdp6.apr0.pc_inc_enable
+test.pdp6.apr0.pc_inc_et9
+test.pdp6.apr0.pc_inc_inh_et0
+test.pdp6.apr0.pc_set_OR_pc_inc
+test.pdp6.apr0.pc_set_enable
 [pattern_trace] 1
 [pattern_trace] 0

@@ -121,9 +121,18 @@ module test;
 		//pdp6.mas = 18'o777777;
 
 		pdp6.fmem0.ff['o0] = 36'o000000010000;
+		pdp6.fmem0.ff['o1] = 36'o000000000222;
+		pdp6.fmem0.ff['o2] = 36'o700000000006;
+		pdp6.fmem0.ff['o3] = 36'o500000000004;
 		pdp6.fmem0.ff['o4] = 36'o000000010304;
 		pdp6.mem0.core['o4] = 36'o222333111666;
+		// MOVE 0,@104(4)	FAC_INH
 		pdp6.mem0.core['o20] = 36'o200_024_000104;
+		// MOVEM 1,@104(4)
+		pdp6.mem0.core['o21] = 36'o202_064_000104;
+		// ROTC 2,3
+		pdp6.mem0.core['o22] = 36'o245_100_000003;
+
 		pdp6.mem0.core['o10410] = 36'o000_000_000333;
 	end
 
