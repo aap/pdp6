@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.76 (w)1999-2016 BSI
-[*] Tue Nov 15 22:56:56 2016
+[*] Wed Nov 16 16:03:38 2016
 [*]
 [dumpfile] "/home/aap/src/pdp6/verilog/dump.vcd"
-[dumpfile_mtime] "Tue Nov 15 22:28:51 2016"
-[dumpfile_size] 232808
+[dumpfile_mtime] "Wed Nov 16 16:02:55 2016"
+[dumpfile_size] 275421
 [savefile] "/home/aap/src/pdp6/verilog/test.gtkw"
-[timestart] 12060
+[timestart] 5380
 [size] 1920 1080
 [pos] -1 -1
-*-8.125873 12925 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-11.385187 13535 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] test.
 [treeopen] test.pdp6.
 [treeopen] test.pdp6.mem0.
@@ -147,7 +147,7 @@ test.pdp6.apr0.mc_split_cyc_sync
 test.pdp6.apr0.mc_mb_membus_enable
 @1401200
 -MC
-@c00200
+@c00201
 -I A
 @28
 test.pdp6.apr0.it0
@@ -164,7 +164,7 @@ test.pdp6.apr0.at3a
 test.pdp6.apr0.af3a
 test.pdp6.apr0.at4
 test.pdp6.apr0.at5
-@1401200
+@1401201
 -I A
 @c00200
 -F
@@ -207,6 +207,25 @@ test.pdp6.apr0.et9
 test.pdp6.apr0.et10
 @1000200
 -E
+@800200
+-S
+@28
+test.pdp6.apr0.s_ac_0
+test.pdp6.apr0.s_ac_2
+test.pdp6.apr0.s_ac_inh
+test.pdp6.apr0.s_ac_inh_if_ac_0
+test.pdp6.apr0.st1
+test.pdp6.apr0.st2
+test.pdp6.apr0.sf3
+test.pdp6.apr0.st3
+test.pdp6.apr0.st3a
+test.pdp6.apr0.st5
+test.pdp6.apr0.st5a
+test.pdp6.apr0.st6
+test.pdp6.apr0.sf7
+test.pdp6.apr0.st7
+@1000200
+-S
 @c00200
 -iobus
 @28
@@ -311,7 +330,7 @@ test.pdp6.mem0.cmc_t12
 @28
 test.pdp6.apr0.at1_inh
 test.pdp6.apr0.ia_NOT_int
-@800200
+@c00200
 -PI
 @30
 test.pdp6.apr0.maN_set[30:35]
@@ -325,7 +344,7 @@ test.pdp6.apr0.pih[1:7]
 test.pdp6.apr0.pir[1:7]
 test.pdp6.apr0.pio[1:7]
 test.pdp6.apr0.iob_pi_req[1:7]
-@1000200
+@1401200
 -PI
 @28
 test.pdp6.apr0.ar_com_cont
@@ -339,9 +358,7 @@ test.pdp6.apr0.cfac_ar_add
 @200
 -
 @28
->14181
 test.pdp6.apr0.pc_inc
->0
 test.pdp6.apr0.ar_pc_chg_flag
 test.pdp6.apr0.pc_inc_enable
 test.pdp6.apr0.pc_inc_et9
