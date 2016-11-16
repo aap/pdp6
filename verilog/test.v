@@ -22,9 +22,13 @@ module test;
 	clock clock0(clk);
 	pdp6 pdp6(.clk(clk), .reset(reset));
 
-	initial
+	initial begin
 //		#110000 $finish;
 		#20000 $finish;
+	end
+	always @(pdp6.apr0.st7)
+		if(pdp6.apr0.st7)
+			$finish;
 
 	initial begin
 		#100 `TESTKEY = 1;
@@ -117,21 +121,23 @@ module test;
 		pdp6.datasw = 36'o111777222666;
 //		pdp6.mas = 18'o010100;
 //		pdp6.mas = 18'o000004;
-		pdp6.mas = 18'o000020;
+		pdp6.mas = 18'o000023;
 		//pdp6.mas = 18'o777777;
 
-		pdp6.fmem0.ff['o0] = 36'o000000010000;
-		pdp6.fmem0.ff['o1] = 36'o000000000222;
-		pdp6.fmem0.ff['o2] = 36'o700000000006;
-		pdp6.fmem0.ff['o3] = 36'o500000000004;
-		pdp6.fmem0.ff['o4] = 36'o000000010304;
-		pdp6.mem0.core['o4] = 36'o222333111666;
+		pdp6.fmem0.ff['o0] = 36'o000000_010000;
+		pdp6.fmem0.ff['o1] = 36'o000000_000222;
+		pdp6.fmem0.ff['o2] = 36'o700000_000006;
+		pdp6.fmem0.ff['o3] = 36'o500000_000004;
+		pdp6.fmem0.ff['o4] = 36'o000000_010304;
+		pdp6.fmem0.ff['o5] = 36'o377777_777777;
 		// MOVE 1,@104(4)	FAC_INH
 		pdp6.mem0.core['o20] = 36'o200_064_000104;
 		// MOVEM 1,@104(4)
 		pdp6.mem0.core['o21] = 36'o202_064_000104;
 		// ROTC 2,3
 		pdp6.mem0.core['o22] = 36'o245_100_000003;
+
+		pdp6.mem0.core['o23] = 36'o200_005_000001;
 
 		pdp6.mem0.core['o10410] = 36'o000_000_000333;
 	end

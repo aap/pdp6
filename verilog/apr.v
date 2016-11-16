@@ -693,8 +693,7 @@ module apr(
 	wire memac_ac = memac & ~ir[5];
 	wire accp_etc_cond = ir_accp_OR_memac & ir[8] & ar0_xor_ar_ov |
 		ir[7] & ar_eq_0;
-	// simplifies to: accp_etc_cond != ir[6]
-	wire accp_etal_test = (accp_etc_cond | ir[6]) & (~accp_etc_cond | ~ir[6]);
+	wire accp_etal_test = accp_etc_cond ^ ir[6];
 	wire accp_dir = accp & ir[5];
 
 	/* ACBM */
@@ -1074,17 +1073,21 @@ module apr(
 	wire ar_as_t1;
 	wire ar_as_t2;
 	wire ar_t3;
-	wire ar_eq_fp_half = 0;
-	wire ar_eq_0 = ar == 0;
-	wire ar0_xor_ar1 = 0;
-	wire ar_ov_set = 0;
-	wire ar_cry0_xor_cry1 = 0;
-	wire ar0_xor_ar_ov = 0;
-	wire ar0_xor_mb0 = 0;
-	wire ar0_eq_sc0 = 0;
 	wire ar_flag_clr = mr_start | et0 & ir_jrst & ir[11];
-	wire ar_flag_set = 0;
-	wire ar_jfcl_clr = 0;
+	wire ar_jrst_AND_ir11 = ir_jrst & ir[11];
+	wire ar_flag_set = et1 & ar_jrst_AND_ir11;
+	wire ar_jfcl_clr = et10 & ir_jfcl;
+
+	wire ar_eq_fp_half = ar == 36'o000400000000;
+	wire ar_eq_0 = ar == 0;
+	wire ar0_xor_ar1 = ar[0] ^ ar[1];
+	wire ar_ov_set = ar_cry0 ^ ar_cry1;
+	wire ar_cry0_xor_cry1 = ar_ov_set & ~memac;
+	wire ar0_xor_ar_ov = ar[0] ^ ar_cry0_xor_cry1;
+	wire ar0_xor_mb0 = ar[0] ^ mb[0];
+	wire ar0_eq_sc0 = ar[0] == sc[0];
+
+	wire set_flags_et10 = et10 & (memac | ir_as);
 
 	pa ar_pa0();	// AR+-1 T0
 	pa ar_pa1();	// AR NEGATE T0
@@ -1125,6 +1128,8 @@ module apr(
 		.p(ar_cry_comp_D));
 
 	wire [0:35] ar_mb_cry = mb & ~ar;
+	// hold the cry out temporarily
+	reg cry0, cry1;
 
 	always @(posedge clk) begin: arctl
 		integer i;
@@ -1132,8 +1137,10 @@ module apr(
 			ar[0:17] <= 0;
 		if(arrt_clr)
 			ar[18:35] <= 0;
-		if(ar_cry_initiate)
-			ar <= ar + { ar_mb_cry[1:35], 1'b0 };
+		if(ar_cry_initiate) begin
+			cry1 <= (ar[1:35] + { ar_mb_cry[2:35], 1'b0 }) + 36'o0 >> 35;
+			{cry0, ar} <= ar + { ar_mb_cry[1:35], 1'b0 };
+		end
 		if(arlt_fm_mb_xor)
 			ar[0:17] <= ar[0:17] ^ mb[0:17];
 		if(arrt_fm_mb_xor)
@@ -1160,6 +1167,48 @@ module apr(
 			ar_ov_flag <= 0;
 			ar_cry0_flag <= 0;
 			ar_cry1_flag <= 0;
+		end
+
+		if(ar_jfcl_clr & ir[12] |
+		   cpa_cono_set & iob[29])
+			ar_pc_chg_flag <= 0;
+		if(ar_flag_set & mb[3] |
+		   et9 & pc_set_OR_pc_inc & ~ar_jrst_AND_ir11)
+			ar_pc_chg_flag <= 1;
+
+		if(ar_jfcl_clr & ir[9] |
+		   cpa_cono_set & iob[32])
+			ar_ov_flag <= 0;
+		if(ar_flag_set & mb[0] |
+		   set_flags_et10 & ar_ov_set |
+		   cfac_overflow |
+		   et10 & ir_fwt & ~ar_cry0 & ar_cry1 |
+		   sct1 & ~mb[18] & ir_ash_OR_ashc | ar0_xor_ar1)
+			ar_ov_flag <= 1;
+
+		if(ar_jfcl_clr & ir[10])
+			ar_cry0_flag <= 0;
+		if(ar_flag_set & mb[1] |
+		   set_flags_et10 & ar_cry0)
+			ar_cry0_flag <= 1;
+
+		if(ar_jfcl_clr & ir[11])
+			ar_cry1_flag <= 0;
+		if(ar_flag_set & mb[2] |
+		   set_flags_et10 & ar_cry1)
+			ar_cry1_flag <= 1;
+
+		if(mr_start) begin
+			cry0 <= 0;
+			cry1 <= 0;
+		end
+		if(cry0) begin
+			cry0 <= 0;
+			ar_cry0 <= 1;
+		end
+		if(cry1) begin
+			cry1 <= 0;
+			ar_cry1 <= 1;
 		end
 		if(et0) begin
 			ar_cry0 <= 0;
@@ -1839,6 +1888,7 @@ module apr(
 	assign iobus_iob_fm_datai = 0;
 	assign iobus_iob_fm_status = 0;
 	assign iobus_iob_out = 0;
+	wire [0:35] iob = iobus_iob_in;
 
 	/*
 	 * PIH, PIR, PIO
