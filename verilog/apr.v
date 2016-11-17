@@ -1002,57 +1002,80 @@ module apr(
 	reg ar_cry0;
 	reg ar_cry1;
 	wire arlt_clr = ar_clr | at4 | blt_t2 | key_ar_clr;
-	wire arlt_com = 0;
+	wire arlt_com = ar_com | ar_as_t0 | cfac_ar_com | et4 & hwt_lt_set;
 	wire arlt_fm_mb_xor = ar_as_t1 | ar_fm_mb_xor;
 	wire arlt_fm_mb0 = cfac_mb_ar_swap | mb_ar_swap | ar_fm_mbJ | ar_fm_mb0 |
 		et4 & ar_fm_mbltJ_et4;
 	wire arlt_fm_mb1 = cfac_mb_ar_swap | mb_ar_swap | ar_fm_mbJ | ar_fm_mb1 |
 		et4 & ar_fm_mbltJ_et4;
-	wire arlt_shlt = 0;
-	wire arlt_shrt = 0;
 	wire arlt_fm_datasw1 = key_ar_fm_datasw1;
-	wire arlt_fm_iob1 = 0;
+	wire arlt_fm_iob1 = iot_t3;
 	wire arrt_clr = ar_clr | key_ar_clr;
-	wire arrt_com = 0;
+	wire arrt_com = ar_com | ar_as_t0 | cfac_ar_com | et4 & hwt_rt_set;
 	wire arrt_fm_mb_xor = ar_as_t1 | ar_fm_mb_xor;
 	wire arrt_fm_mb0 = cfac_mb_ar_swap | mb_ar_swap | ar_fm_mbJ | ar_fm_mb0 |
 		et4 & ar_fm_mbrtJ_et4 | at0;
 	wire arrt_fm_mb1 = cfac_mb_ar_swap | mb_ar_swap | ar_fm_mbJ | ar_fm_mb1 |
 		et4 & ar_fm_mbrtJ_et4 | at0;
-	wire arrt_shlt = 0;
-	wire arrt_shrt = 0;
 	wire arrt_fm_datasw1 = key_ar_fm_datasw1;
-	wire arrt_iob1 = 0;
-	wire ar0_shl_inp = 0;
-	wire ar0_shr_inp = 0;
-	wire ar35_shl_inp = 0;
+	wire arrt_fm_iob1 = iot_t3;
 	// just one for simplicity
+	wire ar_shlt = cfac_ar_sh_lt;
+	wire ar_shrt = cfac_ar_sh_rt;
 	wire ar_cry_initiate = ar_as_t2;
 
-	wire shc_ashc = 0;
-	wire shc_lshc_OR_div = 0;
-	wire shc_div = 0;
 
-	wire ar_clr = dst2 | fat6 | et0a & ar_clr_et0 | et1 & ar_clr_et1 |
-		0;	// TODO: MST1 50ns delay
-	wire ar_clr_et0 = 0;
-	wire ar_clr_et1 = 0;
-	wire ar_com = 0;
-	wire ar_com_et0 = 0;
-	wire ar_com_et4 = 0;
-	wire ar_com_et5 = 0;
-	wire ar_com_et7 = 0;
-	wire ar_fm_mb0 = 0;
-	wire ar_fm_mb0_et1 = 0;
-	wire ar_fm_mb0_et6 = 0;
-	wire ar_fm_mb1 = 0;
-	wire ar_fm_mb1_et1 = 0;
+	wire ar0_shl_inp = ~ir_ash & ~shc_ashc ? ar[1] : ar[0];
+	wire ar0_shr_inp = ir_rotc ? mq[35] :
+		ir_rot ? ar[35] :
+		(ir_ash | shc_ashc | ms_mult | ir_fdv) ? ar[0] :
+		ir_div ? ~mq[35] :
+		ch_load | ir_lsh | ir_lshc ? 0 :
+		0;	// shouldn't happen
+	wire ar35_shl_inp = ir_rot ? ar[0] :
+		shc_ashc ? mq[1] :
+		ir_rotc | shc_lshc_OR_div ? mq[0] :
+		ch_dep | ir_lsh | ir_ash ? 0 :
+		0;	// shouldn't happen
+
+	wire shc_ashc = ir_ashc | nrf2 | faf3;
+	wire shc_lshc_OR_div = ir_lshc | shc_div;
+	wire shc_div = (ir_div | ir_fdv) & ~nrf2;
+
+	wire ar_clr = dst2 | fat6 |
+		et0a & ar_clr_et0 |
+		et1 & ar_clr_et1 |
+		mst1_D;
+	wire ar_clr_et0 = boole_0 | boole_3 | boole_14 | boole_17;
+	wire ar_clr_et1 = hwt_ar_clr | iot_status | iot_datai;
+	wire ar_com = ar_incdec_t0 | ar_negate_t0 |
+		et0a & ar_com_et0 |
+		et4 & ar_com_et4 |
+		et5 & ar_com_et5 |
+		et7 & ar_com_et7 |
+		ar_cry_comp & ar_com_cont;
+	wire ar_com_et0 = boole_2 | boole_4 |
+		boole_12 | boole_13 | boole_15;
+	wire ar_com_et4 = boole_4 | boole_10 | boole_11 | boole_14 |
+		boole_15 | boole_16 | boole_17;
+	wire ar_com_et5 = ir_acbm;
+	wire ar_com_et7 = ir_acbm;
+	wire ar_fm_mb0 = dct1 | lct0a |
+		et1 & ar_fm_mb0_et1 |
+		et6 & ar_fm_mb0_et6;
+	wire ar_fm_mb0_et1 = boole_3 | boole_4 | boole_7 |
+		boole_10 | boole_13 | acbm_set;
+	wire ar_fm_mb0_et6 = iot_consz | iot_conso;
+	wire ar_fm_mb1 = et1 & ar_fm_mb1_et1;
+	wire ar_fm_mb1_et1 = boole_6 | boole_11 | boole_14 | acbm_com;
 	wire ar_fm_mb_xor = et1 & ar_fm_mb_xor_et1;
 	wire ar_fm_mb_xor_et1 = boole_14 | boole_6 | boole_11 | acbm_com;
-	wire ar_fm_mbJ = 0;
-	wire ar_fm_mbJ_et0 = 0;
-	wire ar_fm_mbltJ_et4 = 0;
-	wire ar_fm_mbrtJ_et4 = 0;
+	wire ar_fm_mbJ = cht1 | lct0 | mpt2 |
+		et0a & ar_fm_mbJ_et0;
+	wire ar_fm_mbJ_et0 = hwt_11 | fwt_00 | fwt_11 |
+		memac_mem | iot_blk | iot_datao;
+	wire ar_fm_mbltJ_et4 = hwt_lt | iot_cono;
+	wire ar_fm_mbrtJ_et4 = hwt_rt;
 
 	wire ar1_8_clr = 0;
 	wire ar1_8_set = 0;
@@ -1127,6 +1150,11 @@ module apr(
 		.in(ar_cry_comp),
 		.p(ar_cry_comp_D));
 
+	wire mst1_D;
+	dly50ns ar_dly5(.clk(clk), .reset(reset),
+		.in(mst1),
+		.p(mst1_D));
+
 	wire [0:35] ar_mb_cry = mb & ~ar;
 	// hold the cry out temporarily
 	reg cry0, cry1;
@@ -1141,6 +1169,10 @@ module apr(
 			cry1 <= (ar[1:35] + { ar_mb_cry[2:35], 1'b0 }) + 36'o0 >> 35;
 			{cry0, ar} <= ar + { ar_mb_cry[1:35], 1'b0 };
 		end
+		if(arlt_com)
+			ar[0:17] <= ~ar[0:17];
+		if(arrt_com)
+			ar[0:17] <= ~ar[0:17];
 		if(arlt_fm_mb_xor)
 			ar[0:17] <= ar[0:17] ^ mb[0:17];
 		if(arrt_fm_mb_xor)
@@ -1155,10 +1187,18 @@ module apr(
 			if(arrt_fm_mb1 & mb[i+18])
 				ar[i+18] <= 1;
 		end
+		if(ar_shlt)
+			ar <= { ar0_shl_inp, ar[2:35], ar35_shl_inp };
+		if(ar_shrt)
+			ar <= { ar0_shr_inp, ar[0:34] };
 		if(arlt_fm_datasw1)
 			ar[0:17] <= ar[0:17] | datasw[0:17];
 		if(arrt_fm_datasw1)
 			ar[18:35] <= ar[18:35] | datasw[18:35];
+		if(arlt_fm_iob1)
+			ar[0:17] <= ar[0:17] | iob[0:17];
+		if(arrt_fm_iob1)
+			ar[18:35] <= ar[18:35] | iob[18:35];
 
 		if(mr_clr | ar_t3)
 			ar_com_cont <= 0;
@@ -1169,6 +1209,7 @@ module apr(
 			ar_cry1_flag <= 0;
 		end
 
+		// Flags
 		if(ar_jfcl_clr & ir[12] |
 		   cpa_cono_set & iob[29])
 			ar_pc_chg_flag <= 0;
@@ -1227,22 +1268,31 @@ module apr(
 	wire mqrt_clr = mr_clr;
 	wire mqrt_fm_mb0 = mq_fm_mbJ | cfac_mb_mq_swap;
 	wire mqrt_fm_mb1 = mq_fm_mbJ | cfac_mb_mq_swap | dct0b;
-	wire mq_shl = 0;
-	wire mq_shr = 0;
+	wire mq_shl = cfac_mq_sh_lt;
+	wire mq_shr = cfac_mq_sh_rt;
+	wire mq0_set = dst10a & ar[35];
+	wire mq0_clr = dst10a & ~ar[35];
 
-	wire mq0_shl_inp = 0;
-	wire mq0_shr_inp = 0;
-	wire mq1_shr_inp = 0;
-	wire mq35_shl_inp = 0;
+	wire mq0_shl_inp = shc_ashc ? ar[0] : mq[1];
+	wire mq0_shr_inp = ms_mult & sc_eq_777 | shc_ashc ?
+		ar[0] : ar[35];
+	wire mq1_shr_inp = shc_ashc ? ar[35] : mq[0];
+	wire mq35_shl_inp = ir_rotc ? ar[0] :
+		shc_div ? ~ar[0] :
+		ch_inc_op | ch_NOT_inc_op ? 1 :
+		ir_lshc | shc_ashc | ch_dep ? 0 :
+		0;	// shouldn't happen
 
-	wire mq0_clr = 0;
-	wire mq0_set = 0;
 	wire mq_fm_mbJ = ft4 | ft4a | dst1 | mst1;
-	wire mq35_xor_mb0 = 0;
-	wire mq35_eq_mq36 = 0;
+	wire mq35_xor_mb0 = mq[35] ^ mb[0];
+	wire mq35_eq_mq36 = mq[35] == mq36;
 
 	always @(posedge clk) begin: mqctl
 		integer i;
+		if(mqlt_clr)
+			mq[0:17] <= 0;
+		if(mqrt_clr)
+			mq[18:35] <= 0;
 		for(i = 0; i < 18; i = i+1) begin
 			if(mqlt_fm_mb0 & ~mb[i])
 				mq[i] <= 0;
@@ -1253,6 +1303,19 @@ module apr(
 			if(mqrt_fm_mb1 & mb[i+18])
 				mq[i+18] <= 1;
 		end
+		if(mq_shl)
+			mq <= { mq0_shl_inp, mq[2:35], mq35_shl_inp };
+		if(mq_shr)
+			mq <= { mq0_shr_inp, mq1_shr_inp, mq[1:34] };
+		if(mq0_set)
+			mq[0] <= 1;
+		if(mq0_clr)
+			mq[0] <= 0;
+
+		if(mr_clr | cfac_mq_sh_rt & ~mq[35])
+			mq36 <= 0;
+		if(cfac_mq_sh_rt & mq[35])
+			mq36 <= 1;
 	end
 
 	/*
@@ -1903,21 +1966,21 @@ module apr(
 	// pir contains all current and allowed pi reqs.
 	reg [1:7] pir;
 	wire pir_clr = pi_reset;
-	wire pir_fm_iob1 = 0;
+	wire pir_fm_iob1 = pi_cono_set & iob[24];
 	wire pir_stb;
 
 	// pio is a mask of which pi reqs are allowed.
 	reg [1:7] pio;
-	wire pio_fm_iob1 = 0;
-	wire pio0_fm_iob1 = 0;
+	wire pio_fm_iob1 = pi_cono_set & iob[25];
+	wire pio0_fm_iob1 = pi_cono_set & iob[26];
 
 	// pi_req has the currently highest priority request.
 	wire [1:7] pi_req;
 	// pi_ok is used to mask out low priority reqs
 	wire [1:8] pi_ok;
 
-	// requests coming from the bust
-	wire [1:7] iob_pi_req = iobus_pi_req;	// TODO: apr reqs
+	// requests coming from the bus
+	wire [1:7] iob_pi_req = iobus_pi_req | cpa_req;
 
 	genvar i;
 	assign pi_ok[1] = pi_active;
@@ -1934,15 +1997,25 @@ module apr(
 			pih <= pih | pi_req;
 		if(pih0_fm_pi_ok1)
 			pih <= pih & ~pi_ok;
+
 		if(pir_clr)
 			pir <= 0;
-		if(pir_stb)
+		else if(pir_fm_iob1)
+			pir <= pir | iob[29:35];
+		else if(pir_stb)
 			for(i = 1; i <= 7; i = i+1) begin
 				if(iob_pi_req[i] & pio[i])
 					pir[i] <= 1;
 			end
+		else
+			pir <= pir & ~pih;
+
 		if(pi_reset)
 			pio <= 0;
+		if(pio_fm_iob1)
+			pio <= pio | iob[29:35];
+		if(pio0_fm_iob1)
+			pio <= pio & ~iob[29:35];
 	end
 
 	/*
@@ -1951,9 +2024,9 @@ module apr(
 	reg pi_ov;
 	reg pi_cyc;
 	reg pi_active;
-	wire pi_select = 0;
-	wire pi_status = 0;
-	wire pi_cono_set = 0;
+	wire pi_select = iobus_ios == 1;
+	wire pi_status = pi_select & iobus_iob_fm_status;
+	wire pi_cono_set = pi_select & iobus_cono_set;
 	wire pi_rq = | pi_req;
 	wire pi_enc_32 = pi_req[4] | pi_req[5] | pi_req[6] | pi_req[7];
 	wire pi_enc_33 = pi_req[2] | pi_req[3] | pi_req[6] | pi_req[7];
@@ -1972,7 +2045,8 @@ module apr(
 		.in(pi_sync & ~pi_cyc | blt_t4),
 		.p(pir_stb));
 	pa pi_pa2(.clk(clk), .reset(reset),
-		.in(mr_start | 1'b0),	// TODO
+		.in(mr_start |
+		    pi_select & iobus_cono_clear & iob[23]),
 		.p(pi_reset));
 
 	wire pi_sync_D;
@@ -1989,9 +2063,9 @@ module apr(
 			pi_ov <= 1;
 		if(iat0_D0)
 			pi_cyc <= 1;
-		if(pi_reset | pi_cono_set & iobus_iob_in[27])
+		if(pi_reset | pi_cono_set & iob[27])
 			pi_active <= 0;
-		if(pi_cono_set & iobus_iob_in[28])
+		if(pi_cono_set & iob[28])
 			pi_active <= 1;
 	end
 
@@ -2010,5 +2084,28 @@ module apr(
 	wire cpa = iobus_ios == 0;
 	wire cpa_cono_set = 0;
 	wire cpa_status = 0;
+
+	wire cpa_req_enable = cpa_illeg_op | cpa_non_exist_mem | cpa_pdl_ov |
+		cpa_clock_enable & cpa_clock_flag |
+		cpa_pc_chg_enable & ar_pc_chg_flag |
+		cpa_arov_enable & ar_ov_flag;
+	wire [1:7] cpa_req;
+	genvar j;
+	for(j = 1; j <= 7; j = j + 1)
+		assign cpa_req[j] = cpa_req_enable & (cpa_pia == j);
+
+	always @(posedge clk) begin
+		if(mr_start) begin
+			cpa_iot_user <= 0;
+			cpa_illeg_op <= 0;
+			cpa_non_exist_mem <= 0;
+			cpa_clock_enable <= 0;
+			cpa_clock_flag <= 0;
+			cpa_pc_chg_enable <= 0;
+			cpa_pdl_ov <= 0;
+			cpa_arov_enable <= 0;
+			cpa_pia <= 0;
+		end
+	end
 
 endmodule

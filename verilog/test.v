@@ -41,15 +41,17 @@ module test;
 //		#1000 pdp6.key_inst_stop = 0;
 	end
 
-/*
 	initial begin
-		#400 pdp6.apr0.pio = 7'b1111111;
+		#400;
+		pdp6.apr0.cpa_pia = 5;
+/*
+		pdp6.apr0.pio = 7'b1111111;
 		pdp6.apr0.pih = 7'b0000100;
 		pdp6.apr0.pi_active = 1;
-	end
-	assign pdp6.apr0.iobus_pi_req = 7'b0010000;
 */
-	assign pdp6.apr0.iobus_pi_req = 0;
+	end
+//	assign pdp6.apr0.iobus_pi_req = 0;
+	assign pdp6.apr0.iobus_pi_req = 7'b0010000;
 
 /*	initial begin
 		#100;
@@ -137,7 +139,7 @@ module test;
 		// ROTC 2,3
 		pdp6.mem0.core['o22] = 36'o245_100_000003;
 
-		pdp6.mem0.core['o23] = 36'o200_005_000001;
+		pdp6.mem0.core['o23] = 36'o700200_000005;
 
 		pdp6.mem0.core['o10410] = 36'o000_000_000333;
 	end
