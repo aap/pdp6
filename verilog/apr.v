@@ -129,8 +129,7 @@ module apr(
 	wire key_ma_fm_masw1 = kt2 & key_ma_fm_mas;
 	wire key_ma_inc = kt1 & key_ex_OR_dep_nxt;
 	wire key_ar_clr = kt1 & key_execute_OR_dp_OR_dp_nxt;
-	wire key_ar_fm_datasw1 = kt2 & key_execute_OR_dp_OR_dp_nxt |
-		cpa & iobus_iob_fm_datai;
+	wire key_ar_fm_datasw1;
 	wire key_rd = kt3 & key_ex_OR_ex_nxt;
 	wire key_wr = kt3 & key_dp_OR_dp_nxt;
 
@@ -138,16 +137,18 @@ module apr(
 	pg key_pg0(.clk(clk), .reset(reset), .in(key_inst_stop), .p(run_clr));
 	pg key_pg1(.clk(clk), .reset(reset), .in(sw_power), .p(mr_pwr_clr));
 	pg key_pg2(.clk(clk), .reset(reset), .in(key_manual), .p(kt0));
+	pg key_pg3(.clk(clk), .reset(reset),
+		.in(kt2 & key_execute_OR_dp_OR_dp_nxt |
+		    cpa & iobus_iob_fm_datai),
+		.p(key_ar_fm_datasw1));
+
 	pa key_pa0(.clk(clk), .reset(reset), .in(kt0), .p(kt0a));
-	dly100ns key_dly0(.clk(clk), .reset(reset), .in(kt0a), .p(kt0a_D));
 	pa key_pa1(.clk(clk), .reset(reset),
 		.in(kt0a_D & ~run |
 		    kt0a & key_mem_cont |	// TODO: check run?
 		    st7 & run & key_ex_OR_dep_st),
 		.p(kt1));
-	dly200ns key_dly1(.clk(clk), .reset(reset), .in(kt1), .p(kt1_D));
 	pa key_pa2(.clk(clk), .reset(reset), .in(kt1_D), .p(kt2));
-	dly200ns key_dly2(.clk(clk), .reset(reset), .in(kt2), .p(kt2_D));
 	pa key_pa3(.clk(clk), .reset(reset), .in(kt2_D), .p(kt3));
 	pa key_pa4(.clk(clk), .reset(reset),
 		.in(kt3 & key_execute |
@@ -162,6 +163,10 @@ module apr(
 	pa key_pa6(.clk(clk), .reset(reset),
 		.in(key_rdwr & mc_rs_t1),
 		.p(key_rdwr_ret));
+
+	dly100ns key_dly0(.clk(clk), .reset(reset), .in(kt0a), .p(kt0a_D));
+	dly200ns key_dly1(.clk(clk), .reset(reset), .in(kt1), .p(kt1_D));
+	dly200ns key_dly2(.clk(clk), .reset(reset), .in(kt2), .p(kt2_D));
 
 	/* add to this as needed */
 	always @(posedge reset) begin
@@ -445,7 +450,7 @@ module apr(
 		    ar_t3 & et4_ar_pse),
 		.p(et4));
 	pa e_pa5(.clk(clk), .reset(reset),
-		.in(et4_D & ~et5_inh | iot_t3_D),
+		.in(et4_D & ~et5_inh /* XXX | iot_t3_D*/),
 		.p(et5));
 	pa e_pa6(.clk(clk), .reset(reset),
 		.in(et5_D & e_long),
@@ -713,8 +718,8 @@ module apr(
 	wire fwt_11 = ir_fwt & ir[7:8] == 3;
 
 	/* HWT */
-	wire hwt_lt_set = hwt_rt & ir[4] | (~ir[5] | mb[18]);
-	wire hwt_rt_set = hwt_lt & ir[4] | (~ir[5] | mb[0]);
+	wire hwt_lt_set = hwt_rt & ir[4] & (~ir[5] | mb[18]);
+	wire hwt_rt_set = hwt_lt & ir[4] & (~ir[5] | mb[0]);
 	wire hwt_lt = ir_hwt & ~ir[3];
 	wire hwt_rt = ir_hwt & ir[3];
 	wire hwt_swap = ir_hwt & ir[6];
@@ -844,7 +849,7 @@ module apr(
 	reg ex_pi_sync;
 	reg ex_ill_op;
 	wire ex_clr = mr_start | cpa & iobus_datao_clear;
-	wire ex_set = mr_start | cpa & iobus_datao_set;
+	wire ex_set = cpa & iobus_datao_set;
 	wire ex_ir_uuo = ir_jrst_a & ir_9_OR_10 & ex_user |
 		ir_iot_a & ~ex_pi_sync & ex_user & ~cpa_iot_user |
 		ex_uuo_sync & ir_uuo_a;
@@ -1077,30 +1082,34 @@ module apr(
 	wire ar_fm_mbltJ_et4 = hwt_lt | iot_cono;
 	wire ar_fm_mbrtJ_et4 = hwt_rt;
 
-	wire ar1_8_clr = 0;
-	wire ar1_8_set = 0;
-	wire ar_add = 0;
-	wire ar_sub = 0;
-	wire ar_inc = 0;
-	wire ar_incdec_lt_rt = 0;
-	wire ar_dec = 0;
-	wire ar_sbr = 0;
-	wire ar_cry_comp;
-	wire ar_fm_sc1_8J = 0;
-	wire ar0_5_fm_sc3_8J = 0;
-	wire ar_incdec_t0 = 0;
-	wire ar_negate_t0 = 0;
-	wire ar_incdec_t1 = 0;
-	wire ar17_cry_in = 0;
-	wire ar_as_t0 = 0;
+	wire ar_incdec_t0;
+	wire ar_negate_t0;
+	wire ar_incdec_t1;
+	// these two are a bit of a hack
+	wire ar35_cry_in = ar_incdec_t1;
+	wire ar17_cry_in = ar_incdec_t1 & (ar_incdec_lt_rt | ir_blt);
+	wire ar_as_t0;
 	wire ar_as_t1;
 	wire ar_as_t2;
 	wire ar_t3;
+	wire ar_cry_comp;
+	wire ar1_8_clr = (fpt3 | fat5) & ~ar[0];
+	wire ar1_8_set = (fpt3 | fat5) & ar[0];
+	wire ar_fm_sc1_8J = nrt4 | fst0a;
+	wire ar0_5_fm_sc3_8J = cht6 & ch_inc_op;
+
+	wire ar_add = as_plus;
+	wire ar_sub = as_minus | accp;
+	wire ar_inc = memac_inc | jp_push | jp_pushj | iot_blk |
+		ir_aobjp | ir_aobjn;
+	wire ar_incdec_lt_rt = iot_blk | ir_aobjp | ir_aobjn | jp_AND_ir6_0;
+	wire ar_dec = memac_dec | jp_pop | jp_popj;
+	wire ar_sbr = fwt_negate | ar_add | ar_sub | ar_inc | ar_dec | ir_fsb;
+
 	wire ar_flag_clr = mr_start | et0 & ir_jrst & ir[11];
 	wire ar_jrst_AND_ir11 = ir_jrst & ir[11];
 	wire ar_flag_set = et1 & ar_jrst_AND_ir11;
 	wire ar_jfcl_clr = et10 & ir_jfcl;
-
 	wire ar_eq_fp_half = ar == 36'o000400000000;
 	wire ar_eq_0 = ar == 0;
 	wire ar0_xor_ar1 = ar[0] ^ ar[1];
@@ -1112,11 +1121,26 @@ module apr(
 
 	wire set_flags_et10 = et10 & (memac | ir_as);
 
-	pa ar_pa0();	// AR+-1 T0
-	pa ar_pa1();	// AR NEGATE T0
-	pa ar_pa2();	// AR+-1 T1
+	pa ar_pa0(.clk(clk), .reset(reset),
+		.in(et3 & ar_dec),
+		.p(ar_incdec_t0));
+	pa ar_pa1(.clk(clk), .reset(reset),
+		.in(et3 & fwt_negate |
+		    et3 & ir_fsb |
+		    cfac_ar_negate),
+		.p(ar_negate_t0));
+	pa ar_pa2(.clk(clk), .reset(reset),
+		.in(ar_incdec_t0_D |
+		    ar_negate_t0_D |
+		    et3 & ar_inc |
+		    blt_t5 | nrt5 | cht4),
+		.p(ar_incdec_t1));
 	pa ar_pa3();	// AR17 CRY IN
-	pa ar_pa4();	// AR AS T0
+	pa ar_pa4(.clk(clk), .reset(reset),
+		.in(et3 & ar_sub |
+		    cfac_ar_sub |
+		    blt_t3),
+		.p(ar_as_t0));
 	pa ar_pa5(.clk(clk), .reset(reset),
 		.in(ar_as_t0_D | et3 & ar_add |
 		    at3 | cfac_ar_add),
@@ -1149,13 +1173,25 @@ module apr(
 	dly100ns ar_dly4(.clk(clk), .reset(reset),
 		.in(ar_cry_comp),
 		.p(ar_cry_comp_D));
+	dly100ns ar_dly5(.clk(clk), .reset(reset),
+		.in(ar_incdec_t0),
+		.p(ar_incdec_t0_D));
+	dly100ns ar_dly6(.clk(clk), .reset(reset),
+		.in(ar_negate_t0),
+		.p(ar_negate_t0_D));
 
 	wire mst1_D;
-	dly50ns ar_dly5(.clk(clk), .reset(reset),
+	dly50ns ar_dly7(.clk(clk), .reset(reset),
 		.in(mst1),
 		.p(mst1_D));
 
 	wire [0:35] ar_mb_cry = mb & ~ar;
+	wire [0:35] ar_cry_in = ar_cry_initiate ? { mb&~ar, 1'b0 } :
+		ar35_cry_in & ar17_cry_in ? 36'o000001000001 :
+		ar35_cry_in ? 36'o000000000001 :
+		ar17_cry_in ? 36'o000001000000 :
+		0;
+
 	// hold the cry out temporarily
 	reg cry0, cry1;
 
@@ -1165,14 +1201,14 @@ module apr(
 			ar[0:17] <= 0;
 		if(arrt_clr)
 			ar[18:35] <= 0;
-		if(ar_cry_initiate) begin
-			cry1 <= (ar[1:35] + { ar_mb_cry[2:35], 1'b0 }) + 36'o0 >> 35;
-			{cry0, ar} <= ar + { ar_mb_cry[1:35], 1'b0 };
+		if(ar_cry_in) begin
+			cry1 <= (ar[1:35] + ar_cry_in[1:35]) + 36'o0 >> 35;
+			{cry0, ar} <= ar + ar_cry_in;
 		end
 		if(arlt_com)
 			ar[0:17] <= ~ar[0:17];
 		if(arrt_com)
-			ar[0:17] <= ~ar[0:17];
+			ar[18:35] <= ~ar[18:35];
 		if(arlt_fm_mb_xor)
 			ar[0:17] <= ar[0:17] ^ mb[0:17];
 		if(arrt_fm_mb_xor)
@@ -1199,9 +1235,19 @@ module apr(
 			ar[0:17] <= ar[0:17] | iob[0:17];
 		if(arrt_fm_iob1)
 			ar[18:35] <= ar[18:35] | iob[18:35];
+		if(ar1_8_clr)
+			ar[1:8] <= 0;
+		if(ar1_8_set)
+			ar[1:8] <= 8'o377;
+		if(ar_fm_sc1_8J)
+			ar[1:8] <= sc;
+		if(ar0_5_fm_sc3_8J)
+			ar[0:5] <= sc[3:8];
 
 		if(mr_clr | ar_t3)
 			ar_com_cont <= 0;
+		if(ar_as_t0 | ar_incdec_t0)
+			ar_com_cont <= 1;
 		if(ar_flag_clr) begin
 			ar_pc_chg_flag <= 0;
 			ar_ov_flag <= 0;
@@ -1327,20 +1373,31 @@ module apr(
 	wire fe_fm_mb0_5_1 = 0;
 
 	reg [0:8] sc;
-	wire sc_clr = 0;
-	wire sc_inc = 0;
-	wire sc_com = 0;
+	wire sc_clr = mr_clr | cht4 | cht8a |
+		fat5a | fpt3 | mst5 | dst20 |
+		cht6 & ch_inc_op;
+	wire sc_inc = fpt2 | fat2 | sht0 | fst1 | nrt0 |
+		sct1 | mst2 | dst14a | nrt2;
+	wire sc_com = cht8b | cht5 | fat3 | nrt1 | lct0 | dct0 |
+		et1 & ir_fsc & ~ar[0] |
+		fpt1 & fp_ar0_xor_fmf1 |
+		fat0 & ~ar0_xor_mb0 |
+		fpt1a & ~fp_ar0_xor_mb0_xor_fmf1 |
+		sht1 & mb[18] |
+		fpt1b & fp_mb0_eq_fmf1 |
+		fat7 & mb[0] |
+		nrt3 & (~ar[0] | nr_round);
 	wire sc_pad = 0;
 	wire sc_cry = 0;
 	wire sc_fm_fe1 = 0;
-	wire sc_fm_mb18_28_35_0 = 0;
+	wire sc_fm_mb18_28_35_0 = et0a & (fsc | shift_op);
 	wire sc_mb0_5_0_enable = 0;
 	wire sc_mb6_11_1_enable = 0;
 	wire sc_ar0_8_1_enable = 0;
 	wire sc_mb0_8_1_enable = 0;
-	// TODO: figure out what's going on here...
-	wire sc_eq_777 = 0;
-	wire sc0_2_eq_7 = 0;
+	// TODO: what the hell is sc8b?
+	wire sc_eq_777 = sc == 9'o777;
+	wire sc0_2_eq_7 = sc[0:2] == 3'o7;
 
 	wire sat0 = 0;
 	wire sat1 = 0;
@@ -1348,9 +1405,51 @@ module apr(
 	wire sat21 = 0;
 	wire sat3 = 0;
 
-	wire sct0 = 0;
-	wire sct1 = 0;
-	wire sct2 = 0;
+	wire sct0;
+	wire sct1;
+	wire sct2;
+
+	pa sc_pa0(.clk(clk), .reset(reset),
+		.in(lct0 | dct0 | sht1 | fat5 |
+		    cht8b & ~ir_cao),
+		.p(sct0));
+	pa sc_pa1(.clk(clk), .reset(reset),
+		.in((sct0_D | sct1_D) & ~sc_eq_777),
+		.p(sct1));
+	pa sc_pa2(.clk(clk), .reset(reset),
+		.in((sct0_D | sct1_D) & sc_eq_777),
+		.p(sct2));
+
+	wire sct0_D, sct1_D;
+	dly200ns sc_dly0(.clk(clk), .reset(reset),
+		.in(sct0),
+		.p(sct0_D));
+	// should be 75ns
+	dly70ns sc_dly1(.clk(clk), .reset(reset),
+		.in(sct1),
+		.p(sct1_D));
+
+	always @(posedge clk) begin
+		if(fe_clr)
+			fe <= 0;
+		if(fe_fm_sc1)
+			fe <= fe | sc;
+		if(fe_fm_mb0_5_1)
+			fe <= fe | { 3'b0, mb[0:5]};
+
+		if(sc_clr)
+			sc <= 0;
+		if(sc_inc)
+			sc <= sc + 1;
+		if(sc_com)
+			sc <= ~sc;
+		// TODO: sc_pad, sc_cry
+		if(sc_fm_fe1)
+			sc <= sc | fe;
+		if(sc_fm_mb18_28_35_0)
+			sc <= sc | ~{ mb[18], mb[28:35] };
+		// TODO: single bits
+	end
 
 	/*
 	 * CFAC
@@ -1363,10 +1462,14 @@ module apr(
 	wire cfac_mb_ar_swap = 0;
 	wire cfac_ar_com = 0;
 	wire cfac_overflow = 0;
-	wire cfac_ar_sh_lt = 0;
-	wire cfac_mq_sh_lt = 0;
-	wire cfac_ar_sh_rt = 0;
-	wire cfac_mq_sh_rt = 0;
+	wire cfac_ar_sh_lt = dst14a | nrt2 |
+		sct1 & (dcf1 | shift_op & ~mb[18]);
+	wire cfac_mq_sh_lt = dst14a | nrt2 | dst10b |
+		sct1 & (dcf1 | chf4 | shift_op & ~mb[18]);
+	wire cfac_ar_sh_rt = nrt0 | mst2 | dst16 | dst10a | fdt1 |
+		sct1 & (faf3 | lcf1 | shift_op & mb[18]);
+	wire cfac_mq_sh_rt = nrt0 | mst2 | mst5 | fdt1 |
+		sct1 & (faf3 | shift_op & mb[18]);
 
 	/*
 	 * BLT
@@ -1462,9 +1565,31 @@ module apr(
 		ir_rot | ir_rotc;
 	wire sh_ac_2 = ir_ashc | ir_lshc | ir_rotc;
 
-	wire sht0 = 0;
-	wire sht1 = 0;
-	wire sht1a = 0;
+	wire sht0;
+	wire sht1;
+	wire sht1a;
+
+	pa sh_p0(.clk(clk), .reset(reset),
+		.in(et1 & shift_op & mb[18]),
+		.p(sht0));
+	pa sh_p1(.clk(clk), .reset(reset),
+		.in(et3_D & shift_op),
+		.p(sht1));
+	pa sh_p2(.clk(clk), .reset(reset),
+		.in(sct2 & shf1),
+		.p(sht1a));
+
+	wire et3_D;
+	dly100ns sh_dly(.clk(clk), .reset(reset),
+		.in(et3),
+		.p(et3_D));
+
+	always @(posedge clk) begin
+		if(mp_clr | sht1a)
+			shf1 <= 0;
+		if(sht1)
+			shf1 <= 1;
+	end
 
 	/*
 	 * MP
@@ -1476,6 +1601,11 @@ module apr(
 	wire mpt0a = 0;
 	wire mpt1 = 0;
 	wire mpt2 = 0;
+
+	always @(posedge clk) begin
+		if(mp_clr | mpt0a)
+			mpf1 <= 0;
+	end
 
 	/*
 	 * FA
@@ -1501,6 +1631,17 @@ module apr(
 	wire fat9 = 0;
 	wire fat10 = 0;
 
+	always @(posedge clk) begin
+		if(mp_clr | fat1b | fat10)
+			faf1 <= 0;
+		if(mp_clr | fat1a)
+			faf2 <= 0;
+		if(mp_clr | fat5a)
+			faf3 <= 0;
+		if(mp_clr | fat10)
+			faf4 <= 0;
+	end
+
 	/*
 	 * FM
 	 */
@@ -1510,6 +1651,13 @@ module apr(
 	wire fmt0 = 0;
 	wire fmt0a = 0;
 	wire fmt0b = 0;
+
+	always @(posedge clk) begin
+		if(mp_clr | fmt0a)
+			fmf1 <= 0;
+		if(mp_clr | fmt0b)
+			fmf2 <= 0;
+	end
 
 	/*
 	 * FD
@@ -1521,6 +1669,13 @@ module apr(
 	wire fdt0a = 0;
 	wire fdt0b = 0;
 	wire fdt1 = 0;
+
+	always @(posedge clk) begin
+		if(mp_clr | fdt0a)
+			fdf1 <= 0;
+		if(mp_clr | fdt0b)
+			fdf2 <= 0;
+	end
 
 	/*
 	 * FP
@@ -1541,6 +1696,13 @@ module apr(
 	wire fpt3 = 0;
 	wire fpt4 = 0;
 
+	always @(posedge clk) begin
+		if(mp_clr | fpt1a)
+			fpf1 <= 0;
+		if(mp_clr | fpt1b)
+			fpf2 <= 0;
+	end
+
 	/*
 	 * MS
 	 */
@@ -1554,6 +1716,11 @@ module apr(
 	wire mst4 = 0;
 	wire mst5 = 0;
 	wire mst6 = 0;
+
+	always @(posedge clk) begin
+		if(mp_clr | mst3a)
+			msf1 <= 0;
+	end
 
 	/*
 	 * DS
@@ -1579,6 +1746,7 @@ module apr(
 	wire dst3 = 0;
 	wire dst4 = 0;
 	wire dst5 = 0;
+	wire dst5a = 0;
 	wire dst6 = 0;
 	wire dst7 = 0;
 	wire dst8 = 0;
@@ -1599,11 +1767,33 @@ module apr(
 	wire dst17a = 0;
 	wire dst18 = 0;
 	wire dst19 = 0;
+	wire dst19a = 0;
 	wire dst20 = 0;
 	wire dst21 = 0;
 	wire dst21a = 0;
 
 	wire ds_div_t0 = 0;
+
+	always @(posedge clk) begin
+		if(ds_clr | dst0a)
+			dsf1 <= 0;
+		if(ds_clr | dst5a)
+			dsf2 <= 0;
+		if(ds_clr | dst10)
+			dsf3 <= 0;
+		if(ds_clr | dst11a)
+			dsf4 <= 0;
+		if(ds_clr | dst14a)
+			dsf5 <= 0;
+		if(ds_clr | dst17a)
+			dsf6 <= 0;
+		if(mr_clr)
+			dsf7 <= 0;
+		if(ds_clr | dst19a)
+			dsf8 <= 0;
+		if(ds_clr | dst21a)
+			dsf9 <= 0;
+	end
 
 	/*
 	 * NR
@@ -1626,6 +1816,15 @@ module apr(
 	wire nrt5 = 0;
 	wire nrt5a = 0;
 	wire nrt6 = 0;
+
+	always @(posedge clk) begin
+		if(mp_clr | nrt5a)
+			nrf1 <= 0;
+		if(mp_clr) begin
+			nrf2 <= 0;
+			nrf3 <= 0;
+		end
+	end
 
 	/*
 	 * MA
@@ -1709,6 +1908,10 @@ module apr(
 		if(ex_clr) begin
 			pr <= 0;
 			rlr <= 0;
+		end
+		if(ex_set) begin
+			pr <= pr | iob[0:7];
+			rlr <= rlr | iob[18:25];
 		end
 	end
 
@@ -1926,31 +2129,82 @@ module apr(
 	wire iot_outgoing = iot_datao | iot_cono;
 	wire iot_status = iot_coni | iot_consz | iot_conso;
 	wire iot_datai_o = iot_datai | iot_datao;
-	wire iot_init_setup = 0;
-	wire iot_final_setup = 0;
+	wire iot_init_setup;
+	wire iot_restart;
+	wire iot_final_setup;
+	wire iot_reset;
 
 	wire iot_t0 = 0;
 	wire iot_t0a = 0;
-	wire iot_t2 = 0;
-	wire iot_t3 = 0;
-	wire iot_t3a = 0;
-	wire iot_t4 = 0;
+	wire iot_t2;
+	wire iot_t3;
+	wire iot_t3a;
+	wire iot_t4;
+
+	wire iot_go_P;
+	pg iot_pg0(.clk(clk), .reset(reset),
+		.in(iot_go & ~iot_reset),
+		.p(iot_go_P));
+
+	assign iobus_iob_poweron = sw_power;
+	pa iot_pa0(.clk(clk), .reset(reset),
+		.in(mr_start | cpa_cono_set & iob[19]),
+		.p(iobus_iob_reset));
+	pa iot_pa1(.clk(clk), .reset(reset),
+		.in(iot_t2 & iot_cono),
+		.p(iobus_cono_clear));
+	pa iot_pa2(.clk(clk), .reset(reset),
+		.in(iot_t3 & iot_cono),
+		.p(iobus_cono_set));
+	pa iot_pa3(.clk(clk), .reset(reset),
+		.in(iot_t2 & iot_datao),
+		.p(iobus_datao_clear));
+	pa iot_pa4(.clk(clk), .reset(reset),
+		.in(iot_t3 & iot_datao),
+		.p(iobus_datao_set));
+	assign iobus_iob_fm_datai = iot_datai & iot_drive;
+	assign iobus_iob_fm_status = iot_status & iot_drive;
+	wire iob_fm_ar1 = iot_outgoing & iot_drive;
 
 	wire iot_t0a_D;
 	dly200ns iot_dly0(.clk(clk), .reset(reset),
 		.in(iot_t0a),
 		.p(iot_t0a_D));
+	ldly1us iot_dly1(.clk(clk), .reset(reset),
+		.in(iot_go_P),
+		.p(iot_t2),
+		.l(iot_init_setup));
+	ldly1_5us iot_dly2(.clk(clk), .reset(reset),
+		.in(iot_t2),
+		.p(iot_t3a),
+		.l(iot_final_setup));
+	ldly2us iot_dly3(.clk(clk), .reset(reset),
+		.in(iot_t3a),
+		.p(iot_t4),
+		.l(iot_reset));
+	ldly1us iot_dly4(.clk(clk), .reset(reset),
+		.in(iot_t2),
+		.p(iot_t3),
+		.l(iot_restart));
+	wire iot_drive = iot_init_setup | iot_final_setup | iot_t2;
+
+	always @(posedge clk) begin
+		if(mr_clr | iot_t2)
+			iot_go <= 0;
+		if(et4 & ir_iot & ~iot_blk)
+			iot_go <= 1;
+
+		if(mr_clr | iot_t0a)
+			iot_f0a <= 0;
+		if(iot_t0)
+			iot_f0a <= 1;
+	end
 
 	/* IOB */
-	assign iobus_iob_poweron = 0;
-	assign iobus_iob_reset = 0;
-	assign iobus_datao_clear = 0;
-	assign iobus_datao_set = 0;
-	assign iobus_cono_clear = 0;
-	assign iobus_cono_set = 0;
-	assign iobus_iob_fm_datai = 0;
-	assign iobus_iob_fm_status = 0;
-	assign iobus_iob_out = 0;
+	assign iobus_iob_out = iob_fm_ar1 ? ar :
+		cpa_status ? cpa_iob :
+		pi_status ? pi_iob :
+		0;
 	wire [0:35] iob = iobus_iob_in;
 
 	/*
@@ -2038,6 +2292,8 @@ module apr(
 	wire pi_sync;
 	wire pi_reset;
 
+	wire [0:35] pi_iob = { 28'b0, pi_active, pio };
+
 	pa pi_pa0(.clk(clk), .reset(reset),
 		.in(it0 | at0),
 		.p(pi_sync));
@@ -2082,8 +2338,9 @@ module apr(
 	reg cpa_arov_enable;
 	reg [33:35] cpa_pia;
 	wire cpa = iobus_ios == 0;
-	wire cpa_cono_set = 0;
-	wire cpa_status = 0;
+	wire cpa_cono_set = cpa & iobus_cono_set;
+	wire cpa_status = cpa & iobus_iob_fm_status;
+	wire cpa_clock_flag_set = 0;
 
 	wire cpa_req_enable = cpa_illeg_op | cpa_non_exist_mem | cpa_pdl_ov |
 		cpa_clock_enable & cpa_clock_flag |
@@ -2093,6 +2350,13 @@ module apr(
 	genvar j;
 	for(j = 1; j <= 7; j = j + 1)
 		assign cpa_req[j] = cpa_req_enable & (cpa_pia == j);
+
+	wire [0:35] cpa_iob = { 18'b0,
+		1'b0, cpa_pdl_ov, cpa_iot_user, ex_user,
+		cpa_illeg_op, cpa_non_exist_mem, 1'b0, cpa_clock_enable,
+		cpa_clock_flag, 1'b0, cpa_pc_chg_enable, ar_pc_chg_flag,
+		1'b0, cpa_arov_enable, ar_ov_flag,
+		cpa_pia };
 
 	always @(posedge clk) begin
 		if(mr_start) begin
@@ -2106,6 +2370,47 @@ module apr(
 			cpa_arov_enable <= 0;
 			cpa_pia <= 0;
 		end
+
+		if(cpa_cono_set & iob[21])
+			cpa_iot_user <= 0;
+		if(cpa_cono_set & iob[20])
+			cpa_iot_user <= 1;
+
+		if(cpa_cono_set & iob[22])
+			cpa_illeg_op <= 0;
+		if(mc_illeg_address)
+			cpa_illeg_op <= 1;
+
+		if(cpa_cono_set & iob[23])
+			cpa_non_exist_mem <= 0;
+		if(mc_non_exist_mem)
+			cpa_non_exist_mem <= 1;
+
+		if(cpa_cono_set & iob[24])
+			cpa_clock_enable <= 0;
+		if(cpa_cono_set & iob[25])
+			cpa_clock_enable <= 1;
+		if(cpa_cono_set & iob[26])
+			cpa_clock_flag <= 0;
+		if(cpa_clock_flag_set)
+			cpa_clock_flag <= 1;
+
+		if(cpa_cono_set & iob[27])
+			cpa_pc_chg_enable <= 0;
+		if(cpa_cono_set & iob[28])
+			cpa_pc_chg_enable <= 1;
+		if(cpa_cono_set & iob[18])
+			cpa_pdl_ov <= 0;
+		if(et10 & mb_ar_swap_et10 & ar_cry0)
+			cpa_pdl_ov <= 1;
+
+		if(cpa_cono_set & iob[30])
+			cpa_arov_enable <= 0;
+		if(cpa_cono_set & iob[31])
+			cpa_arov_enable <= 1;
+
+		if(cpa_cono_set)
+			cpa_pia <= iob[33:35];
 	end
 
 endmodule

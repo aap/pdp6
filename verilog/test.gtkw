@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.76 (w)1999-2016 BSI
-[*] Wed Nov 16 16:03:38 2016
+[*] Sun Nov 20 23:19:44 2016
 [*]
 [dumpfile] "/home/aap/src/pdp6/verilog/dump.vcd"
-[dumpfile_mtime] "Wed Nov 16 16:02:55 2016"
-[dumpfile_size] 275421
+[dumpfile_mtime] "Sun Nov 20 15:05:49 2016"
+[dumpfile_size] 137687
 [savefile] "/home/aap/src/pdp6/verilog/test.gtkw"
-[timestart] 5380
+[timestart] 4220
 [size] 1920 1080
 [pos] -1 -1
-*-11.385187 13535 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-7.832355 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] test.
 [treeopen] test.pdp6.
 [treeopen] test.pdp6.mem0.
@@ -129,11 +129,14 @@ test.pdp6.apr0.mc_illeg_address
 test.pdp6.apr0.mc_membus_fm_mb1
 @200
 -
-@30
-test.pdp6.apr0.rlr[18:25]
-test.pdp6.apr0.rla[18:25]
-test.pdp6.apr0.pr[18:25]
 @28
+test.pdp6.apr0.ex_clr
+test.pdp6.apr0.ex_set
+test.pdp6.apr0.rlr[18:25]
+@30
+test.pdp6.apr0.rla[18:25]
+@28
+test.pdp6.apr0.pr[18:25]
 test.pdp6.apr0.pr18_ok
 @200
 -
@@ -147,7 +150,7 @@ test.pdp6.apr0.mc_split_cyc_sync
 test.pdp6.apr0.mc_mb_membus_enable
 @1401200
 -MC
-@c00201
+@c00200
 -I A
 @28
 test.pdp6.apr0.it0
@@ -164,7 +167,7 @@ test.pdp6.apr0.at3a
 test.pdp6.apr0.af3a
 test.pdp6.apr0.at4
 test.pdp6.apr0.at5
-@1401201
+@1401200
 -I A
 @c00200
 -F
@@ -191,7 +194,7 @@ test.pdp6.apr0.ft6a
 test.pdp6.apr0.ft7
 @1401200
 -F
-@800200
+@c00200
 -E
 @28
 test.pdp6.apr0.et0a
@@ -205,9 +208,9 @@ test.pdp6.apr0.et7
 test.pdp6.apr0.et8
 test.pdp6.apr0.et9
 test.pdp6.apr0.et10
-@1000200
+@1401200
 -E
-@800200
+@c00200
 -S
 @28
 test.pdp6.apr0.s_ac_0
@@ -224,7 +227,7 @@ test.pdp6.apr0.st5a
 test.pdp6.apr0.st6
 test.pdp6.apr0.sf7
 test.pdp6.apr0.st7
-@1000200
+@1401200
 -S
 @c00200
 -iobus
@@ -343,9 +346,48 @@ test.pdp6.apr0.pi_req[1:7]
 test.pdp6.apr0.pih[1:7]
 test.pdp6.apr0.pir[1:7]
 test.pdp6.apr0.pio[1:7]
+test.pdp6.apr0.pi_select
+@30
+test.pdp6.apr0.pi_iob[0:35]
+@28
 test.pdp6.apr0.iob_pi_req[1:7]
 @1401200
 -PI
+@c00200
+-IOT
+@28
+test.pdp6.apr0.iot_go
+test.pdp6.apr0.iot_go_P
+@200
+-
+@28
+test.pdp6.apr0.iot_t0
+test.pdp6.apr0.iot_f0a
+test.pdp6.apr0.iot_t0a
+test.pdp6.apr0.iot_init_setup
+test.pdp6.apr0.iot_t2
+test.pdp6.apr0.iot_final_setup
+test.pdp6.apr0.iot_drive
+test.pdp6.apr0.iot_t3a
+test.pdp6.apr0.iot_reset
+test.pdp6.apr0.iot_t4
+test.pdp6.apr0.iot_t3
+test.pdp6.apr0.iot_restart
+@200
+-
+@28
+test.pdp6.apr0.iot_blki
+test.pdp6.apr0.iot_datai
+test.pdp6.apr0.iot_blko
+test.pdp6.apr0.iot_datao
+test.pdp6.apr0.iot_coni
+test.pdp6.apr0.iot_cono
+test.pdp6.apr0.iot_consz
+test.pdp6.apr0.iot_conso
+@1401200
+-IOT
+@800200
+-misc
 @28
 test.pdp6.apr0.ar_com_cont
 test.pdp6.apr0.ar_add
@@ -365,5 +407,35 @@ test.pdp6.apr0.pc_inc_et9
 test.pdp6.apr0.pc_inc_inh_et0
 test.pdp6.apr0.pc_set_OR_pc_inc
 test.pdp6.apr0.pc_set_enable
+@1000200
+-misc
+@c00200
+-cpa
+@28
+test.pdp6.apr0.cpa
+test.pdp6.apr0.cpa_cono_set
+test.pdp6.apr0.cpa_status
+@200
+-
+@28
+test.pdp6.apr0.cpa_iot_user
+test.pdp6.apr0.cpa_illeg_op
+test.pdp6.apr0.cpa_non_exist_mem
+test.pdp6.apr0.cpa_clock_enable
+test.pdp6.apr0.cpa_clock_flag
+test.pdp6.apr0.cpa_pc_chg_enable
+test.pdp6.apr0.cpa_pdl_ov
+test.pdp6.apr0.cpa_arov_enable
+test.pdp6.apr0.cpa_pia[33:35]
+@30
+test.pdp6.apr0.cpa_iob[0:35]
+@200
+-
+@28
+test.pdp6.apr0.iob_pi_req[1:7]
+test.pdp6.apr0.iobus_pi_req[1:7]
+test.pdp6.apr0.cpa_req[1:7]
+@1401200
+-cpa
 [pattern_trace] 1
 [pattern_trace] 0
