@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.76 (w)1999-2016 BSI
-[*] Sun Nov 20 23:19:44 2016
+[*] Mon Nov 21 10:43:37 2016
 [*]
 [dumpfile] "/home/aap/src/pdp6/verilog/dump.vcd"
-[dumpfile_mtime] "Sun Nov 20 15:05:49 2016"
-[dumpfile_size] 137687
+[dumpfile_mtime] "Mon Nov 21 10:38:44 2016"
+[dumpfile_size] 250577
 [savefile] "/home/aap/src/pdp6/verilog/test.gtkw"
-[timestart] 4220
+[timestart] 4906
 [size] 1920 1080
 [pos] -1 -1
-*-7.832355 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-7.734977 5505 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] test.
 [treeopen] test.pdp6.
 [treeopen] test.pdp6.mem0.
@@ -60,6 +60,8 @@ test.pdp6.apr0.ir[0:17]
 test.pdp6.apr0.mb[0:35]
 test.pdp6.apr0.ar[0:35]
 test.pdp6.apr0.mq[0:35]
+test.pdp6.apr0.sc[0:8]
+test.pdp6.apr0.fe[0:8]
 test.pdp6.apr0.datasw[0:35]
 test.pdp6.apr0.mas[18:35]
 @1000200
@@ -386,7 +388,7 @@ test.pdp6.apr0.iot_consz
 test.pdp6.apr0.iot_conso
 @1401200
 -IOT
-@800200
+@c00200
 -misc
 @28
 test.pdp6.apr0.ar_com_cont
@@ -407,7 +409,7 @@ test.pdp6.apr0.pc_inc_et9
 test.pdp6.apr0.pc_inc_inh_et0
 test.pdp6.apr0.pc_set_OR_pc_inc
 test.pdp6.apr0.pc_set_enable
-@1000200
+@1401200
 -misc
 @c00200
 -cpa
@@ -437,5 +439,21 @@ test.pdp6.apr0.iobus_pi_req[1:7]
 test.pdp6.apr0.cpa_req[1:7]
 @1401200
 -cpa
+@800200
+-shift
+@28
+test.pdp6.apr0.sht0
+test.pdp6.apr0.sht1
+test.pdp6.apr0.shf1
+@29
+test.pdp6.apr0.sht1a
+@200
+-
+@28
+test.pdp6.apr0.sct0
+test.pdp6.apr0.sct1
+test.pdp6.apr0.sct2
+@1000200
+-shift
 [pattern_trace] 1
 [pattern_trace] 0

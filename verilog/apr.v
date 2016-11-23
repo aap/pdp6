@@ -450,7 +450,7 @@ module apr(
 		    ar_t3 & et4_ar_pse),
 		.p(et4));
 	pa e_pa5(.clk(clk), .reset(reset),
-		.in(et4_D & ~et5_inh /* XXX | iot_t3_D*/),
+		.in(et4_D & ~et5_inh | iot_t3_D),
 		.p(et5));
 	pa e_pa6(.clk(clk), .reset(reset),
 		.in(et5_D & e_long),
@@ -2134,8 +2134,8 @@ module apr(
 	wire iot_final_setup;
 	wire iot_reset;
 
-	wire iot_t0 = 0;
-	wire iot_t0a = 0;
+	wire iot_t0;
+	wire iot_t0a;
 	wire iot_t2;
 	wire iot_t3;
 	wire iot_t3a;
@@ -2162,6 +2162,12 @@ module apr(
 	pa iot_pa4(.clk(clk), .reset(reset),
 		.in(iot_t3 & iot_datao),
 		.p(iobus_datao_set));
+	pa iot_pa5(.clk(clk), .reset(reset),
+		.in(et4 & iot_blk),
+		.p(iot_t0));
+	pa iot_pa6(.clk(clk), .reset(reset),
+		.in(mc_rs_t1 & iot_f0a),
+		.p(iot_t0a));
 	assign iobus_iob_fm_datai = iot_datai & iot_drive;
 	assign iobus_iob_fm_status = iot_status & iot_drive;
 	wire iob_fm_ar1 = iot_outgoing & iot_drive;
