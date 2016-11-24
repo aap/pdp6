@@ -1,18 +1,18 @@
 [*]
 [*] GTKWave Analyzer v3.3.76 (w)1999-2016 BSI
-[*] Mon Nov 21 10:43:37 2016
+[*] Thu Nov 24 10:04:34 2016
 [*]
 [dumpfile] "/home/aap/src/pdp6/verilog/dump.vcd"
-[dumpfile_mtime] "Mon Nov 21 10:38:44 2016"
-[dumpfile_size] 250577
+[dumpfile_mtime] "Thu Nov 24 09:54:12 2016"
+[dumpfile_size] 223600
 [savefile] "/home/aap/src/pdp6/verilog/test.gtkw"
-[timestart] 4906
+[timestart] 4587
 [size] 1920 1080
 [pos] -1 -1
-*-7.734977 5505 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-10.555068 11855 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] test.
 [treeopen] test.pdp6.
-[treeopen] test.pdp6.mem0.
+[treeopen] test.pdp6.fmem0.
 [sst_width] 337
 [signals_width] 442
 [sst_expanded] 1
@@ -181,6 +181,9 @@ test.pdp6.apr0.f_c_c_aclt
 test.pdp6.apr0.f_c_c_acrt
 test.pdp6.apr0.f_ac_2
 test.pdp6.apr0.f_ac_2_etc
+@200
+-
+@28
 test.pdp6.apr0.ft0
 test.pdp6.apr0.ft1
 test.pdp6.apr0.f1a
@@ -203,7 +206,9 @@ test.pdp6.apr0.et0a
 test.pdp6.apr0.et0
 test.pdp6.apr0.et1
 test.pdp6.apr0.et3
+test.pdp6.apr0.et4_inh
 test.pdp6.apr0.et4
+test.pdp6.apr0.et5_inh
 test.pdp6.apr0.et5
 test.pdp6.apr0.et6
 test.pdp6.apr0.et7
@@ -212,12 +217,14 @@ test.pdp6.apr0.et9
 test.pdp6.apr0.et10
 @1401200
 -E
-@c00200
+@800200
 -S
 @28
 test.pdp6.apr0.s_ac_0
 test.pdp6.apr0.s_ac_2
+@29
 test.pdp6.apr0.s_ac_inh
+@28
 test.pdp6.apr0.s_ac_inh_if_ac_0
 test.pdp6.apr0.st1
 test.pdp6.apr0.st2
@@ -229,7 +236,7 @@ test.pdp6.apr0.st5a
 test.pdp6.apr0.st6
 test.pdp6.apr0.sf7
 test.pdp6.apr0.st7
-@1401200
+@1000200
 -S
 @c00200
 -iobus
@@ -271,6 +278,49 @@ test.pdp6.apr0.mc_non_exist_mem_rst
 test.pdp6.apr0.mc_non_exist_rd
 @1401200
 -membus
+@c00030
+test.fmem0scope[0:35]
+@28
+(0)test.fmem0scope[0:35]
+(1)test.fmem0scope[0:35]
+(2)test.fmem0scope[0:35]
+(3)test.fmem0scope[0:35]
+(4)test.fmem0scope[0:35]
+(5)test.fmem0scope[0:35]
+(6)test.fmem0scope[0:35]
+(7)test.fmem0scope[0:35]
+(8)test.fmem0scope[0:35]
+(9)test.fmem0scope[0:35]
+(10)test.fmem0scope[0:35]
+(11)test.fmem0scope[0:35]
+(12)test.fmem0scope[0:35]
+(13)test.fmem0scope[0:35]
+(14)test.fmem0scope[0:35]
+(15)test.fmem0scope[0:35]
+(16)test.fmem0scope[0:35]
+(17)test.fmem0scope[0:35]
+(18)test.fmem0scope[0:35]
+(19)test.fmem0scope[0:35]
+(20)test.fmem0scope[0:35]
+(21)test.fmem0scope[0:35]
+(22)test.fmem0scope[0:35]
+(23)test.fmem0scope[0:35]
+(24)test.fmem0scope[0:35]
+(25)test.fmem0scope[0:35]
+(26)test.fmem0scope[0:35]
+(27)test.fmem0scope[0:35]
+(28)test.fmem0scope[0:35]
+(29)test.fmem0scope[0:35]
+(30)test.fmem0scope[0:35]
+(31)test.fmem0scope[0:35]
+(32)test.fmem0scope[0:35]
+(33)test.fmem0scope[0:35]
+(34)test.fmem0scope[0:35]
+(35)test.fmem0scope[0:35]
+@1401200
+-group_end
+@30
+test.mem0scope[0:35]
 @c00200
 -mem0
 @28
@@ -332,6 +382,21 @@ test.pdp6.mem0.cmc_t11
 test.pdp6.mem0.cmc_t12
 @1401200
 -mem0
+@c00200
+-fmem0
+@28
+test.pdp6.fmem0.fma_rd_rq
+test.pdp6.fmem0.fma_wr_rq
+@200
+-
+@28
+test.pdp6.fmem0.fmct0
+test.pdp6.fmem0.fmct1
+test.pdp6.fmem0.fmct3
+test.pdp6.fmem0.fmct4
+test.pdp6.fmem0.fmct5
+@1401200
+-fmem0
 @28
 test.pdp6.apr0.at1_inh
 test.pdp6.apr0.ia_NOT_int
@@ -439,13 +504,12 @@ test.pdp6.apr0.iobus_pi_req[1:7]
 test.pdp6.apr0.cpa_req[1:7]
 @1401200
 -cpa
-@800200
+@c00200
 -shift
 @28
 test.pdp6.apr0.sht0
 test.pdp6.apr0.sht1
 test.pdp6.apr0.shf1
-@29
 test.pdp6.apr0.sht1a
 @200
 -
@@ -453,7 +517,27 @@ test.pdp6.apr0.sht1a
 test.pdp6.apr0.sct0
 test.pdp6.apr0.sct1
 test.pdp6.apr0.sct2
-@1000200
+@1401200
 -shift
+@800200
+-BLT
+@28
+test.pdp6.apr0.blt_last
+test.pdp6.apr0.blt_done
+test.pdp6.apr0.blt_t0
+test.pdp6.apr0.blt_f0a
+test.pdp6.apr0.blt_t0a
+test.pdp6.apr0.blt_t1
+test.pdp6.apr0.blt_t2
+test.pdp6.apr0.blt_t3
+test.pdp6.apr0.blt_f3a
+test.pdp6.apr0.blt_t3a
+test.pdp6.apr0.blt_t4
+test.pdp6.apr0.blt_t5
+test.pdp6.apr0.blt_f5a
+test.pdp6.apr0.blt_t5a
+test.pdp6.apr0.blt_t6
+@1000200
+-BLT
 [pattern_trace] 1
 [pattern_trace] 0

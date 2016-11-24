@@ -76,7 +76,7 @@ module core161c(
 	reg cmc_pse_sync;
 	reg cmc_stop;
 
-	reg [0:36] core[0:040000];
+	reg [0:35] core[0:040000];
 
 	wire cyc_rq_p0 = memsel_p0 == membus_sel_p0 &
 		~membus_fmc_select_p0 & membus_rq_cyc_p0;

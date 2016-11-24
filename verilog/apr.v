@@ -335,8 +335,8 @@ module apr(
 	wire ft6;
 	wire ft6a;
 	wire ft7;
-	wire f_c_c_aclt = jp_pop | jp_popj;
-	wire f_c_c_acrt = jp_jra | ir_blt;
+	wire f_c_c_aclt = jp_jra | ir_blt;
+	wire f_c_c_acrt = jp_pop | jp_popj;
 	wire f_ac_2 = sh_ac_2 | ir_md_f_ac_2;
 	wire f_c_c_aclt_OR_rt = f_c_c_aclt | f_c_c_acrt;
 	wire f_ac_2_etc = f_c_c_aclt_OR_rt | f_ac_2;
@@ -1458,7 +1458,9 @@ module apr(
 	wire cfac_ar_add = 0;
 	wire cfac_ar_sub = 0;
 	wire cfac_mb_fm_mqJ = 0;
-	wire cfac_mb_mq_swap = 0;
+	wire cfac_mb_mq_swap = dst2 | dst3 | dst7 |
+		dst9 | dst19a | dst21a |
+		blt_t0 | blt_t3a | blt_t5;
 	wire cfac_mb_ar_swap = 0;
 	wire cfac_ar_com = 0;
 	wire cfac_overflow = 0;
@@ -1477,24 +1479,89 @@ module apr(
 	reg blt_f0a;
 	reg blt_f3a;
 	reg blt_f5a;
-	wire blt_done = 0;
-	wire blt_last = 0;
+	wire blt_done = ~mq[0] | pi_rq;
+	wire blt_last = ir_blt & ~mq[0];
 
-	wire blt_t0 = 0;
-	wire blt_t0a = 0;
-	wire blt_t1 = 0;
-	wire blt_t2 = 0;
-	wire blt_t3 = 0;
-	wire blt_t3a = 0;
-	wire blt_t4 = 0;
-	wire blt_t5 = 0;
-	wire blt_t5a = 0;
-	wire blt_t6 = 0;
+	wire blt_t0;
+	wire blt_t0a;
+	wire blt_t1;
+	wire blt_t2;
+	wire blt_t3;
+	wire blt_t3a;
+	wire blt_t4;
+	wire blt_t5;
+	wire blt_t5a;
+	wire blt_t6;
 
-	wire blt_t6_D;
+	pa blt_pa0(.clk(clk), .reset(reset),
+		.in(et3 & ir_blt),
+		.p(blt_t0));
+	pa blt_pa1(.clk(clk), .reset(reset),
+		.in(mc_rs_t1 & blt_f0a),
+		.p(blt_t0a));
+	pa blt_pa2(.clk(clk), .reset(reset),
+		.in(blt_t0a_D),
+		.p(blt_t1));
+	pa blt_pa3(.clk(clk), .reset(reset),
+		.in(blt_t1_D),
+		.p(blt_t2));
+	pa blt_pa4(.clk(clk), .reset(reset),
+		.in(blt_t2_D),
+		.p(blt_t3));
+	pa blt_pa5(.clk(clk), .reset(reset),
+		.in(ar_t3 & blt_f3a),
+		.p(blt_t3a));
+	pa blt_pa6(.clk(clk), .reset(reset),
+		.in(blt_t3a_D),
+		.p(blt_t4));
+	pa blt_pa7(.clk(clk), .reset(reset),
+		.in(blt_t4_D),
+		.p(blt_t5));
+	pa blt_pa8(.clk(clk), .reset(reset),
+		.in(ar_t3 & blt_f5a),
+		.p(blt_t5a));
+	pa blt_pa9(.clk(clk), .reset(reset),
+		.in(blt_t5a & ~blt_done),
+		.p(blt_t6));
+
+	wire blt_t0a_D, blt_t1_D;
+	wire blt_t2_D, blt_t3a_D;
+	wire blt_t4_D, blt_t6_D;
 	dly100ns blt_dly0(.clk(clk), .reset(reset),
+		.in(blt_t0a),
+		.p(blt_t0a_D));
+	dly100ns blt_dly1(.clk(clk), .reset(reset),
+		.in(blt_t1),
+		.p(blt_t1_D));
+	dly100ns blt_dly2(.clk(clk), .reset(reset),
+		.in(blt_t2),
+		.p(blt_t2_D));
+	dly100ns blt_dly3(.clk(clk), .reset(reset),
+		.in(blt_t3a),
+		.p(blt_t3a_D));
+	dly100ns blt_dly4(.clk(clk), .reset(reset),
+		.in(blt_t4),
+		.p(blt_t4_D));
+	dly100ns blt_dly5(.clk(clk), .reset(reset),
 		.in(blt_t6),
 		.p(blt_t6_D));
+
+	always @(posedge clk) begin
+		if(mr_clr | blt_t0a)
+			blt_f0a <= 0;
+		if(blt_t0)
+			blt_f0a <= 1;
+
+		if(mr_clr | blt_t3a)
+			blt_f3a <= 0;
+		if(blt_t3)
+			blt_f3a <= 1;
+
+		if(mr_clr | blt_t5a)
+			blt_f5a <= 0;
+		if(blt_t5)
+			blt_f5a <= 1;
+	end
 
 	/*
 	 * FS
