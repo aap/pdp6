@@ -1111,9 +1111,12 @@ pulse(dct1){
 }
 
 pulse(dct0a){
+	word mb;
 	trace("DCT0A\n");
 	apr->dcf1 = 0;			// 6-20
-	swap(&apr->mb, &apr->mq);	// 6-17, 6-13 (dct0b)
+	mb = apr->mq;			// 6-13
+	apr->mq |= apr->mb;		// 6-17 dct0b
+	apr->mb = mb;
 	apr->ar = ~apr->ar & FW;	// 6-17
 	nextpulse(apr, dct1);		// 6-20
 }

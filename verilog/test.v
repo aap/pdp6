@@ -26,7 +26,7 @@ module test;
 	initial begin
 		stop = 0;
 //		#110000 stop = 1;
-		#50000 stop = 1;
+		#20000 stop = 1;
 	end
 	always @(pdp6.apr0.st7)
 		if(pdp6.apr0.st7)
@@ -36,7 +36,7 @@ module test;
 	always @(stop)
 		if(stop) begin: fin
 			integer i;
-			#1000;
+			#4000;
 			for(i = 0; i < 'o20; i = i + 1)
 				$display("%o %o %o", i, pdp6.mem0.core[i], pdp6.fmem0.ff[i]);
 			for(i = 'o1000; i < 'o1010; i = i + 1)
@@ -161,7 +161,7 @@ module test;
 		#20 reset = 0;
 
 		pdp6.datasw = 36'o111777222666;
-		pdp6.mas = 18'o000060;
+		pdp6.mas = 18'o000067;
 
 		for(i = 0; i < 'o40000; i = i + 1)
 			pdp6.mem0.core[i] = 0;
@@ -176,7 +176,10 @@ module test;
 		pdp6.fmem0.ff['o5] = 36'o377777_777777;
 		pdp6.fmem0.ff['o6] = 36'o444000_222000;
 		pdp6.fmem0.ff['o7] = 36'o777776_000010;		// BLK ptr
-		pdp6.fmem0.ff['o10] = 36'o000002_001000;		// BLT ptr
+		pdp6.fmem0.ff['o10] = 36'o000002_001000;	// BLT ptr
+		pdp6.fmem0.ff['o11] = 36'o440600_001000;	// char ptr
+		pdp6.fmem0.ff['o12] = 36'o300600_001000;	// char ptr
+		pdp6.fmem0.ff['o13] = 36'o000000_005555;	// char
 		pdp6.fmem0.ff['o17] = 36'o777000_001000;	// PDL ptr
 //		pdp6.fmem0.ff['o17] = 36'o777000_777777;	// PDL ptr
 		pdp6.mem0.core['o20] = 36'o200_064_000104;	// MOVE 1,@104(4)	FAC_INH
@@ -200,7 +203,12 @@ module test;
 		pdp6.mem0.core['o56] = 36'o244_100_000001;	// ASHC 2,1
 
 		pdp6.mem0.core['o60] = 36'o251_400_001001;	// BLT 10,1007
+		pdp6.mem0.core['o64] = 36'o133_000_000011;	// IBP 11
+		pdp6.mem0.core['o65] = 36'o135_000_000012;	// LBP 0,12
+		pdp6.mem0.core['o66] = 36'o134_000_000012;	// ILBP 0,12
+		pdp6.mem0.core['o67] = 36'o137_540_000012;	// DBP 13,12
 
+		pdp6.mem0.core['o1000] = 36'o50_45_54_54_57_00;
 		pdp6.mem0.core['o10410] = 36'o000_000_000333;
 	end
 

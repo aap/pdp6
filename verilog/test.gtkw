@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.76 (w)1999-2016 BSI
-[*] Thu Nov 24 10:04:34 2016
+[*] Thu Nov 24 15:13:00 2016
 [*]
 [dumpfile] "/home/aap/src/pdp6/verilog/dump.vcd"
-[dumpfile_mtime] "Thu Nov 24 09:54:12 2016"
-[dumpfile_size] 223600
+[dumpfile_mtime] "Thu Nov 24 15:10:54 2016"
+[dumpfile_size] 251956
 [savefile] "/home/aap/src/pdp6/verilog/test.gtkw"
-[timestart] 4587
+[timestart] 0
 [size] 1920 1080
 [pos] -1 -1
-*-10.555068 11855 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-11.555068 8970 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] test.
 [treeopen] test.pdp6.
 [treeopen] test.pdp6.fmem0.
@@ -217,14 +217,12 @@ test.pdp6.apr0.et9
 test.pdp6.apr0.et10
 @1401200
 -E
-@800200
+@c00200
 -S
 @28
 test.pdp6.apr0.s_ac_0
 test.pdp6.apr0.s_ac_2
-@29
 test.pdp6.apr0.s_ac_inh
-@28
 test.pdp6.apr0.s_ac_inh_if_ac_0
 test.pdp6.apr0.st1
 test.pdp6.apr0.st2
@@ -236,7 +234,7 @@ test.pdp6.apr0.st5a
 test.pdp6.apr0.st6
 test.pdp6.apr0.sf7
 test.pdp6.apr0.st7
-@1000200
+@1401200
 -S
 @c00200
 -iobus
@@ -278,49 +276,6 @@ test.pdp6.apr0.mc_non_exist_mem_rst
 test.pdp6.apr0.mc_non_exist_rd
 @1401200
 -membus
-@c00030
-test.fmem0scope[0:35]
-@28
-(0)test.fmem0scope[0:35]
-(1)test.fmem0scope[0:35]
-(2)test.fmem0scope[0:35]
-(3)test.fmem0scope[0:35]
-(4)test.fmem0scope[0:35]
-(5)test.fmem0scope[0:35]
-(6)test.fmem0scope[0:35]
-(7)test.fmem0scope[0:35]
-(8)test.fmem0scope[0:35]
-(9)test.fmem0scope[0:35]
-(10)test.fmem0scope[0:35]
-(11)test.fmem0scope[0:35]
-(12)test.fmem0scope[0:35]
-(13)test.fmem0scope[0:35]
-(14)test.fmem0scope[0:35]
-(15)test.fmem0scope[0:35]
-(16)test.fmem0scope[0:35]
-(17)test.fmem0scope[0:35]
-(18)test.fmem0scope[0:35]
-(19)test.fmem0scope[0:35]
-(20)test.fmem0scope[0:35]
-(21)test.fmem0scope[0:35]
-(22)test.fmem0scope[0:35]
-(23)test.fmem0scope[0:35]
-(24)test.fmem0scope[0:35]
-(25)test.fmem0scope[0:35]
-(26)test.fmem0scope[0:35]
-(27)test.fmem0scope[0:35]
-(28)test.fmem0scope[0:35]
-(29)test.fmem0scope[0:35]
-(30)test.fmem0scope[0:35]
-(31)test.fmem0scope[0:35]
-(32)test.fmem0scope[0:35]
-(33)test.fmem0scope[0:35]
-(34)test.fmem0scope[0:35]
-(35)test.fmem0scope[0:35]
-@1401200
--group_end
-@30
-test.mem0scope[0:35]
 @c00200
 -mem0
 @28
@@ -399,6 +354,7 @@ test.pdp6.fmem0.fmct5
 -fmem0
 @28
 test.pdp6.apr0.at1_inh
+@29
 test.pdp6.apr0.ia_NOT_int
 @c00200
 -PI
@@ -517,9 +473,17 @@ test.pdp6.apr0.sht1a
 test.pdp6.apr0.sct0
 test.pdp6.apr0.sct1
 test.pdp6.apr0.sct2
+@200
+-
+@28
+test.pdp6.apr0.sat0
+test.pdp6.apr0.sat1
+test.pdp6.apr0.sat2
+test.pdp6.apr0.sat21
+test.pdp6.apr0.sat3
 @1401200
 -shift
-@800200
+@c00200
 -BLT
 @28
 test.pdp6.apr0.blt_last
@@ -537,7 +501,56 @@ test.pdp6.apr0.blt_t5
 test.pdp6.apr0.blt_f5a
 test.pdp6.apr0.blt_t5a
 test.pdp6.apr0.blt_t6
-@1000200
+@1401200
 -BLT
+@c00200
+-CH
+@28
+test.pdp6.apr0.ch_inc_op
+test.pdp6.apr0.ch_NOT_inc_op
+test.pdp6.apr0.ch_load
+test.pdp6.apr0.ch_dep
+test.pdp6.apr0.cht1
+test.pdp6.apr0.chf1
+test.pdp6.apr0.cht2
+test.pdp6.apr0.chf2
+test.pdp6.apr0.cht3
+test.pdp6.apr0.cht3a
+test.pdp6.apr0.cht4
+test.pdp6.apr0.chf3
+test.pdp6.apr0.cht4a
+test.pdp6.apr0.cht5
+test.pdp6.apr0.cht6
+test.pdp6.apr0.cht7
+test.pdp6.apr0.cht8
+test.pdp6.apr0.chf6
+test.pdp6.apr0.cht8a
+test.pdp6.apr0.cht8b
+test.pdp6.apr0.cht9
+test.pdp6.apr0.chf7
+test.pdp6.apr0.chf4
+test.pdp6.apr0.chf5
+@1401200
+-CH
+@c00200
+-LC
+@28
+test.pdp6.apr0.lct0
+test.pdp6.apr0.lcf1
+test.pdp6.apr0.lct0a
+@1401200
+-LC
+@c00200
+-DC
+@28
+test.pdp6.apr0.dct0
+test.pdp6.apr0.dcf1
+test.pdp6.apr0.dct0a
+test.pdp6.apr0.dct0b
+test.pdp6.apr0.dct1
+test.pdp6.apr0.dct2
+test.pdp6.apr0.dct3
+@1401200
+-DC
 [pattern_trace] 1
 [pattern_trace] 0
