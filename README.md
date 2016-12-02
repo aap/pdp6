@@ -8,6 +8,9 @@ The maintenance manual has flow charts, schematics and explanations:
 
 ![Screenshot of the front panel](https://raw.githubusercontent.com/aap/pdp6/master/art/screenshot.png)
 
+More recently I've been working on a verilog simulation that I want
+to put on an FPGA eventually.
+
 ## Code
 
 The code is more or less a transcription of the schematics into C.
@@ -34,11 +37,12 @@ The only things missing from the cpu is the repeat key mechanism.
 
 ## File tree
 
-* `src` source for the emulator
+* `emu` source for the emulator
+* `verilog` source for the verilog simulation
 * `art` everything graphical
 * `code` some test code for the PDP-6
-* `misc` some misc. and old stuff
 * `tools` tools like an assembler and linker
+* `misc` some misc. and old stuff
 
 ## To do
 
