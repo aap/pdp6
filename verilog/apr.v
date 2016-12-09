@@ -1,5 +1,3 @@
-`default_nettype none
-
 module apr(
 	input wire clk,
 	input wire reset,
@@ -34,25 +32,36 @@ module apr(
 	input wire sw_split_cyc,
 
 	// lights
-	output [0:17] ir,
-	output [0:35] mi,
-	output [0:35] ar,
-	output [0:35] mb,
-	output [0:35] mq,
-	output [18:35] pc,
-	output [18:35] ma,
-	output [0:8] fe,
-	output [0:8] sc,
-	output run,
-	output mc_stop,
-	output pi_active,
-	output [1:7] pih,
-	output [1:7] pir,
-	output [1:7] pio,
-	output [18:25] pr,
-	output [18:25] rlr,
-	output [18:25] rla,
-	// TODO: all the flipflops?
+	output reg [0:17] ir,
+	output reg [0:35] mi,
+	output reg [0:35] ar,
+	output reg [0:35] mb,
+	output reg [0:35] mq,
+	output reg [18:35] pc,
+	output reg [18:35] ma,
+	output reg run,
+	output reg mc_stop,
+	output reg pi_active,
+	output reg [1:7] pih,
+	output reg [1:7] pir,
+	output reg [1:7] pio,
+	output reg [18:25] pr,
+	output reg [18:25] rlr,
+	output wire [18:25] rla,
+	output wire [0:7] ff0,
+	output wire [0:7] ff1,
+	output wire [0:7] ff2,
+	output wire [0:7] ff3,
+	output wire [0:7] ff4,
+	output wire [0:7] ff5,
+	output wire [0:7] ff6,
+	output wire [0:7] ff7,
+	output wire [0:7] ff8,
+	output wire [0:7] ff9,
+	output wire [0:7] ff10,
+	output wire [0:7] ff11,
+	output wire [0:7] ff12,
+	output wire [0:7] ff13,
 
 	// membus
 	output wire membus_wr_rs,
@@ -82,10 +91,28 @@ module apr(
 	input  wire [0:35] iobus_iob_in
 );
 
+	assign ff0 = { key_ex_st, key_ex_sync, key_dep_st, key_dep_sync, key_rdwr, mc_rd, mc_wr, mc_rq  };
+	assign ff1 = { if1a, af0, af3, af3a, et4_ar_pse, f1a, f4a, f6a };
+	assign ff2 = { sf3, sf5a, sf7, ar_com, blt_f0a, blt_f3a, blt_f5a, iot_f0a };
+	assign ff3 = { fpf1, fpf2, faf1, faf2, faf3, faf4, fmf1, fmf2 };
+	assign ff4 = { fdf1, fdf2, nr_round, nrf1, nrf2, nrf3, fsf1, chf7 };
+	assign ff5 = { dsf1, dsf2, dsf3, dsf4, dsf5, dsf6, dsf7, dsf8 };
+	assign ff6 = { dsf9, msf1, mpf1, mpf2, mc_split_cyc_sync, mc_stop_sync, shf1, sc_eq_777 };
+	assign ff7 = { chf1, chf2, chf3, chf4, chf5, chf6, lcf1, dcf1 };
+	assign ff8 = { pi_ov, pi_cyc, pi_rq, iot_go, a_long, ma_eq_mas, uuo_f1, cpa_pdl_ov };
+	assign ff9 = fe[1:8];
+	assign ff10 = sc[1:8];
+	assign ff11 = { ~ex_user, cpa_illeg_op, ex_ill_op, ex_uuo_sync, ex_pi_sync, mq36, sc[0], fe[0] };
+	assign ff12 = { key_rim_sbr, ar_cry0_xor_cry1, ar_cry0, ar_cry1, ar_ov_flag, ar_cry0_flag, ar_cry1_flag, ar_pc_chg_flag };
+	assign ff13 = { cpa_non_exist_mem, cpa_clock_enable, cpa_clock_flag, cpa_pc_chg_enable, cpa_arov_enable, cpa_pia[33:35] };
+
+	// TODO:
+	reg a_long = 1'b0;
+
 	/*
 	 * KEY
 	 */
-	reg run;
+	// reg run;
 	reg key_ex_st;
 	reg key_dep_st;
 	reg key_ex_sync;
@@ -133,7 +160,7 @@ module apr(
 	wire key_rd = kt3 & key_ex_OR_ex_nxt;
 	wire key_wr = kt3 & key_dp_OR_dp_nxt;
 
-	wire kt0a_D, kt1_D, kt2_D;
+	wire kt0a_D, kt1_D, kt2_D, kt3_D;
 	pg key_pg0(.clk(clk), .reset(reset), .in(key_inst_stop), .p(run_clr));
 	pg key_pg1(.clk(clk), .reset(reset), .in(sw_power), .p(mr_pwr_clr));
 	pg key_pg2(.clk(clk), .reset(reset), .in(key_manual), .p(kt0));
@@ -167,7 +194,9 @@ module apr(
 	dly100ns key_dly0(.clk(clk), .reset(reset), .in(kt0a), .p(kt0a_D));
 	dly200ns key_dly1(.clk(clk), .reset(reset), .in(kt1), .p(kt1_D));
 	dly200ns key_dly2(.clk(clk), .reset(reset), .in(kt2), .p(kt2_D));
+	dly100ns key_dly3(.clk(clk), .reset(reset), .in(kt3), .p(kt3_D));
 
+`ifdef simulation
 	/* add to this as needed */
 	always @(posedge reset) begin
 		run <= 0;
@@ -177,6 +206,7 @@ module apr(
 		mb <= 0;
 		mq <= 0;
 	end
+`endif
 
 	always @(posedge clk) begin
 		if(run_clr |
@@ -236,7 +266,9 @@ module apr(
 		    pi_sync_D & if1a & ia_NOT_int),
 		.p(it1));
 	pa i_pa3(.clk(clk), .reset(reset),
-		.in(mc_rs_t1 & if1a),
+		.in(mc_rs_t1 & if1a |
+		    kt3_D & key_execute |
+		    xct_t0_D),
 		.p(it1a));
 
 	wire it0_D, iat0_D0, iat0_D1;
@@ -600,7 +632,7 @@ module apr(
 	/*
 	 * IR
 	 */
-	reg [0:17] ir;
+	// reg [0:17] ir;
 	assign iobus_ios = ir[3:9];
 	wire ir0_12_clr = mr_clr;
 	wire ir13_17_clr = mr_clr | at5_D | cht8a;
@@ -775,6 +807,11 @@ module apr(
 		.in(et3 & ir_xct),
 		.p(xct_t0));
 
+	wire xct_t0_D;
+	dly200ns xct_dly0(.clk(clk), .reset(reset),
+		.in(xct_t0),
+		.p(xct_t0_D));
+
 	/*
 	 * UUO
 	 */
@@ -804,7 +841,7 @@ module apr(
 	/*
 	 * PC
 	 */
-	reg [18:35] pc;
+	// reg [18:35] pc;
 	wire pc_clr = et7 & pc_set | kt1 & key_start_OR_read_in;
 	wire pc_fm_ma1 = et8 & pc_set | kt3 & key_start_OR_read_in;
 	wire pc_inc = et0 & ~pc_inc_inh_et0 |
@@ -835,7 +872,7 @@ module apr(
 		if(pc_clr)
 			pc <= 0;
 		if(pc_inc)
-			pc <= pc + 1;
+			pc <= pc + 18'b1;
 		if(pc_fm_ma1)
 			pc <= pc | ma;
 	end
@@ -881,7 +918,7 @@ module apr(
 	/*
 	 * MB
 	 */
-	reg [0:35] mb;
+	// reg [0:35] mb;
 	wire mblt_clr = et1 & ex_ir_uuo | mb_clr;
 	wire mblt_fm_ar0 = mb_fm_arJ | mb_ar_swap | mb_fm_ar0 | cfac_mb_ar_swap;
 	wire mblt_fm_ar1 = mb_fm_arJ | mb_ar_swap | cfac_mb_ar_swap;
@@ -998,7 +1035,7 @@ module apr(
 	/*
 	 * AR
 	 */
-	reg [0:35] ar;
+	// reg [0:35] ar;
 	reg ar_com_cont;
 	reg ar_pc_chg_flag;
 	reg ar_ov_flag;
@@ -1035,13 +1072,13 @@ module apr(
 		ir_rot ? ar[35] :
 		(ir_ash | shc_ashc | ms_mult | ir_fdv) ? ar[0] :
 		ir_div ? ~mq[35] :
-		ch_load | ir_lsh | ir_lshc ? 0 :
-		0;	// shouldn't happen
+		ch_load | ir_lsh | ir_lshc ? 1'b0 :
+		1'b0;	// shouldn't happen
 	wire ar35_shl_inp = ir_rot ? ar[0] :
 		shc_ashc ? mq[1] :
 		ir_rotc | shc_lshc_OR_div ? mq[0] :
-		ch_dep | ir_lsh | ir_ash ? 0 :
-		0;	// shouldn't happen
+		ch_dep | ir_lsh | ir_ash ? 1'b0 :
+		1'b0;	// shouldn't happen
 
 	wire shc_ashc = ir_ashc | nrf2 | faf3;
 	wire shc_lshc_OR_div = ir_lshc | shc_div;
@@ -1173,12 +1210,6 @@ module apr(
 	dly100ns ar_dly4(.clk(clk), .reset(reset),
 		.in(ar_cry_comp),
 		.p(ar_cry_comp_D));
-	dly100ns ar_dly5(.clk(clk), .reset(reset),
-		.in(ar_incdec_t0),
-		.p(ar_incdec_t0_D));
-	dly100ns ar_dly6(.clk(clk), .reset(reset),
-		.in(ar_negate_t0),
-		.p(ar_negate_t0_D));
 
 	wire mst1_D;
 	dly50ns ar_dly7(.clk(clk), .reset(reset),
@@ -1186,11 +1217,11 @@ module apr(
 		.p(mst1_D));
 
 	wire [0:35] ar_mb_cry = mb & ~ar;
-	wire [0:35] ar_cry_in = ar_cry_initiate ? { mb&~ar, 1'b0 } :
+	wire [0:35] ar_cry_in = ar_cry_initiate ? { mb[1:35]&~ar[1:35], 1'b0 } :
 		ar35_cry_in & ar17_cry_in ? 36'o000001000001 :
 		ar35_cry_in ? 36'o000000000001 :
 		ar17_cry_in ? 36'o000001000000 :
-		0;
+		36'b0;
 
 	// hold the cry out temporarily
 	reg cry0, cry1;
@@ -1240,7 +1271,7 @@ module apr(
 		if(ar1_8_set)
 			ar[1:8] <= 8'o377;
 		if(ar_fm_sc1_8J)
-			ar[1:8] <= sc;
+			ar[1:8] <= sc[1:8];
 		if(ar0_5_fm_sc3_8J)
 			ar[0:5] <= sc[3:8];
 
@@ -1270,7 +1301,7 @@ module apr(
 		   set_flags_et10 & ar_ov_set |
 		   cfac_overflow |
 		   et10 & ir_fwt & ~ar_cry0 & ar_cry1 |
-		   sct1 & ~mb[18] & ir_ash_OR_ashc | ar0_xor_ar1)
+		   sct1 & ~mb[18] & ir_ash_OR_ashc & ar0_xor_ar1)
 			ar_ov_flag <= 1;
 
 		if(ar_jfcl_clr & ir[10])
@@ -1306,7 +1337,7 @@ module apr(
 	/*
 	 * MQ
 	 */
-	reg [0:35] mq;
+	// reg [0:35] mq;
 	reg mq36;
 	wire mqlt_clr = mr_clr;
 	wire mqlt_fm_mb0 = mq_fm_mbJ | cfac_mb_mq_swap;
@@ -1325,9 +1356,9 @@ module apr(
 	wire mq1_shr_inp = shc_ashc ? ar[35] : mq[0];
 	wire mq35_shl_inp = ir_rotc ? ar[0] :
 		shc_div ? ~ar[0] :
-		ch_inc_op | ch_NOT_inc_op ? 1 :
-		ir_lshc | shc_ashc | ch_dep ? 0 :
-		0;	// shouldn't happen
+		ch_inc_op | ch_NOT_inc_op ? 1'b1 :
+		ir_lshc | shc_ashc | ch_dep ? 1'b0 :
+		1'b0;	// shouldn't happen
 
 	wire mq_fm_mbJ = ft4 | ft4a | dst1 | mst1;
 	wire mq35_xor_mb0 = mq[35] ^ mb[0];
@@ -1477,7 +1508,7 @@ module apr(
 		if(sc_clr)
 			sc <= 0;
 		if(sc_inc)
-			sc <= sc + 1;
+			sc <= sc + 9'b1;
 		if(sc_com)
 			sc <= ~sc;
 		if(sc_pad)
@@ -1488,7 +1519,22 @@ module apr(
 			sc <= sc | fe;
 		if(sc_fm_mb18_28_35_0)
 			sc <= sc | ~{ mb[18], mb[28:35] };
-		// TODO: single bits
+		if(cht4a | fmt0a | fdt0a | mpt0 | ds_div_t0)
+			sc[0] <= 1;
+		if(fpt01 | fmt0a | fdt0a | mpt0 | ds_div_t0)
+			sc[1] <= 1;
+		if(fmt0a | fdt0a | mpt0 | ds_div_t0)
+			sc[2] <= 1;
+		if(fmt0a | fdt0a)
+			sc[3] <= 1;
+		if(cht4a | mpt0 | ds_div_t0)
+			sc[4:5] <= 2'b11;
+		if(fmt0a | mpt0)
+			sc[6] <= 1;
+		if(cht4a | ds_div_t0)
+			sc[7] <= 1;
+		if(cht4a | fdt0a | ds_div_t0)
+			sc[8] <= 1;
 	end
 
 	/*
@@ -1668,10 +1714,10 @@ module apr(
 		.in(sat3 & chf2),
 		.p(cht3a));
 	pa ch_pa4(.clk(clk), .reset(reset),
-		.in(cht4a & ~sc[0]),
+		.in(cht3a & ~sc[0]),
 		.p(cht4));
 	pa ch_pa5(.clk(clk), .reset(reset),
-		.in(ar_t3 & ~chf3),
+		.in(ar_t3 & chf3),
 		.p(cht4a));
 	pa ch_pa6(.clk(clk), .reset(reset),
 		.in(cht3a & sc[0]),
@@ -2102,7 +2148,7 @@ module apr(
 	/*
 	 * MA
 	 */
-	reg [18:35] ma;
+	// reg [18:35] ma;
 	reg ma32_cry_out;
 	wire ma_clr = it0 | at0 | at3 | ft4a | key_ma_clr | iot_t0a |
 		et1 & ma_clr_et1 |
@@ -2149,9 +2195,12 @@ module apr(
 		integer i;
 		if(ma_clr)
 			ma <= 0;
-		if(ma_inc) begin
-			{ma32_cry_out, ma[32:35]} = ma[32:35]+1;
-			ma[18:31] = ma[18:31] + (ma32_cry_out & ma31_cry_in_en);
+		if(ma_inc)
+			{ma32_cry_out, ma[32:35]} <= ma[32:35] + 4'b1;
+		if(ma32_cry_out) begin
+			if(ma31_cry_in_en)
+				ma[18:31] <= ma[18:31] + 14'b1;
+			ma32_cry_out <= 1'b0;
 		end
 		if(ma_fm_mbrt1)
 			ma <= ma | mb[18:35];
@@ -2166,7 +2215,7 @@ module apr(
 	/*
 	 * PR
 	 */
-	reg [18:25] pr;
+	// reg [18:25] pr;
 	wire pr18_ok = ma[18:25] <= pr;
 	wire pr_rel_AND_ma_ok = ~ex_inh_rel & pr18_ok;
 	wire pr_rel_AND_NOT_ma_ok = ~ex_inh_rel & ~pr18_ok;
@@ -2174,8 +2223,9 @@ module apr(
 	/*
 	 * RLR, RLA
 	 */
-	reg [18:25] rlr;
-	wire [18:25] rla = ma[18:25] + (ex_inh_rel ? 0 : rlr);
+	// reg [18:25] rlr;
+	// wire [18:25] rla = ma[18:25] + (ex_inh_rel ? 0 : rlr);
+	assign rla = ma[18:25] + (ex_inh_rel ? 8'b0 : rlr);
 
 	always @(posedge clk) begin
 		if(ex_clr) begin
@@ -2191,7 +2241,7 @@ module apr(
 	/*
 	 * MI
 	 */
-	reg [0:35] mi;
+	// reg [0:35] mi;
 	wire milt_clr = mi_clr;
 	wire milt_fm_mblt1 = mi_fm_mb1;
 	wire mirt_clr = mi_clr;
@@ -2231,7 +2281,7 @@ module apr(
 	reg mc_rd;
 	reg mc_wr;
 	reg mc_rq;
-	reg mc_stop;
+	// reg mc_stop;
 	reg mc_stop_sync;
 	reg mc_split_cyc_sync;
 	wire mc_sw_stop = key_mem_stop | sw_addr_stop;
@@ -2491,19 +2541,19 @@ module apr(
 	 */
 	// pih contains the currently serviced pi reqs.
 	// lower channels override higher ones.
-	reg [1:7] pih;
+	// reg [1:7] pih;
 	wire pih_clr = pi_reset;
 	wire pih_fm_pi_ch_rq = et0a & pi_hold;
 	wire pih0_fm_pi_ok1 = et1 & pi_rst;
 
 	// pir contains all current and allowed pi reqs.
-	reg [1:7] pir;
+	// reg [1:7] pir;
 	wire pir_clr = pi_reset;
 	wire pir_fm_iob1 = pi_cono_set & iob[24];
 	wire pir_stb;
 
 	// pio is a mask of which pi reqs are allowed.
-	reg [1:7] pio;
+	// reg [1:7] pio;
 	wire pio_fm_iob1 = pi_cono_set & iob[25];
 	wire pio0_fm_iob1 = pi_cono_set & iob[26];
 
@@ -2515,12 +2565,14 @@ module apr(
 	// requests coming from the bus
 	wire [1:7] iob_pi_req = iobus_pi_req | cpa_req;
 
-	genvar i;
 	assign pi_ok[1] = pi_active;
-	for(i = 1; i <= 7; i = i + 1) begin
-		assign pi_req[i] =  pi_ok[i] & ~pih[i] &  pir[i];
-		assign pi_ok[i+1] = pi_ok[i] & ~pih[i] & ~pir[i];
-	end
+	genvar i;
+	generate
+		for(i = 1; i <= 7; i = i + 1) begin: pi_reg_gen
+			assign pi_req[i] =  pi_ok[i] & ~pih[i] &  pir[i];
+			assign pi_ok[i+1] = pi_ok[i] & ~pih[i] & ~pir[i];
+		end
+	endgenerate
 
 	always @(posedge clk) begin: pirctl
 		integer i;
@@ -2529,7 +2581,7 @@ module apr(
 		if(pih_fm_pi_ch_rq)
 			pih <= pih | pi_req;
 		if(pih0_fm_pi_ok1)
-			pih <= pih & ~pi_ok;
+			pih <= pih & ~pi_ok[1:7];
 
 		if(pir_clr)
 			pir <= 0;
@@ -2556,7 +2608,7 @@ module apr(
 	 */
 	reg pi_ov;
 	reg pi_cyc;
-	reg pi_active;
+	// reg pi_active;
 	wire pi_select = iobus_ios == 1;
 	wire pi_status = pi_select & iobus_iob_fm_status;
 	wire pi_cono_set = pi_select & iobus_cono_set;
@@ -2627,8 +2679,11 @@ module apr(
 		cpa_arov_enable & ar_ov_flag;
 	wire [1:7] cpa_req;
 	genvar j;
-	for(j = 1; j <= 7; j = j + 1)
-		assign cpa_req[j] = cpa_req_enable & (cpa_pia == j);
+	generate
+		for(j = 1; j <= 7; j = j + 1) begin: cpa_req_gen
+			assign cpa_req[j] = cpa_req_enable & (cpa_pia == j);
+		end
+	endgenerate
 
 	wire [0:35] cpa_iob = { 18'b0,
 		1'b0, cpa_pdl_ov, cpa_iot_user, ex_user,

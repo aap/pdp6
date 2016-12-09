@@ -55,18 +55,19 @@ module fast162(
 );
 
 	/* Jumpers */
-	reg [0:3] memsel_p0;
-	reg [0:3] memsel_p1;
-	reg [0:3] memsel_p2;
-	reg [0:3] memsel_p3;
-	reg fmc_p0_sel;
-	reg fmc_p1_sel;
-	reg fmc_p2_sel;
-	reg fmc_p3_sel;
+	parameter memsel_p0 = 4'b0;
+	parameter memsel_p1 = 4'b0;
+	parameter memsel_p2 = 4'b0;
+	parameter memsel_p3 = 4'b0;
+	parameter fmc_p0_sel = 1'b1;
+	parameter fmc_p1_sel = 1'b0;
+	parameter fmc_p2_sel = 1'b0;
+	parameter fmc_p3_sel = 1'b0;
+
 
 	reg fmc_act;
 	reg fmc_rd0;
-	reg fmc_rs;
+	reg fmc_rs;		// not used, what is this?
 	reg fmc_stop;
 	reg fmc_wr;
 	wire [0:35] fm_out = (fma != 0 | fmc_rd0) ? ff[fma] : 0;
@@ -75,43 +76,39 @@ module fast162(
 	wire wr_rs = fmc_p0_sel ? membus_wr_rs_p0 :
 	             fmc_p1_sel ? membus_wr_rs_p1 :
 	             fmc_p2_sel ? membus_wr_rs_p2 :
-	             fmc_p3_sel ? membus_wr_rs_p3 : 0;
-	wire rq_cyc = fmc_p0_sel ? membus_rq_cyc_p0 :
-	              fmc_p1_sel ? membus_rq_cyc_p1 :
-	              fmc_p2_sel ? membus_rq_cyc_p2 :
-	              fmc_p3_sel ? membus_rq_cyc_p3 : 0;
+	             fmc_p3_sel ? membus_wr_rs_p3 : 1'b0;
 	wire fma_rd_rq = fmc_p0_sel ? membus_rd_rq_p0 :
 	                 fmc_p1_sel ? membus_rd_rq_p1 :
 	                 fmc_p2_sel ? membus_rd_rq_p2 :
-	                 fmc_p3_sel ? membus_rd_rq_p3 : 0;
+	                 fmc_p3_sel ? membus_rd_rq_p3 : 1'b0;
 	wire fma_wr_rq = fmc_p0_sel ? membus_wr_rq_p0 :
 	                 fmc_p1_sel ? membus_wr_rq_p1 :
 	                 fmc_p2_sel ? membus_wr_rq_p2 :
-	                 fmc_p3_sel ? membus_wr_rq_p3 : 0;
+	                 fmc_p3_sel ? membus_wr_rq_p3 : 1'b0;
 	wire [21:35] fma = fmc_p0_sel ? membus_ma_p0[32:35] :
 	                   fmc_p1_sel ? membus_ma_p1[32:35] :
 	                   fmc_p2_sel ? membus_ma_p2[32:35] :
-	                   fmc_p3_sel ? membus_ma_p3[32:35] : 0;
-	wire [0:35] mb_in = fmc_p0_sel ? membus_mb_in_p0 :
-	                    fmc_p1_sel ? membus_mb_in_p1 :
-	                    fmc_p2_sel ? membus_mb_in_p2 :
-	                    fmc_p3_sel ? membus_mb_in_p3 : 0;
+	                   fmc_p3_sel ? membus_ma_p3[32:35] : 1'b0;
+	wire [0:35] mb_in = fmc_p0_wr_sel ? membus_mb_in_p0 :
+	                    fmc_p1_wr_sel ? membus_mb_in_p1 :
+	                    fmc_p2_wr_sel ? membus_mb_in_p2 :
+	                    fmc_p3_wr_sel ? membus_mb_in_p3 : 1'b0;
 	assign membus_addr_ack_p0 = fmc_addr_ack & fmc_p0_sel;
 	assign membus_rd_rs_p0 = fmc_rd_rs & fmc_p0_sel;
-	assign membus_mb_out_p0 = fmc_p0_sel ? mb_out : 0;
+	assign membus_mb_out_p0 = fmc_p0_sel ? mb_out : 1'b0;
 	assign membus_addr_ack_p1 = fmc_addr_ack & fmc_p1_sel;
 	assign membus_rd_rs_p1 = fmc_rd_rs & fmc_p1_sel;
-	assign membus_mb_out_p1 = fmc_p1_sel ? mb_out : 0;
+	assign membus_mb_out_p1 = fmc_p1_sel ? mb_out : 1'b0;
 	assign membus_addr_ack_p2 = fmc_addr_ack & fmc_p2_sel;
 	assign membus_rd_rs_p2 = fmc_rd_rs & fmc_p2_sel;
-	assign membus_mb_out_p2 = fmc_p2_sel ? mb_out : 0;
+	assign membus_mb_out_p2 = fmc_p2_sel ? mb_out : 1'b0;
 	assign membus_addr_ack_p3 = fmc_addr_ack & fmc_p3_sel;
 	assign membus_rd_rs_p3 = fmc_rd_rs & fmc_p3_sel;
-	assign membus_mb_out_p3 = fmc_p3_sel ? mb_out : 0;
+	assign membus_mb_out_p3 = fmc_p3_sel ? mb_out : 1'b0;
 
 	wire fmc_addr_ack;
 	wire fmc_rd_rs;
-	wire [0:35] mb_out = fmc_rd_strb ? fm_out : 0;
+	wire [0:35] mb_out = fmc_rd_strb ? fm_out : 36'b0;
 
 	wire fmc_p0_sel1 = fmc_p0_sel & ~fmc_stop;
 	wire fmc_p1_sel1 = fmc_p1_sel & ~fmc_stop;
@@ -195,9 +192,11 @@ module fast162(
 	bd  fmc_bd1(.clk(clk), .reset(reset), .in(fmct1), .p(fmc_rd_rs));
 	bd2 fmc_bd2(.clk(clk), .reset(reset), .in(fmct1), .p(fmc_rd_strb));
 
+`ifdef simulation
 	always @(posedge reset) begin
 		fmc_act <= 0;
 	end
+`endif
 
 	always @(posedge clk) begin
 		if(fmc_restart | fmc_pwr_on) begin

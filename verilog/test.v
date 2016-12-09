@@ -1,4 +1,5 @@
 `timescale 1ns/1ns
+`define simulation
 
 module clock(output reg clk);
 	initial
@@ -8,8 +9,8 @@ module clock(output reg clk);
 endmodule
 
 //`define TESTKEY pdp6.key_inst_stop
-`define TESTKEY pdp6.key_read_in
-//`define TESTKEY pdp6.key_start
+//`define TESTKEY pdp6.key_read_in
+`define TESTKEY pdp6.key_start
 //`define TESTKEY pdp6.key_exec
 //`define TESTKEY pdp6.key_ex
 //`define TESTKEY pdp6.key_dep
@@ -132,19 +133,6 @@ module test;
 
 		pdp6.mem0_sw_single_step = 0;
 		pdp6.mem0_sw_restart = 0;
-		pdp6.fmem0.memsel_p0 = 0;
-		pdp6.fmem0.memsel_p1 = 0;
-		pdp6.fmem0.memsel_p2 = 0;
-		pdp6.fmem0.memsel_p3 = 0;
-		pdp6.fmem0.fmc_p0_sel = 1;
-		pdp6.fmem0.fmc_p1_sel = 0;
-		pdp6.fmem0.fmc_p2_sel = 0;
-		pdp6.fmem0.fmc_p3_sel = 0;
-		pdp6.mem0.memsel_p0 = 0;
-		pdp6.mem0.memsel_p1 = 0;
-		pdp6.mem0.memsel_p2 = 0;
-		pdp6.mem0.memsel_p3 = 0;
-
 	end
 
 /*
@@ -161,7 +149,7 @@ module test;
 		#20 reset = 0;
 
 		pdp6.datasw = 36'o111777222666;
-		pdp6.mas = 18'o000067;
+		pdp6.mas = 18'o000070;
 
 		for(i = 0; i < 'o40000; i = i + 1)
 			pdp6.mem0.core[i] = 0;
@@ -180,8 +168,10 @@ module test;
 		pdp6.fmem0.ff['o11] = 36'o440600_001000;	// char ptr
 		pdp6.fmem0.ff['o12] = 36'o300600_001000;	// char ptr
 		pdp6.fmem0.ff['o13] = 36'o000000_005555;	// char
+		pdp6.fmem0.ff['o14] = 36'o010700_001017;
 		pdp6.fmem0.ff['o17] = 36'o777000_001000;	// PDL ptr
 //		pdp6.fmem0.ff['o17] = 36'o777000_777777;	// PDL ptr
+
 		pdp6.mem0.core['o20] = 36'o200_064_000104;	// MOVE 1,@104(4)	FAC_INH
 		pdp6.mem0.core['o21] = 36'o202_064_000104;	// MOVEM 1,@104(4)
 		pdp6.mem0.core['o22] = 36'o245_100_000003;	// ROTC 2,3
@@ -207,6 +197,7 @@ module test;
 		pdp6.mem0.core['o65] = 36'o135_000_000012;	// LBP 0,12
 		pdp6.mem0.core['o66] = 36'o134_000_000012;	// ILBP 0,12
 		pdp6.mem0.core['o67] = 36'o137_540_000012;	// DBP 13,12
+		pdp6.mem0.core['o70] = 36'o134_000_000014;	// ILBP 0,14
 
 		pdp6.mem0.core['o1000] = 36'o50_45_54_54_57_00;
 		pdp6.mem0.core['o10410] = 36'o000_000_000333;

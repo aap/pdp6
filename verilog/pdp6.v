@@ -41,8 +41,6 @@ module pdp6(
 	wire [0:35] mq;
 	wire [18:35] pc;
 	wire [18:35] ma;
-	wire [0:8] fe;
-	wire [0:8] sc;
 	wire run;
 	wire mc_stop;
 	wire pi_active;
@@ -136,8 +134,6 @@ module pdp6(
 		.mq(mq),
 		.pc(pc),
 		.ma(ma),
-		.fe(fe),
-		.sc(sc),
 		.run(run),
 		.mc_stop(mc_stop),
 		.pi_active(pi_active),
@@ -177,7 +173,12 @@ module pdp6(
 	reg mem0_sw_single_step;
 	reg mem0_sw_restart;
 
-	fast162 fmem0(
+	fast162
+	 #(.memsel_p0(4'b0), .memsel_p1(4'b0),
+	   .memsel_p2(4'b0), .memsel_p3(4'b0),
+	   .fmc_p0_sel(1'b1), .fmc_p1_sel(1'b0),
+	   .fmc_p2_sel(1'b0), .fmc_p3_sel(1'b0))
+	fmem0(
 		.clk(clk),
 		.reset(reset),
 		.power(sw_power),
@@ -209,7 +210,10 @@ module pdp6(
 		.membus_fmc_select_p3(1'b0)
 	);
 
-	core161c mem0(
+	core161c
+	 #(.memsel_p0(4'b0), .memsel_p1(4'b0),
+	   .memsel_p2(4'b0), .memsel_p3(4'b0))
+	mem0(
 		.clk(clk),
 		.reset(reset),
 		.power(sw_power),
