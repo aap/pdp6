@@ -316,7 +316,7 @@ module core161c(
 `ifdef simulation
 		if(cmc_t4)
 			/* As a hack zero core here */
-			core[cma[32:35]] <= 0;
+			core[cma[22:35]] <= 0;
 `endif
 		if(cmc_t5) begin
 			cmc_rd <= 0;
@@ -337,7 +337,7 @@ module core161c(
 		if(cmc_t9 & cmc_wr)
 			/* again a hack. core is written some time after t8.
 			 * (cmc_wr is always set here) */
-			core[cma[32:35]] <= core[cma[32:35]] | cmb;
+			core[cma[22:35]] <= core[cma[22:35]] | cmb;
 `endif
 		if(cmc_t11)
 			cmc_await_rq <= 1;

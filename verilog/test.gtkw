@@ -1,20 +1,19 @@
 [*]
 [*] GTKWave Analyzer v3.3.76 (w)1999-2016 BSI
-[*] Thu Nov 24 15:13:00 2016
+[*] Sat Dec 10 18:05:06 2016
 [*]
 [dumpfile] "/home/aap/src/pdp6/verilog/dump.vcd"
-[dumpfile_mtime] "Thu Nov 24 15:10:54 2016"
-[dumpfile_size] 251956
+[dumpfile_mtime] "Sat Dec 10 17:52:00 2016"
+[dumpfile_size] 335826
 [savefile] "/home/aap/src/pdp6/verilog/test.gtkw"
-[timestart] 0
+[timestart] 4810
 [size] 1920 1080
 [pos] -1 -1
-*-11.555068 8970 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-11.555068 17575 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] test.
 [treeopen] test.pdp6.
-[treeopen] test.pdp6.fmem0.
 [sst_width] 337
-[signals_width] 442
+[signals_width] 486
 [sst_expanded] 1
 [sst_vpaned_height] 319
 @28
@@ -60,6 +59,9 @@ test.pdp6.apr0.ir[0:17]
 test.pdp6.apr0.mb[0:35]
 test.pdp6.apr0.ar[0:35]
 test.pdp6.apr0.mq[0:35]
+@28
+test.pdp6.apr0.mq36
+@30
 test.pdp6.apr0.sc[0:8]
 test.pdp6.apr0.fe[0:8]
 test.pdp6.apr0.datasw[0:35]
@@ -304,7 +306,6 @@ test.pdp6.apr0.membus_mb_pulse
 @200
 -
 @30
-test.pdp6.mem0.corescope[0:35]
 test.pdp6.mem0.ma[21:35]
 test.pdp6.mem0.cma[22:35]
 @28
@@ -335,6 +336,8 @@ test.pdp6.mem0.cmc_t9a
 test.pdp6.mem0.cmc_t10
 test.pdp6.mem0.cmc_t11
 test.pdp6.mem0.cmc_t12
+@30
+test.pdp6.mem0.sa[0:35]
 @1401200
 -mem0
 @c00200
@@ -354,7 +357,6 @@ test.pdp6.fmem0.fmct5
 -fmem0
 @28
 test.pdp6.apr0.at1_inh
-@29
 test.pdp6.apr0.ia_NOT_int
 @c00200
 -PI
@@ -552,5 +554,81 @@ test.pdp6.apr0.dct2
 test.pdp6.apr0.dct3
 @1401200
 -DC
+@c00200
+-MP
+@28
+test.pdp6.apr0.mpf2
+test.pdp6.apr0.mpt0
+test.pdp6.apr0.mpf1
+test.pdp6.apr0.mpt0a
+test.pdp6.apr0.mpt1
+test.pdp6.apr0.mpt2
+@1401200
+-MP
+@c00200
+-MS
+@28
+test.pdp6.apr0.mst1
+test.pdp6.apr0.mst2
+test.pdp6.apr0.mst3
+test.pdp6.apr0.mst4
+test.pdp6.apr0.msf1
+test.pdp6.apr0.mst3a
+test.pdp6.apr0.mst5
+test.pdp6.apr0.mst6
+@1401200
+-MS
+@c00201
+-DS
+@28
+test.pdp6.apr0.ds_div_t0
+test.pdp6.apr0.dst0
+test.pdp6.apr0.dsf1
+test.pdp6.apr0.dst0a
+test.pdp6.apr0.dst1
+test.pdp6.apr0.dst2
+test.pdp6.apr0.dst3
+test.pdp6.apr0.dst4
+test.pdp6.apr0.dst5
+test.pdp6.apr0.dsf2
+test.pdp6.apr0.dst5a
+test.pdp6.apr0.dst6
+test.pdp6.apr0.dst7
+test.pdp6.apr0.dst8
+test.pdp6.apr0.dst9
+test.pdp6.apr0.dsf3
+test.pdp6.apr0.dst10
+test.pdp6.apr0.dst10a
+test.pdp6.apr0.dst10b
+test.pdp6.apr0.dst11
+test.pdp6.apr0.dst12
+test.pdp6.apr0.dsf4
+test.pdp6.apr0.dst11a
+test.pdp6.apr0.dst13
+test.pdp6.apr0.dst14a
+test.pdp6.apr0.dst14b
+test.pdp6.apr0.dst14
+test.pdp6.apr0.dst15
+test.pdp6.apr0.dst16
+test.pdp6.apr0.dst17
+test.pdp6.apr0.dst17a
+test.pdp6.apr0.dst18
+test.pdp6.apr0.dst19
+test.pdp6.apr0.dst19a
+test.pdp6.apr0.dst19b
+test.pdp6.apr0.dst20
+test.pdp6.apr0.dst21
+test.pdp6.apr0.dst21a
+@200
+-
+@28
+test.pdp6.apr0.dsf5
+test.pdp6.apr0.dsf6
+test.pdp6.apr0.dsf7
+test.pdp6.apr0.dsf7_xor_mq0
+test.pdp6.apr0.dsf8
+test.pdp6.apr0.dsf9
+@1401201
+-DS
 [pattern_trace] 1
 [pattern_trace] 0

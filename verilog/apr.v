@@ -1087,7 +1087,7 @@ module apr(
 	wire ar_clr = dst2 | fat6 |
 		et0a & ar_clr_et0 |
 		et1 & ar_clr_et1 |
-		mst1_D;
+		mst1_D0;
 	wire ar_clr_et0 = boole_0 | boole_3 | boole_14 | boole_17;
 	wire ar_clr_et1 = hwt_ar_clr | iot_status | iot_datai;
 	wire ar_com = ar_incdec_t0 | ar_negate_t0 |
@@ -1210,11 +1210,6 @@ module apr(
 	dly100ns ar_dly4(.clk(clk), .reset(reset),
 		.in(ar_cry_comp),
 		.p(ar_cry_comp_D));
-
-	wire mst1_D;
-	dly50ns ar_dly7(.clk(clk), .reset(reset),
-		.in(mst1),
-		.p(mst1_D));
 
 	wire [0:35] ar_mb_cry = mb & ~ar;
 	wire [0:35] ar_cry_in = ar_cry_initiate ? { mb[1:35]&~ar[1:35], 1'b0 } :
@@ -1910,16 +1905,45 @@ module apr(
 	reg mpf2;
 	wire mp_clr = mr_clr;
 
-	wire mpt0 = 0;
-	wire mpt0a = 0;
-	wire mpt1 = 0;
-	wire mpt2 = 0;
+	wire mpt0;
+	wire mpt0a;
+	wire mpt1;
+	wire mpt2;
+
+	pa mp_pa0(.clk(clk), .reset(reset),
+		.in(et0 & ir_mul),
+		.p(mpt0));
+	pa mp_pa1(.clk(clk), .reset(reset),
+		.in(mst6 & mpf1),
+		.p(mpt0a));
+	pa mp_pa2(.clk(clk), .reset(reset),
+		.in(mpt0a_D & ~ir[6]),
+		.p(mpt1));
+	pa mp_pa3(.clk(clk), .reset(reset),
+		.in(mpt1_D),
+		.p(mpt2));
+
+	wire mpt0a_D, mpt1_D, mpt2_D;
+	dly200ns mp_dly0(.clk(clk), .reset(reset),
+		.in(mpt0a),
+		.p(mpt0a_D));
+	dly100ns mp_dly1(.clk(clk), .reset(reset),
+		.in(mpt1),
+		.p(mpt1_D));
+	dly100ns mp_dly2(.clk(clk), .reset(reset),
+		.in(mpt2),
+		.p(mpt2_D));
 
 	always @(posedge clk) begin
 		if(mp_clr | mpt0a)
 			mpf1 <= 0;
+		if(mpt0)
+			mpf1 <= 1;
+
 		if(mp_clr)
 			mpf2 <= 0;
+		if(mpt0 & ar[0] & mb[0])
+			mpf2 <= 1;
 	end
 
 	/*
@@ -2022,19 +2046,58 @@ module apr(
 	 * MS
 	 */
 	reg msf1;
-	wire ms_mult = 0;
+	wire ms_mult = mpf1 | fmf2;
 
-	wire mst1 = 0;
-	wire mst2 = 0;
-	wire mst3 = 0;
-	wire mst3a = 0;
-	wire mst4 = 0;
-	wire mst5 = 0;
-	wire mst6 = 0;
+	wire mst1;
+	wire mst2;
+	wire mst3;
+	wire mst3a;
+	wire mst4;
+	wire mst5;
+	wire mst6;
+
+	pa ms_pa0(.clk(clk), .reset(reset),
+		.in(mpt0 | fmt0a),
+		.p(mst1));
+	pa ms_pa1(.clk(clk), .reset(reset),
+		.in(((mst1_D1 | mst2_D) & mq35_eq_mq36 | mst3a) & ~sc_eq_777),
+		.p(mst2));
+	pa ms_pa2(.clk(clk), .reset(reset),
+		.in((mst1_D1 | mst2_D) & ~mq[35] & mq36),
+		.p(mst3));
+	pa ms_pa3(.clk(clk), .reset(reset),
+		.in((mst1_D1 | mst2_D) & mq[35] & ~mq36),
+		.p(mst4));
+	pa ms_pa4(.clk(clk), .reset(reset),
+		.in(ar_t3 & msf1),
+		.p(mst3a));
+	pa ms_pa5(.clk(clk), .reset(reset),
+		.in((mst2_D & mq35_eq_mq36 | mst3a) & sc_eq_777),
+		.p(mst5));
+	pa ms_pa6(.clk(clk), .reset(reset),
+		.in(mst5_D),
+		.p(mst6));
+
+	wire mst1_D0, mst1_D1;
+	wire mst2_D, mst5_D;
+	dly50ns ms_dly0(.clk(clk), .reset(reset),
+		.in(mst1),
+		.p(mst1_D0));
+	dly200ns ms_dly1(.clk(clk), .reset(reset),
+		.in(mst1),
+		.p(mst1_D1));
+	dly150ns ms_dly2(.clk(clk), .reset(reset),
+		.in(mst2),
+		.p(mst2_D));
+	dly100ns ms_dly3(.clk(clk), .reset(reset),
+		.in(mst5),
+		.p(mst5_D));
 
 	always @(posedge clk) begin
 		if(mp_clr | mst3a)
 			msf1 <= 0;
+		if(mst3 | mst4)
+			msf1 <= 1;
 	end
 
 	/*
@@ -2049,69 +2112,253 @@ module apr(
 	reg dsf7;
 	reg dsf8;
 	reg dsf9;
-	wire ds_div = 0;
-	wire ds_divi = 0;
+	wire ds_div = ir_div & ir[6];
+	wire ds_divi = ir_div & ~ir[6];
+	wire dsf7_xor_mq0 = dsf7 ^ mq[0];
+
 	wire ds_clr;
-	wire dsf7_xor_mq0 = 0;
+	wire dst0;
+	wire dst0a;
+	wire dst1;
+	wire dst2;
+	wire dst3;
+	wire dst4;
+	wire dst5;
+	wire dst5a;
+	wire dst6;
+	wire dst7;
+	wire dst8;
+	wire dst9;
+	wire dst10;
+	wire dst10a;
+	wire dst10b;
+	wire dst11;
+	wire dst11a;
+	wire dst12;
+	wire dst13;
+	wire dst14a;
+	wire dst14b;
+	wire dst14;
+	wire dst15;
+	wire dst16;
+	wire dst17;
+	wire dst17a;
+	wire dst18;
+	wire dst19;
+	wire dst19a;
+	wire dst19b;
+	wire dst20;
+	wire dst21;
+	wire dst21a;
 
-	wire dst0 = 0;
-	wire dst0a = 0;
-	wire dst1 = 0;
-	wire dst2 = 0;
-	wire dst3 = 0;
-	wire dst4 = 0;
-	wire dst5 = 0;
-	wire dst5a = 0;
-	wire dst6 = 0;
-	wire dst7 = 0;
-	wire dst8 = 0;
-	wire dst9 = 0;
-	wire dst10 = 0;
-	wire dst10a = 0;
-	wire dst10b = 0;
-	wire dst11 = 0;
-	wire dst11a = 0;
-	wire dst12 = 0;
-	wire dst13 = 0;
-	wire dst14 = 0;
-	wire dst14a = 0;
-	wire dst14b = 0;
-	wire dst15 = 0;
-	wire dst16 = 0;
-	wire dst17 = 0;
-	wire dst17a = 0;
-	wire dst18 = 0;
-	wire dst19 = 0;
-	wire dst19a = 0;
-	wire dst20 = 0;
-	wire dst21 = 0;
-	wire dst21a = 0;
-
-	wire ds_div_t0 = 0;
+	wire ds_div_t0;
 
 	pa ds_pa0(.clk(clk), .reset(reset),
 		.in(mr_clr),
 		.p(ds_clr));
+	pa ds_pa1(.clk(clk), .reset(reset),
+		.in(et0 & ir_div),
+		.p(ds_div_t0));
+	pa ds_pa2(.clk(clk), .reset(reset),
+		.in((et0 & ds_divi | fdt0a) & ar[0]),
+		.p(dst0));
+	pa ds_pa3(.clk(clk), .reset(reset),
+		.in(ar_t3 & dsf1),
+		.p(dst0a));
+	pa ds_pa4(.clk(clk), .reset(reset),
+		.in((et0 & ~ar[0] | dst0a) & ds_divi),
+		.p(dst1));
+	pa ds_pa5(.clk(clk), .reset(reset),
+		.in(dst1_D),
+		.p(dst2));
+	pa ds_pa6(.clk(clk), .reset(reset),
+		.in(et0 & ar[0] & ds_div),
+		.p(dst3));
+	pa ds_pa7(.clk(clk), .reset(reset),
+		.in(dst3_D),
+		.p(dst4));
+	pa ds_pa8(.clk(clk), .reset(reset),
+		.in(dst4_D),
+		.p(dst5));
+	pa ds_pa9(.clk(clk), .reset(reset),
+		.in(ar_t3 & dsf2),
+		.p(dst5a));
+	pa ds_pa10(.clk(clk), .reset(reset),
+		.in(dst5a_D & ~ar_eq_0),
+		.p(dst6));
+	pa ds_pa11(.clk(clk), .reset(reset),
+		.in(dst6_D),
+		.p(dst7));
+	pa ds_pa12(.clk(clk), .reset(reset),
+		.in(dst5a_D & ar_eq_0),
+		.p(dst8));
+	pa ds_pa13(.clk(clk), .reset(reset),
+		.in(dst8_D),
+		.p(dst9));
+	pa ds_pa14(.clk(clk), .reset(reset),
+		.in(ar_t3 & dsf3 |
+		    fdt0a & ~ar[0] |
+		    dst0a & ~ds_divi |
+		    et0 & ds_div & ~ar[0] |
+		    dst2 | dst7),
+		.p(dst10));
+	pa ds_pa15(.clk(clk), .reset(reset),
+		.in(dst10_D & ir_fdv),
+		.p(dst10a));
+	pa ds_pa16(.clk(clk), .reset(reset),
+		.in(dst10_D & ir_div),
+		.p(dst10b));
+	pa ds_pa17(.clk(clk), .reset(reset),
+		.in((dst10a_D | dst10b_D) & mb[0]),
+		.p(dst11));
+	pa ds_pa18(.clk(clk), .reset(reset),
+		.in((dst10a_D | dst10b_D) & ~mb[0]),
+		.p(dst12));
+	pa ds_pa19(.clk(clk), .reset(reset),
+		.in(ar_t3 & dsf4),
+		.p(dst11a));
+	pa ds_pa20(.clk(clk), .reset(reset),
+		.in(dst11a & ~ar[0]),
+		.p(dst13));
+	pa ds_pa21(.clk(clk), .reset(reset),
+		.in(ar_t3 & dsf5 | 
+		    dst11a & ar[0]),
+		.p(dst14a));
+	pa ds_pa22(.clk(clk), .reset(reset),
+		.in(dst14a),
+		.p(dst14b));
+	pa ds_pa23(.clk(clk), .reset(reset),
+		.in(dst14b_D & ~sc_eq_777 & mq35_xor_mb0),
+		.p(dst14));
+	pa ds_pa24(.clk(clk), .reset(reset),
+		.in(dst14b_D & ~sc_eq_777 & ~mq35_xor_mb0),
+		.p(dst15));
+	pa ds_pa25(.clk(clk), .reset(reset),
+		.in(dst14b_D & sc_eq_777),
+		.p(dst16));
+	pa ds_pa26(.clk(clk), .reset(reset),
+		.in(dst16_D & ar[0] & ~mb[0]),
+		.p(dst17));
+	pa ds_pa27(.clk(clk), .reset(reset),
+		.in(dst16_D & ar[0] & mb[0]),
+		.p(dst18));
+	pa ds_pa28(.clk(clk), .reset(reset),
+		.in(dst16_D & ~ar[0] |
+		    ar_t3 & dsf6),
+		.p(dst17a));
+	pa ds_pa29(.clk(clk), .reset(reset),
+		.in(dst17a & dsf7),
+		.p(dst19));
+	pa ds_pa30(.clk(clk), .reset(reset),
+		.in(dst17a & ~dsf7 |
+		    ar_t3 & dsf8),
+		.p(dst19a));
+	pa ds_pa31(.clk(clk), .reset(reset),
+		.in(dst19_D),
+		.p(dst19b));
+	pa ds_pa32(.clk(clk), .reset(reset),
+		.in(dst19a_D),
+		.p(dst20));
+	pa ds_pa33(.clk(clk), .reset(reset),
+		.in(dst20_D & dsf7_xor_mq0),
+		.p(dst21));
+	pa ds_pa34(.clk(clk), .reset(reset),
+		.in(dst20_D & ~dsf7_xor_mq0 |
+		    ar_t3 & dsf9),
+		.p(dst21a));
+
+
+	wire dst1_D, dst3_D, dst4_D, dst5a_D, dst6_D, dst8_D;
+	wire dst10_D, dst10a_D, dst10b_D, dst14b_D, dst16_D;
+	wire dst19_D, dst19a_D, dst20_D;
+	dly150ns ds_dly0(.clk(clk), .reset(reset),
+		.in(dst1),
+		.p(dst1_D));
+	dly100ns ds_dly1(.clk(clk), .reset(reset),
+		.in(dst3),
+		.p(dst3_D));
+	dly100ns ds_dly2(.clk(clk), .reset(reset),
+		.in(dst4),
+		.p(dst4_D));
+	dly100ns ds_dly3(.clk(clk), .reset(reset),
+		.in(dst5a),
+		.p(dst5a_D));
+	dly100ns ds_dly4(.clk(clk), .reset(reset),
+		.in(dst6),
+		.p(dst6_D));
+	dly100ns ds_dly5(.clk(clk), .reset(reset),
+		.in(dst8),
+		.p(dst8_D));
+	dly100ns ds_dly6(.clk(clk), .reset(reset),
+		.in(dst10),
+		.p(dst10_D));
+	dly200ns ds_dly7(.clk(clk), .reset(reset),
+		.in(dst10a),
+		.p(dst10a_D));
+	dly200ns ds_dly8(.clk(clk), .reset(reset),
+		.in(dst10b),
+		.p(dst10b_D));
+	dly100ns ds_dly9(.clk(clk), .reset(reset),
+		.in(dst14b),
+		.p(dst14b_D));
+	dly100ns ds_dly10(.clk(clk), .reset(reset),
+		.in(dst16),
+		.p(dst16_D));
+	dly50ns ds_dly11(.clk(clk), .reset(reset),
+		.in(dst19),
+		.p(dst19_D));
+	dly100ns ds_dly12(.clk(clk), .reset(reset),
+		.in(dst19a),
+		.p(dst19a_D));
+	dly100ns ds_dly13(.clk(clk), .reset(reset),
+		.in(dst20),
+		.p(dst20_D));
 
 	always @(posedge clk) begin
 		if(ds_clr | dst0a)
 			dsf1 <= 0;
+		if(dst0)
+			dsf1 <= 1;
+
 		if(ds_clr | dst5a)
 			dsf2 <= 0;
+		if(dst5)
+			dsf2 <= 1;
+
 		if(ds_clr | dst10)
 			dsf3 <= 0;
+		if(dst9)
+			dsf3 <= 1;
+
 		if(ds_clr | dst11a)
 			dsf4 <= 0;
+		if(dst11 | dst12)
+			dsf4 <= 1;
+
 		if(ds_clr | dst14a)
 			dsf5 <= 0;
+		if(dst14 | dst15)
+			dsf5 <= 1;
+
 		if(ds_clr | dst17a)
 			dsf6 <= 0;
+		if(dst17 | dst18)
+			dsf6 <= 1;
+
 		if(mr_clr)
 			dsf7 <= 0;
+		if(dst0 | dst3)
+			dsf7 <= 1;
+
 		if(ds_clr | dst19a)
 			dsf8 <= 0;
+		if(dst19b)
+			dsf8 <= 1;
+
 		if(ds_clr | dst21a)
 			dsf9 <= 0;
+		if(dst21)
+			dsf9 <= 1;
 	end
 
 	/*
@@ -2134,7 +2381,12 @@ module apr(
 	wire nrt4 = 0;
 	wire nrt5 = 0;
 	wire nrt5a = 0;
-	wire nrt6 = 0;
+	wire nrt6;
+
+	pa nr_pa0(.clk(clk), .reset(reset),
+		.in(mpt0a & ir[6] |
+		    mpt2_D),	// TODO
+		.p(nrt6));
 
 	always @(posedge clk) begin
 		if(mp_clr | nrt5a)
