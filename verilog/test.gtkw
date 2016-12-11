@@ -1,15 +1,15 @@
 [*]
 [*] GTKWave Analyzer v3.3.76 (w)1999-2016 BSI
-[*] Sat Dec 10 18:05:06 2016
+[*] Sun Dec 11 15:59:05 2016
 [*]
 [dumpfile] "/home/aap/src/pdp6/verilog/dump.vcd"
-[dumpfile_mtime] "Sat Dec 10 17:52:00 2016"
-[dumpfile_size] 335826
+[dumpfile_mtime] "Sun Dec 11 15:55:54 2016"
+[dumpfile_size] 256855
 [savefile] "/home/aap/src/pdp6/verilog/test.gtkw"
-[timestart] 4810
+[timestart] 0
 [size] 1920 1080
 [pos] -1 -1
-*-11.555068 17575 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-11.555068 5260 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] test.
 [treeopen] test.pdp6.
 [sst_width] 337
@@ -434,7 +434,7 @@ test.pdp6.apr0.pc_set_OR_pc_inc
 test.pdp6.apr0.pc_set_enable
 @1401200
 -misc
-@c00200
+@c00201
 -cpa
 @28
 test.pdp6.apr0.cpa
@@ -448,6 +448,7 @@ test.pdp6.apr0.cpa_illeg_op
 test.pdp6.apr0.cpa_non_exist_mem
 test.pdp6.apr0.cpa_clock_enable
 test.pdp6.apr0.cpa_clock_flag
+test.pdp6.apr0.cpa_clock_flag_set
 test.pdp6.apr0.cpa_pc_chg_enable
 test.pdp6.apr0.cpa_pdl_ov
 test.pdp6.apr0.cpa_arov_enable
@@ -460,7 +461,7 @@ test.pdp6.apr0.cpa_iob[0:35]
 test.pdp6.apr0.iob_pi_req[1:7]
 test.pdp6.apr0.iobus_pi_req[1:7]
 test.pdp6.apr0.cpa_req[1:7]
-@1401200
+@1401201
 -cpa
 @c00200
 -shift
@@ -578,7 +579,7 @@ test.pdp6.apr0.mst5
 test.pdp6.apr0.mst6
 @1401200
 -MS
-@c00201
+@c00200
 -DS
 @28
 test.pdp6.apr0.ds_div_t0
@@ -628,7 +629,93 @@ test.pdp6.apr0.dsf7
 test.pdp6.apr0.dsf7_xor_mq0
 test.pdp6.apr0.dsf8
 test.pdp6.apr0.dsf9
-@1401201
+@1401200
 -DS
+@c00200
+-FM
+@28
+test.pdp6.apr0.fmt0
+test.pdp6.apr0.fmf1
+test.pdp6.apr0.fmt0a
+test.pdp6.apr0.fmf2
+test.pdp6.apr0.fmt0b
+@1401200
+-FM
+@c00200
+-FD
+@28
+test.pdp6.apr0.fdt0
+test.pdp6.apr0.fdf1
+test.pdp6.apr0.fdt0a
+test.pdp6.apr0.fdf2
+test.pdp6.apr0.fdt0b
+test.pdp6.apr0.fdt1
+@1401200
+-FD
+@c00200
+-FP
+@28
+test.pdp6.apr0.fpt0
+test.pdp6.apr0.fpt01
+test.pdp6.apr0.fpt1
+test.pdp6.apr0.fpf1
+test.pdp6.apr0.fpt1a
+test.pdp6.apr0.fpt1aa
+test.pdp6.apr0.fpf2
+test.pdp6.apr0.fpt1b
+test.pdp6.apr0.fpt2
+test.pdp6.apr0.fpt3
+test.pdp6.apr0.fpt4
+@200
+-
+@28
+test.pdp6.apr0.fp_ar0_xor_fmf1
+test.pdp6.apr0.fp_ar0_xor_mb0_xor_fmf1
+test.pdp6.apr0.fp_mb0_eq_fmf1
+@1401200
+-FP
+@c00200
+-NR
+@28
+test.pdp6.apr0.ar_eq_fp_half
+test.pdp6.apr0.nr_ar9_eq_ar0
+test.pdp6.apr0.nr_round
+test.pdp6.apr0.nrt05
+test.pdp6.apr0.nrt0
+test.pdp6.apr0.nrt01
+test.pdp6.apr0.nrt1
+test.pdp6.apr0.nrt2
+test.pdp6.apr0.nrt3
+test.pdp6.apr0.nrt31
+test.pdp6.apr0.nrt4
+test.pdp6.apr0.nrt5
+test.pdp6.apr0.nrt5a
+test.pdp6.apr0.nrt6
+@1401200
+-NR
+@c00200
+-FA
+@28
+test.pdp6.apr0.fat0
+test.pdp6.apr0.fat1
+test.pdp6.apr0.faf1
+test.pdp6.apr0.fat1b
+test.pdp6.apr0.faf2
+test.pdp6.apr0.fat1a
+test.pdp6.apr0.fat2
+test.pdp6.apr0.fat3
+test.pdp6.apr0.fat4
+test.pdp6.apr0.fat5
+test.pdp6.apr0.faf3
+test.pdp6.apr0.fat5a
+test.pdp6.apr0.fat6
+test.pdp6.apr0.fat7
+test.pdp6.apr0.fat8
+test.pdp6.apr0.fat8a
+test.pdp6.apr0.fat9
+test.pdp6.apr0.faf4
+test.pdp6.apr0.fat10
+@1401200
+-FA
 [pattern_trace] 1
 [pattern_trace] 0

@@ -1,3 +1,17 @@
+// input 100mhz, output ~60hz
+module clk60hz(
+	input wire clk,
+	output wire outclk
+);
+	reg [21:0] cnt = 0;
+	assign outclk = cnt == 1666666;
+	always @(posedge clk)
+		if(outclk)
+			cnt <= 0;
+		else
+			cnt <= cnt + 22'b1;
+endmodule
+
 module pg(
 	input clk,
 	input reset,

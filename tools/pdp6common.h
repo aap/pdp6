@@ -10,6 +10,9 @@ int isneg(word w);
 void writew(word w, FILE *fp);
 word readw(FILE *fp);
 
+word dtopdp(double d);
+double pdptod(word f);
+
 char ascii2rad(char c);
 char rad2ascii(char c);
 int israd50(char c);

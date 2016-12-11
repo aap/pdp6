@@ -5,7 +5,7 @@
 #include <assert.h>
 #include "pdp6common.h"
 #include "pdp6bin.h"
-#include "../args.h"
+#include "args.h"
 
 #define nil NULL
 

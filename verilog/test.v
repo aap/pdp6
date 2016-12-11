@@ -157,7 +157,8 @@ module test;
 			pdp6.fmem0.ff[i] = 0;
 
 		//`include "test1.inc"
-		`include "test2.inc"
+		//`include "test2.inc"
+		`include "test_fp.inc"
 	end
 
 	wire [0:35] mem0scope = pdp6.mem0.core['o1000];

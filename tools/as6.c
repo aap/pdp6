@@ -6,7 +6,7 @@
 #include <stdarg.h>
 #include "pdp6common.h"
 #include "pdp6bin.h"
-#include "../src/args.h"
+#include "args.h"
 
 #define nil NULL
 
@@ -431,28 +431,58 @@ Token
 symnum(char *s)
 {
 	Token t;
-	int isnum;
+	int neg, exp;
 	word n;
+	double f, e;
 	char *symp;
 
-	isnum = 1;
-	symp = s;
 	n = 0;
-	while(*s){
-		if(!isdigit(*s))
-			isnum = 0;
-		else if(isnum){
-			symp++;	/* ignore leading digits for symbols */
-			n = n*radix + *s-'0';
-		}
+	f = 0.0;
+	while(isdigit(*s)){
+		n = n*radix + *s-'0';
+		f = f*10.0 + *s-'0';
 		s++;
 	}
-	if(isnum){
-		t.type = Word;
-		t.w = n;
-	}else{
+	symp = s;
+	if(*s == '.'){
+		s++;
+		e = 1.0/10.0;
+		while(isdigit(*s)){
+			f += (*s-'0')*e;
+			e /= 10.0;
+			s++;
+		}
+/* NOTE: doesn't work since token() chops off + and -
+		if(*s == 'e' || *s == 'E'){
+			s++;
+			neg = 0;
+			if(*s == '+')
+				s++;
+			else if(*s == '-'){
+				neg = 1;
+				s++;
+			}
+			exp = 0;
+			while(isdigit(*s)){
+				exp = exp*10 + *s-'0';
+				s++;
+			}
+			while(exp--)
+				if(neg)
+					f /= 10.0;
+				else
+					f *= 10.0;
+		}
+*/
+		n = dtopdp(f);
+	}
+
+	if(*s){
 		t.type = Symbol;
 		t.s = getsym(sixbit(symp));
+	}else {
+		t.type = Word;
+		t.w = n;
 	}
 	return t;
 }

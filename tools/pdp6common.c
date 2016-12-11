@@ -37,6 +37,63 @@ readw(FILE *fp)
 	return w;
 }
 
+/* convert double to PDP-6 float */
+word
+dtopdp(double d)
+{
+	uint64_t x, e, m;
+	int sign;
+	word f;
+	sign = 0;
+	if(d < 0.0){
+		sign = 1;
+		d *= -1.0;
+	}
+	x = *(uint64_t*)&d;
+	/* sign is guaranteed to be 0 now */
+	e = (x >> 52) & 0x7FF;
+	m = x & 0xFFFFFFFFFFFFF;
+	e += 128-1023;
+	m >>= 25;
+	/* normalize */
+	if(x != 0){
+		m >>= 1;
+		m |= 0400000000;
+		e += 1;
+	}
+	f = e << 27;
+	f |= m;
+	if(sign)
+		f = -f & 0777777777777;
+	return f;
+}
+
+/* convert PDP-6 float to double */
+double
+pdptod(word f)
+{
+	uint64_t x, s, e, m;
+	s = 0;
+	if(f & 0400000000000){
+		f = -f & 0777777777777;
+		s = 1;
+	}
+	e = (f >> 27) & 0377;
+	m = f & 0777777777;
+	e += 1023-128;
+	/* normalize */
+	if(m != 0){
+		m &= ~0400000000;
+		m <<= 1;
+		e -= 1;
+	}
+	m <<= 25;
+	x = m;
+	x |= (e & 0x7FF) << 52;
+	x |= s << 63;
+	return *(double*)&x;
+}
+
 /* map ascii to radix50/squoze, also map lower to upper case */
 char
 ascii2rad(char c)
