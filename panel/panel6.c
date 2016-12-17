@@ -362,6 +362,9 @@ talki2c(void *x)
 		read(fd, p, 0xE);
 		p += 0xE;
 
+		read(fd, p, 0x5);
+		p += 0x5;
+
 		n = 0;
 		set18lights(&msg[n], ir_l); n += 3;
 		set18lights(&msg[n], pc_l); n += 3;
@@ -396,6 +399,13 @@ talki2c(void *x)
 		setlights(msg[n++], &ff_l[88], 8);
 		setlights(msg[n++], &ff_l[96], 8);
 		setlights(msg[n++], &ff_l[104], 8);
+
+		setlights(msg[n++], pr_l, 8);
+		setlights(msg[n++], rlr_l, 8);
+		setlights(msg[n++], rla_l, 8);
+
+		setlights(msg[n++]<<1, tty_l, 7);
+		setlights(msg[n++], ttibuf_l, 8);
 
 		for(i = 0; i < n; i++)
 			printf("%02X ", msg[i]);
