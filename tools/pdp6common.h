@@ -10,6 +10,7 @@ int isneg(word w);
 void writew(word w, FILE *fp);
 word readw(FILE *fp);
 
+void decompdbl(double d, int *s, word *e, uint64_t *m);
 word dtopdp(double d);
 double pdptod(word f);
 

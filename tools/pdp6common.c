@@ -37,6 +37,19 @@ readw(FILE *fp)
 	return w;
 }
 
+/* decompose a double into sign, exponent and mantissa */
+void
+decompdbl(double d, int *s, word *e, uint64_t *m)
+{
+	uint64_t x;
+	x = *(uint64_t*)&d;
+	*s = !!(x & 0x8000000000000000);
+	*e = (x >> 52) & 0x7FF;
+	*m = x & 0xFFFFFFFFFFFFF;
+	if(x != 0)
+		*m |= 0x10000000000000;
+}
+
 /* convert double to PDP-6 float */
 word
 dtopdp(double d)
@@ -60,7 +73,8 @@ dtopdp(double d)
 		m >>= 1;
 		m |= 0400000000;
 		e += 1;
-	}
+	}else
+		e = 0;
 	f = e << 27;
 	f |= m;
 	if(sign)
@@ -86,7 +100,8 @@ pdptod(word f)
 		m &= ~0400000000;
 		m <<= 1;
 		e -= 1;
-	}
+	}else
+		e = 0;
 	m <<= 25;
 	x = m;
 	x |= (e & 0x7FF) << 52;

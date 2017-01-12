@@ -12,6 +12,11 @@
 
 enum
 {
+	FW = 0777777777777
+};
+
+enum
+{
 	MAXSYM  = 4000,
 	MAXLINE = 256,
 	MAXOPND = 20
@@ -426,61 +431,152 @@ updateext(Sym *s, Value *v, int l)
 
 /* Token parsing */
 
-/* parse a potential number, fall back to symbol */
+/* shift uint64 by any amount */
+uint64_t
+shift(uint64_t i, int sh)
+{
+	int left;
+	left = sh < 0;
+	if(left) sh = -sh;
+	if(sh > 64)
+		return 0;
+	else{
+		if(left)
+			return i << sh;
+		else
+			return i >> sh;
+	}
+}
+
+/* combined shift of two 36 bit words */
+void
+shiftc(word *a, word *b, int sh)
+{
+	word aa, bb;
+
+	aa = shift(*a, sh) & FW;
+	bb = shift(*b, sh) & FW;
+	if(sh < 0){
+		*a = aa | shift(*b, sh+36) & FW;
+		*b = bb;
+	}else{
+		*b = bb | shift(*a, sh-36) & FW;
+		*a = aa;
+	}
+}
+
+/* get the integer and fractional parts of a double */
+void
+splitd(double d, word *integ, word *fract)
+{
+	int s;
+	word e;
+	uint64_t m;
+
+	decompdbl(d, &s, &e, &m);
+	*integ = shift(m, 52 + 1023-e) & FW;
+	*fract = shift(m, 16 + 1023-e) & FW;
+}
+
+/* parse a potential number, fall back to symbol, advance line pointer */
 Token
-symnum(char *s)
+symnum(void)
 {
 	Token t;
 	int neg, exp;
 	word n;
 	double f, e;
-	char *symp;
+	word fract, integ;
+	int isnum;
+	char *symp, symbuf[7];
+	int fixed;
+	int sgn;
+	int sh;
 
 	n = 0;
 	f = 0.0;
-	while(isdigit(*s)){
-		n = n*radix + *s-'0';
-		f = f*10.0 + *s-'0';
-		s++;
+	isnum = 0;
+	fixed = 0;
+	fract = 0;
+	if(lp[0] == '^' && lp[1] == 'F'){
+		fixed = 1;
+		lp += 2;
 	}
-	symp = s;
-	if(*s == '.'){
-		s++;
+	while(isdigit(*lp)){
+		n = n*radix + *lp-'0';
+		f = f*10.0 + *lp-'0';
+		isnum = 1;
+		lp++;
+	}
+	/* ignore leading digits if it is a symbol */
+	symp = lp;
+	/* try to parse a fractional number */
+	if(*lp == '.'){
+		lp++;
 		e = 1.0/10.0;
-		while(isdigit(*s)){
-			f += (*s-'0')*e;
+		while(isdigit(*lp)){
+			f += (*lp-'0')*e;
 			e /= 10.0;
-			s++;
+			isnum = 1;
+			lp++;
 		}
-/* NOTE: doesn't work since token() chops off + and -
-		if(*s == 'e' || *s == 'E'){
-			s++;
-			neg = 0;
-			if(*s == '+')
-				s++;
-			else if(*s == '-'){
-				neg = 1;
-				s++;
+		if(isnum){
+			if(*lp == 'e' || *lp == 'E'){
+				lp++;
+				neg = 0;
+				if(*lp == '+')
+					lp++;
+				else if(*lp == '-'){
+					neg = 1;
+					lp++;
+				}
+				exp = 0;
+				while(isdigit(*lp)){
+					exp = exp*10 + *lp-'0';
+					lp++;
+				}
+				while(exp--)
+					if(neg)
+						f /= 10.0;
+					else
+						f *= 10.0;
 			}
-			exp = 0;
-			while(isdigit(*s)){
-				exp = exp*10 + *s-'0';
-				s++;
-			}
-			while(exp--)
-				if(neg)
-					f /= 10.0;
-				else
-					f *= 10.0;
+			splitd(f, &integ, &fract);
+			n = fixed ? integ : dtopdp(f);
 		}
-*/
-		n = dtopdp(f);
+	}
+	/* bit shift */
+	if(isnum && *lp == 'B'){
+		/* TODO: actually a numeric expression */
+		lp++;
+		sh = 0;
+		sgn = 1;
+		if(*lp == '-'){
+			sgn = -1;
+			lp++;
+		}else if(*lp == '+')
+			lp++;
+		while(isdigit(*lp)){
+			sh = sh*10 + *lp-'0';
+			lp++;
+		}
+		sh *= sgn;
+		shiftc(&n, &fract, sh-35);
 	}
 
-	if(*s){
+	/* A number would end here, so it's a symbol */
+	if(!isnum || *lp && !isspace(*lp) && israd50(*lp)){
+		lp = symp;
+		symp = symbuf;
+		while(*lp && !isspace(*lp) && israd50(*lp)){
+			if(symp < &symbuf[6])
+				*symp++ = *lp;
+			lp++;
+		}
+		*symp = '\0';
 		t.type = Symbol;
-		t.s = getsym(sixbit(symp));
-	}else {
+		t.s = getsym(sixbit(symbuf));
+	}else{
 		t.type = Word;
 		t.w = n;
 	}
@@ -491,8 +587,6 @@ Token
 token(void)
 {
 	Token t;
-	char tok[100];
-	char *p;
 
 	if(peekt.type != Unused){
 		t = peekt;
@@ -501,16 +595,11 @@ token(void)
 	}
 
 	skipwhite();
-	p = tok;
 	while(*lp)
 		switch(ctab[*lp]){
 		case Letter:
 		case Digit:
-			while(*lp && !isspace(*lp) && israd50(*lp))
-				*p++ = *lp++;
-			*p = '\0';
-			t = symnum(tok);
-			return t;
+			return symnum();
 
 		case ';':
 			while(*lp)
@@ -526,7 +615,10 @@ token(void)
 				t.type = Radix8;
 			else if(*lp == 'B')
 				t.type = Radix2;
-			else{
+			else if(*lp == 'F'){
+				lp--;
+				return symnum();
+			}else{
 				err(1, "error: unknown Radix ^%c\n", *lp);
 				t.type = Radix8;
 			}
@@ -690,6 +782,7 @@ eval(Expr *e, Sym **ext, int pass)
 		v.val &= 0777777777777;
 		return v;
 	}
+	panic("Doesn't happen\n");
 }
 
 
@@ -795,7 +888,7 @@ Value
 expr(int pass, Sym **s)
 {
 	/* -			5
-	 * ^D ^O ^B ^F ^L	4
+	 * ^D ^O ^B ^L		4
 	 * B _			3
 	 * logical	! &	2
 	 * mul/div	* /	1
@@ -806,7 +899,7 @@ expr(int pass, Sym **s)
 	Expr *e;
 	Sym *ext;
 	Value v;
-	char name[8];
+/*	char name[8]; */
 
 /*	printf("EXP LINE: %s %o\n", lp, peekt.type); */
 	ext = nil;
