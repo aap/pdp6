@@ -8,6 +8,9 @@
 #include "pdp6bin.h"
 #include "args.h"
 
+// TODO: "ABC"
+//       A,,B
+
 #define nil NULL
 
 enum
@@ -104,6 +107,31 @@ struct Token
 	};
 };
 
+/* Expressions */
+
+enum Xtype
+{
+	Xval, Xsym, Xunop, Xbiop
+};
+
+/* This holds an expression AST */
+typedef struct Expr Expr;
+struct Expr
+{
+	int type;	/* Xtype */
+	Value v;	/* Xval */
+	Sym *s;		/* Xsym */
+	int op;		/* Xunop (unary), Xbiop (binary) */
+	Expr *l, *r;
+};
+
+typedef struct Litword Litword;
+struct Litword
+{
+	Value v;
+	Litword *next;
+};
+
 int ctab[] = {
 	Unused, Unused, Unused, Unused, Unused, Unused, Unused, Unused,
 	Unused, Unused, Unused, Unused, Unused, Unused, Unused, Unused,
@@ -118,7 +146,7 @@ int ctab[] = {
 	Unused, Letter, Letter, Letter, Letter, Letter, Letter, Letter,
 	Letter, Letter, Letter, Letter, Letter, Letter, Letter, Letter,
 	Letter, Letter, Letter, Letter, Letter, Letter, Letter, Letter,
-	Letter, Letter, Letter, Unused, Unused, Unused,    '^',  Shift,
+	Letter, Letter, Letter,    '[', Unused,    ']',    '^',  Shift,
 
 	Unused, Letter, Letter, Letter, Letter, Letter, Letter, Letter,
 	Letter, Letter, Letter, Letter, Letter, Letter, Letter, Letter,
@@ -149,6 +177,12 @@ Value absdot, reldot;	/* saved values of dot */
 int radix = 8;
 Token peekt;
 
+Value littabs[9];	/* memory locations of literal tables */
+int nlit;		/* current literal table */
+int litlevel;		/* literal nesting level; 0 = not inside literal */
+Litword *curlit;	/* currently active literal */
+Litword *litlist;	/* list of literals seen */
+
 /*
  * for REL output
  */
@@ -159,6 +193,9 @@ hword itemtype, itemsz;
 hword relocp;
 word blockreloc;
 int blocksz;
+
+
+void statement(void);
 
 /* Helpers */
 
@@ -194,6 +231,30 @@ mustopen(const char *name, const char *mode)
 	return f;
 }
 
+/* Append to literal and return position in list */
+int
+addw(Litword **list, Litword *lw)
+{
+	int n;
+	Litword **p;
+	n = 0;
+	for(p = list; *p; p = &(*p)->next)
+		n++;
+	*p = lw;
+	return n;
+}
+
+/* Add literal */
+/* TODO: don't add duplicates */
+Value
+addlit(Litword *l)
+{
+	Value loc;
+	loc = littabs[nlit];
+	loc.val += addw(&litlist, l);
+	return loc;
+}
+
 /* Output/listing */
 
 void
@@ -204,7 +265,7 @@ writeout(void)
 		writew(item[i], relfp);
 	//	printf("\t\tDUMP: %06o %06o\n", left(item[i]), right(item[i]));
 	}
-	printf("\n");
+	//printf("\n");
 }
 
 /* Start a REL block */
@@ -266,6 +327,14 @@ Value lastdot;
 void
 putv(word w, int rel)
 {
+	Litword *lw;
+	if(litlevel){
+		lw = malloc(sizeof(Litword));
+		lw->v = (Value){ w, rel };
+		lw->next = nil;
+		addw(&curlit, lw);
+		return;
+	}
 	if(pass2){
 		fprintf(lstfp, "%06o%c\t%06o%c%06o%c\t",
 			right(dot->v.val), dot->v.rel ? '\'' : ' ',
@@ -642,17 +711,6 @@ token(void)
 
 /* Expressions */
 
-/* This holds an expression AST */
-typedef struct Expr Expr;
-struct Expr
-{
-	int type;	/* word, symbol or operator */
-	word w;		/* type 0 */
-	Sym *s;		/* type 1 */
-	int op;		/* type 2 (unary), 3 (binary) */
-	Expr *l, *r;
-};
-
 Expr*
 newexpr(int type)
 {
@@ -666,9 +724,9 @@ newexpr(int type)
 void
 freeexpr(Expr *e)
 {
-	if(e->type >= 2)
+	if(e->type >= Xunop)
 		freeexpr(e->r);
-	if(e->type == 3)
+	if(e->type == Xbiop)
 		freeexpr(e->l);
 	free(e);
 }
@@ -698,12 +756,10 @@ eval(Expr *e, Sym **ext, int pass)
 	char name[8];
 
 	switch(e->type){
-	case 0:
-		v.val = e->w;
-		v.rel = 0;
-		return v;
+	case Xval:
+		return e->v;
 
-	case 1:
+	case Xsym:
 		if(!pass2 && pass == 1 && (e->s->type & Def) == 0 ||
 		    pass2 && pass == 2 && e->s->type & Extern){
 			unsixbit(e->s->name, name);
@@ -716,7 +772,7 @@ eval(Expr *e, Sym **ext, int pass)
 		}
 		return e->s->v;
 
-	case 2:
+	case Xunop:
 		if(e->op == Minus){
 			v = eval(e->r, ext, pass);
 			if(*ext)
@@ -726,7 +782,7 @@ eval(Expr *e, Sym **ext, int pass)
 		}
 		panic("expression operator");
 
-	case 3:
+	case Xbiop:
 		ex1 = nil;
 		ex2 = nil;
 		v = eval(e->l, &ex1, pass);
@@ -785,31 +841,34 @@ eval(Expr *e, Sym **ext, int pass)
 	panic("Doesn't happen\n");
 }
 
-
+/* Build an expression AST */
 Expr*
 parseexpr(int i)
 {
 	Expr *e, *e2;
 	Token t;
+	Sym *s;
 	int oldradix;
+	Litword *litsav;
 
 	t = token();
 	if(t.type == Eol){
-		e = newexpr(0);
-		e->w = 0;
+		e = newexpr(Xval);
+		e->v = (Value){ 0, 0 };
 		return e;
 	}
 
 	/* unary and atoms */
 	if(i == 4){
 		if(t.type == Word){
-			e = newexpr(0);
-			e->w = t.w;
+			e = newexpr(Xval);
+			e->v.val = t.w;
+			e->v.rel = 0;
 		}else if(t.type == Symbol){
-			e = newexpr(1);
+			e = newexpr(Xsym);
 			e->s = t.s;
 		}else if(t.type == Minus){
-			e = newexpr(2);
+			e = newexpr(Xunop);
 			e->op = Minus;
 			e->r = parseexpr(i);
 		}else if(t.type == Radix10 || t.type == Radix8 || t.type == Radix2){
@@ -829,6 +888,24 @@ parseexpr(int i)
 				err(1, "error: '>' expected");
 				peekt = t;
 			}
+		}else if(t.type == '['){
+			litlevel++;
+			litsav = curlit;
+			curlit = nil;
+
+			// TODO: more than one line
+			statement();
+
+			t = token();
+			if(t.type != ']'){
+				err(1, "error: ']' expected");
+				peekt = t;
+			}
+			e = newexpr(Xval);
+			e->v = addlit(curlit);
+
+			curlit = litsav;
+			litlevel--;
 		}else{
 			err(1, "error: expression syntax %o", t.type);
 			return nil;
@@ -838,7 +915,7 @@ parseexpr(int i)
 
 	/* n-ary expressions */
 	if(t.type == Word || t.type == Symbol ||
-	   t.type == Minus || t.type == '<' ||
+	   t.type == Minus || t.type == '<' || t.type == '[' ||
 	   t.type == Radix10 || t.type == Radix8 || t.type == Radix2 ){
 		peekt = t;
 		e = parseexpr(i+1);
@@ -848,7 +925,7 @@ parseexpr(int i)
 	}
 
 	for(t = token(); isop(t.type) == i; t = token()){
-		e2 = newexpr(3);
+		e2 = newexpr(Xbiop);
 		e2->op = t.type;
 		e2->l = e;
 		e2->r = parseexpr(i+1);
@@ -866,16 +943,16 @@ printexpr(Expr *e)
 	char *opnames[] = {
 		"+", "-", "*", "/", "!", "&", "_", "^D", "^O", "^B"
 	};
-	if(e->type == 0)
-		printf("%lo", e->w);
-	else if(e->type == 1){
+	if(e->type == Xval)
+		printf("%lo %d", e->v.val, e->v.rel);
+	else if(e->type == Xsym){
 		unsixbit(e->s->name, name);
 		printf("%s", name);
-	}else if(e->type == 2){
+	}else if(e->type == Xunop){
 		printf("(%s ", opnames[e->op - Plus]);
 		printexpr(e->r);
 		printf(")");
-	}else if(e->type == 3){
+	}else if(e->type == Xbiop){
 		printf("(");
 		printexpr(e->l);
 		printf(" %s ", opnames[e->op - Plus]);
@@ -884,6 +961,7 @@ printexpr(Expr *e)
 	}
 }
 
+/* Parse and evaluate an expression */
 Value
 expr(int pass, Sym **s)
 {
@@ -899,23 +977,12 @@ expr(int pass, Sym **s)
 	Expr *e;
 	Sym *ext;
 	Value v;
-/*	char name[8]; */
 
-/*	printf("EXP LINE: %s %o\n", lp, peekt.type); */
 	ext = nil;
 	e = parseexpr(0);
-/*	printf("EXPR: ");
-	printexpr(e);
-	printf("\n");*/
 	v = eval(e, &ext, pass);
 	if(s)
 		*s = ext;
-/*
-	if(ext){
-		unsixbit(ext->name, name);
-		printf("SAW EXTERNAL: %s\n", name);
-	}
-*/
 	freeexpr(e);
 	return v;
 }
@@ -1281,6 +1348,23 @@ endOp(void)
 }
 
 void
+litOp(void)
+{
+	Litword *l, *next;
+	if(litlist)
+		littabs[nlit] = dot->v;
+	for(l = litlist; l; l = next){
+		next = l->next;
+		printf("L: %012lo %d\n", l->v.val, l->v.rel);
+		putv(l->v.val, l->v.rel);
+		free(l);
+	}
+	if(litlist)
+		nlit++;
+	litlist = nil;
+}
+
+void
 statement(void)
 {
 	Token t;
@@ -1364,12 +1448,17 @@ statement(void)
 		case Word:
 		case Radix10: case Radix8: case Radix2:
 		case Minus:
+		case '[':
 			peekt = t;
 			ext = nil;
 			val = expr(0, &ext);
 			updateext(ext, &val, 0);
 			putv(val.val, val.rel);
 			break;
+
+		case ']':
+			peekt = t;
+			return;
 
 		default:
 			err(0, "unknown token %c(%o)", t.type, t.type);
@@ -1485,9 +1574,9 @@ writesymtab(void)
 		putword(rad, 0);
 		putword(fw(0, right(s->v.val)), s->v.rel);
 
-		printf("%s %3o: %012lo %o\n", name, s->type, s->v.val, s->v.rel);
+		//printf("%s %3o: %012lo %o\n", name, s->type, s->v.val, s->v.rel);
 		for(add = s->add; add; add = add->next){
-			printf(" %c %06o\n", "rl"[add->l], right(add->v.val));
+			//printf(" %c %06o\n", "rl"[add->l], right(add->v.val));
 
 			putword(rad, 0);
 			putword(fw(0400000 | (add->l ? 0200000 : 0), right(add->v.val)),
@@ -1543,31 +1632,6 @@ main(int argc, char *argv[])
 
 	initsymtab();
 
-	if(0){
-	Sym *s;
-	s = getsym(sixbit("HELLO"));
-	s->type = Local | Def;
-	s->v.val = 0432100001234;
-	s->v.rel = 1;
-	s = getsym(sixbit("ASDF"));
-	s->type = Intern | Def;
-	s->v.val = 0100;
-	s->v.rel = 1;
-	s = getsym(sixbit("BAR"));
-	s->type = Local | Def;
-	s->v.val = 0100;
-	s->v.rel = 0;
-	s = getsym(sixbit("QUUX"));
-	s->type = Extern;
-	s->v.val = 0;
-	s->v.rel = 0;
-	s = getsym(sixbit("QWERTY"));
-	s->type = Label | Local | Def;
-	s->v.val = 010;
-	s->v.rel = 1;
-	s = getsym(sixbit("QWERTYUIOP"));
-	}
-
 	resetdot();
 	pass2 = 0;
 	if(argc){
@@ -1592,6 +1656,7 @@ main(int argc, char *argv[])
 
 		assemble();
 	}
+	litOp();
 	putc(3, tmpfp);
 
 	fclose(tmpfp);
@@ -1605,6 +1670,9 @@ main(int argc, char *argv[])
 	tmpfp = mustopen("a.tmp", "r");
 
 	resetdot();
+	nlit = 0;
+
+
 	pass2 = 1;
 //	printf("\n   PASS2\n\n");
 
@@ -1612,6 +1680,7 @@ main(int argc, char *argv[])
 	putword(rad50(0, progtitle), 0);
 
 	assemble();
+	litOp();
 
 	writesymtab();
 
@@ -1688,6 +1757,7 @@ Ps pslist[] = {
 	{ "RADIX",    radixOp },
 	{ "BLOCK",    blockOp },
 	{ "END",      endOp },
+	{ "LIT",      litOp },
 /*
    " '
    RADIX50 SQUOZE
@@ -1699,7 +1769,6 @@ Ps pslist[] = {
    IOWD
     INTEGER
     ARRAY
-   LIT
    ENTRY
    OPDEF
 */
