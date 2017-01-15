@@ -93,7 +93,7 @@ module apr(
 
 	assign ff0 = { key_ex_st, key_ex_sync, key_dep_st, key_dep_sync, key_rdwr, mc_rd, mc_wr, mc_rq  };
 	assign ff1 = { if1a, af0, af3, af3a, et4_ar_pse, f1a, f4a, f6a };
-	assign ff2 = { sf3, sf5a, sf7, ar_com, blt_f0a, blt_f3a, blt_f5a, iot_f0a };
+	assign ff2 = { sf3, sf5a, sf7, ar_com_cont, blt_f0a, blt_f3a, blt_f5a, iot_f0a };
 	assign ff3 = { fpf1, fpf2, faf1, faf2, faf3, faf4, fmf1, fmf2 };
 	assign ff4 = { fdf1, fdf2, nr_round, nrf1, nrf2, nrf3, fsf1, chf7 };
 	assign ff5 = { dsf1, dsf2, dsf3, dsf4, dsf5, dsf6, dsf7, dsf8 };
@@ -2780,6 +2780,7 @@ module apr(
 	// reg mc_stop;
 	reg mc_stop_sync;
 	reg mc_split_cyc_sync;
+	// TODO: what is MC DR SPLIT?
 	wire mc_sw_stop = key_mem_stop | sw_addr_stop;
 	wire mc_rd_rq_pulse;
 	wire mc_wr_rq_pulse;
