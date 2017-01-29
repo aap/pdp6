@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <stdint.h>
 #include <stdarg.h>
 #include <assert.h>
@@ -23,6 +24,12 @@ struct Add
 	Add *next;
 };
 
+enum
+{
+	RIM = 0,
+	RIM10,
+	SAV,
+};
 
 char *argv0;
 FILE *in;
@@ -35,6 +42,7 @@ Add *addlist;
 int error;
 char **files;
 int nfiles;
+int fmt = RIM;
 
 FILE*
 mustopen(const char *name, const char *mode)
@@ -406,10 +414,75 @@ saverim(const char *filename)
 	fclose(out);
 }
 
+/* Saves in RIM10 format. Only one block is written.
+ *	IOWD count,origin
+ *	word
+ *	...
+ *	word
+ *	checksum
+ *	...
+ *	JRST start
+ */
+void
+saverim10(const char *filename)
+{
+	FILE *out;
+	hword i;
+	word w;
+	word checksum;
+
+	out = mustopen(filename, "wb");
+	checksum = 0;
+
+	w = fw(-(locmax+1-locmin), locmin-1);
+	writew(w, out);	/* IOWD count,origin */
+	checksum += w;
+	for(i = locmin; i <= locmax; i++){
+		writew(mem[i], out);
+		checksum += mem[i];
+	}
+	writew(-checksum, out);
+
+	writew(fw(0254000, start), out);	/* JRST start */
+	fclose(out);
+}
+
+void
+writeww(word w, FILE *fp)
+{
+	unsigned char c;
+	putc((w >> 29) & 0177, fp);
+	putc((w >> 22) & 0177, fp);
+	putc((w >> 15) & 0177, fp);
+	putc((w >> 8) & 0177, fp);
+	putc((w>>1) & 0177 | (w & 1) << 7, fp);
+}
+
+/* Saves in SAV format. Only one block is saved.
+ *	IOWD count,origin
+ *	word
+ *	...
+ *	word
+ *	...
+ *	JRST start
+ */
+void
+savesav(const char *filename)
+{
+	FILE *out;
+	hword i;
+	out = mustopen(filename, "wb");
+	writeww(fw(-(locmax+1-locmin), locmin-1), out);	/* IOWD count,origin */
+	for(i = locmin; i <= locmax; i++)
+		writeww(mem[i], out);
+	writeww(fw(0254000, start), out);	/* JRST start */
+	fclose(out);
+}
+
 void
 usage(void)
 {
-	fprintf(stderr, "usage: %s\n", argv0);
+	fprintf(stderr, "usage: %s [-r relbase] [-f fmt] [-o outfile] input1 input2 ...\n", argv0);
 	exit(1);
 }
 
@@ -420,6 +493,7 @@ main(int argc, char *argv[])
 	hword type;
 	int i;
 	char *outfile;
+	char *fmtstr;
 	void (*typesw[8])(void) = {
 		skipitem,
 		handlecode,
@@ -431,18 +505,40 @@ main(int argc, char *argv[])
 		handlestart,
 	};
 
-	outfile = "a.rim";
+	outfile = nil;
+	rel = 0100;
 
 	ARGBEGIN{
 	case 'r':
 		rel = strtol(EARGF(usage()), NULL, 8);
 		break;
+
+	case 'f':
+		fmtstr = EARGF(usage());
+		if(strcmp(fmtstr, "rim") == 0)
+			fmt = RIM;
+		if(strcmp(fmtstr, "rim10") == 0)
+			fmt = RIM10;
+		else if(strcmp(fmtstr, "sav") == 0)
+			fmt = SAV;
+		else
+			usage();
+		break;
+
 	case 'o':
 		outfile = EARGF(usage());
 		break;
+
 	default:
 		usage();
 	}ARGEND;
+
+	if(outfile == nil){
+		if(fmt == RIM || fmt == RIM10)
+			outfile = "a.rim";
+		else if(fmt == SAV)
+			outfile = "a.sav";
+	}
 
 	nfiles = argc;
 	files = argv;
@@ -474,7 +570,12 @@ main(int argc, char *argv[])
 //	disasmrange(0600+rel, 0603+rel);
 //	disasmrange(0200+rel, 0212+rel);
 
-	saverim(outfile);
+	if(fmt == RIM)
+		saverim(outfile);
+	else if(fmt == RIM10)
+		saverim10(outfile);
+	else if(fmt == SAV)
+		savesav(outfile);
 
 	return 0;
 }

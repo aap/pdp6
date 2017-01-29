@@ -8,8 +8,7 @@
 #include "pdp6bin.h"
 #include "args.h"
 
-// TODO: "ABC"
-//       A,,B
+// TODO: A,,B
 
 #define nil NULL
 
@@ -138,8 +137,8 @@ int ctab[] = {
 	Unused, Unused, Unused, Unused, Unused, Unused, Unused, Unused,
 	Unused, Unused, Unused, Unused, Unused, Unused, Unused, Unused,
 
-	Ignore, Exclam, Unused, Unused, Letter, Letter,  Amper, Unused,
-	   '(',    ')',   Star,   Plus, Unused,  Minus, Letter,  Slash,
+	Ignore, Exclam,    '"', Unused, Letter, Letter,  Amper,   '\'',
+	   '(',    ')',   Star,   Plus,    ',',  Minus, Letter,  Slash,
 	 Digit,  Digit,  Digit,  Digit,  Digit,  Digit,  Digit,  Digit,
 	 Digit,  Digit, Unused,    ';',    '<', Unused,    '>', Unused,
 
@@ -202,6 +201,8 @@ void statement(void);
 void
 err(int n, char *fmt, ...)
 {
+	if(n == 0 && pass2)
+		return;
 	va_list ap;
 	va_start(ap, fmt);
 	fprintf(stderr, "%s:%d: ", filename, lineno);
@@ -652,6 +653,30 @@ symnum(void)
 	return t;
 }
 
+word
+character(char delim, int sz)
+{
+	int mask;
+	word w;
+	char c;
+
+	w = 0;
+	mask = (1<<sz) - 1;
+	while(c = *lp++, c != delim){
+		if(c == '\\')
+			c = *lp++;
+		if(sz == 6)
+			c = ascii2sixbit(c);
+		if(c < 0)
+			continue;
+		c &= mask;
+		w = (w<<sz) | c;
+	}
+	if(sz == 7)
+		w &= 0377777777777;
+	return w;
+}
+
 Token
 token(void)
 {
@@ -669,6 +694,18 @@ token(void)
 		case Letter:
 		case Digit:
 			return symnum();
+
+		case '"':
+			lp++;
+			t.type = Word;
+			t.w = character('"', 7);
+			return t;
+
+		case '\'':
+			lp++;
+			t.type = Word;
+			t.w = character('\'', 6);
+			return t;
 
 		case ';':
 			while(*lp)
@@ -852,7 +889,8 @@ parseexpr(int i)
 	Litword *litsav;
 
 	t = token();
-	if(t.type == Eol){
+	if(t.type == Eol || t.type == ','){
+		peekt = t;
 		e = newexpr(Xval);
 		e->v = (Value){ 0, 0 };
 		return e;
@@ -931,8 +969,7 @@ parseexpr(int i)
 		e2->r = parseexpr(i+1);
 		e = e2;
 	}
-	if(t.type != Eol)
-		peekt = t;
+	peekt = t;
 	return e;
 }
 
@@ -1025,13 +1062,62 @@ splitop(void)
 					nparn++;
 				else if(*lp == ')')
 					nparn--;
+			lp--;
+		}else if(*lp == '['){
+			/* same as above */
+			if(*ops[numops-1] == '\0')
+				ops[numops-1] = lp;
+			lp++;
+			nparn = 1;
+			for(; *lp && *lp != ';' && nparn != 0; lp++)
+				if(*lp == '[')
+					nparn++;
+				else if(*lp == ']')
+					nparn--;
+			lp--;
 		}else{
 			if(*ops[numops-1] == '\0')
 				ops[numops-1] = lp;
 		}
 	}
 	*lp = '\0';
+}
 
+/* parse an effective address of the form @Y(X) */
+Value
+ea(void)
+{
+	word w;
+	Token t;
+	Sym *ext;
+	Value x, y;
+
+	w = 0;
+	if(*lp == '@'){
+		lp++;
+		w = 0000020000000;
+	}
+	ext = nil;
+	y = expr(0, &ext);
+	updateext(ext, &y, 0);
+	if(left(y.val))
+		err(0, "warning: address truncated");
+	w |= right(y.val);
+
+	t = token();
+	if(t.type == '('){
+		/* TODO: this is probably a statement */
+		x = expr(2, nil);
+		if(t = token(), t.type != ')'){
+			err(1, "error: ')' expected");
+			peekt = t;
+		}
+		if(x.rel)
+			err(0, "warning: index relocation ignored");
+		w |= fw(right(x.val) & 017, left(x.val));
+	}else
+		peekt = t;
+	return (Value){ w, y.rel };
 }
 
 /* Primary and IO instruction statement */
@@ -1061,24 +1147,31 @@ opline(word w, int io)
 		ep = ops[0];
 		break;
 	default:
-		err(0, "warning: too many operands");
+		err(0, "warning: too many operands: %d", numops);
 	case 2:
 		acp = ops[0];
 		ep = ops[1];
 	}
 
 	lp = acp;
+	peekt.type = Unused;
 	ac = expr(2, nil);
 
 	i = 0;
 	lp = ep;
+	peekt.type = Unused;
 	if(*lp == '@'){
 		lp++;
 		i = 1;
 	}
-	ext = nil;
-	y = expr(0, &ext);
-	updateext(ext, &y, 0);
+	t = token();
+	peekt = t;
+	if(peekt.type != '('){
+		ext = nil;
+		y = expr(0, &ext);
+		updateext(ext, &y, 0);
+	}else
+		y = (Value){ 0, 0 };
 
 	x = (Value){ 0, 0 };
 	t = token();
@@ -1115,7 +1208,7 @@ opline(word w, int io)
  */
 
 void
-internal(void)
+internOp(void)
 {
 	Sym *s;
 	int i;
@@ -1132,7 +1225,7 @@ internal(void)
 }
 
 void
-external(void)
+externOp(void)
 {
 	Sym *s;
 	int i;
@@ -1146,30 +1239,6 @@ external(void)
 		else
 			s->type |= Extern;
 	}
-}
-
-void
-xwd(void)
-{
-	Value l, r;
-	Sym *exl, *exr;
-
-	splitop();
-	l = (Value){ 0, 0 };
-	r = (Value){ 0, 0 };
-	if(numops != 2)
-		err(0, "warning: need two operands");
-	else{
-		exl = nil;
-		exr = nil;
-		lp = ops[0];
-		l = expr(0, &exl);
-		lp = ops[1];
-		r = expr(0, &exr);
-		updateext(exl, &l, 1);
-		updateext(exr, &r, 0);
-	}
-	putv(fw(right(l.val), right(r.val)), (l.rel<<1) | r.rel);
 }
 
 void
@@ -1187,31 +1256,210 @@ subttl(void)
 }
 
 void
-locOp(void)
+radixOp(void)
 {
+	int r;
+	Value v;
+
 	skipwhite();
-	if(dot->v.rel) reldot = dot->v;
-	else absdot = dot->v;
-	if(*lp && *lp != ';'){
-		dot->v = expr(1, nil);
-		dot->v.val &= 0777777;
-		dot->v.rel = 0;
-	}else
-		dot->v = absdot;
+	if(*lp == '\0' || *lp == ';')
+		return;
+	r = radix;
+	radix = 10;
+	v = expr(1, nil);
+	radix = r;
+	if(v.val < 2 || v.val > 10)
+		err(1, "error: invalid radix %d", v.val);
+	else
+		radix = v.val;
 }
 
 void
-relocOp(void)
+endOp(void)
 {
 	skipwhite();
-	if(dot->v.rel) reldot = dot->v;
-	else absdot = dot->v;
-	if(*lp && *lp != ';'){
-		dot->v = expr(1, nil);
-		dot->v.val &= 0777777;
-		dot->v.rel = 1;
+	start = expr(2, nil);
+	hadstart = 1;
+}
+
+void
+litOp(void)
+{
+	Litword *l, *next;
+	if(litlist)
+		littabs[nlit] = dot->v;
+	for(l = litlist; l; l = next){
+		next = l->next;
+//		printf("L: %012lo %d\n", l->v.val, l->v.rel);
+		putv(l->v.val, l->v.rel);
+		free(l);
+	}
+	if(litlist)
+		nlit++;
+	litlist = nil;
+}
+
+void
+expOp(void)
+{
+	Value v;
+	Token t;
+	Sym *ext;
+
+	do{
+		ext = nil;
+		v = expr(0, &ext);
+		updateext(ext, &v, 0);
+		putv(v.val, v.rel);
+	}while(t = token(), t.type == ',');
+}
+
+void
+decOp(void)
+{
+	int r;
+	r = radix;
+	radix = 10;
+	expOp();
+	radix = r;
+}
+
+void
+octOp(void)
+{
+	int r;
+	r = radix;
+	radix = 8;
+	expOp();
+	radix = r;
+}
+
+void
+byteOp(void)
+{
+	Token t;
+	word b, w;
+	int sz;
+	int mask;
+	int r;
+	int pos;
+
+	w = 0;
+	pos = 36;
+	sz = 6;
+	mask = 077;
+	for(;;){
+		/* byte size change */
+		if(t = token(), t.type == '('){
+			r = radix;
+			radix = 10;
+			sz = expr(0, nil).val;
+			if(t = token(), t.type != ')'){
+				err(1, "error: ')' expected");
+				peekt = t;
+			}
+			radix = r;
+			mask = (1<<sz) - 1;
+		}else
+			peekt = t;
+
+		/* byte */
+		b = expr(2, nil).val & mask;
+		pos -= sz;
+		if(pos < 0){
+			putv(w, 0);
+			w = 0;
+			pos = 36 - sz;
+		}
+		w |= b << pos;
+
+		t = token();
+		if(t.type == '(')
+			peekt = t;
+		else if(t.type != ',')
+			break;
+	}
+	putv(w, 0);
+}
+
+void
+xwd(void)
+{
+	Token t;
+	Value l, r;
+	Sym *exl, *exr;
+
+	exl = nil;
+	exr = nil;
+	l = (Value){ 0, 0 };
+	r = (Value){ 0, 0 };
+
+	l = expr(0, &exl);
+	updateext(exl, &l, 1);
+	if(t = token(), t.type == ','){
+		r = expr(0, &exr);
+		updateext(exr, &r, 0);
 	}else
-		dot->v = reldot;
+		err(0, "warning: right operand missing");
+
+	putv(fw(right(l.val), right(r.val)), (l.rel<<1) | r.rel);
+}
+
+void
+iowd(void)
+{
+	Token t;
+	Value l, r;
+	Sym *exl, *exr;
+
+	exl = nil;
+	exr = nil;
+	l = (Value){ 0, 0 };
+	r = (Value){ 0, 0 };
+
+	l = expr(2, &exl);
+	if(t = token(), t.type == ','){
+		r = expr(0, &exr);
+		updateext(exr, &r, 0);
+	}else
+		err(0, "warning: right operand missing");
+
+	putv(fw(right(-l.val), right(r.val-1)), (l.rel<<1) | r.rel);
+}
+
+void
+pointOp(void)
+{
+	Value v;
+	Token t;
+	word sz, pos;
+	int r;
+
+	peekt.type = Unused;
+
+	r = radix;
+	radix = 10;
+	sz = expr(2, nil).val & 077;
+	radix = r;
+
+	if(t = token(), t.type != ','){
+		peekt = t;
+		err(2, "error: ',' expected");
+	}
+
+	v = ea();
+
+	pos = 044;
+	if(t = token(), t.type == ','){
+		r = radix;
+		radix = 10;
+		pos = expr(2, nil).val & 077;
+		radix = r;
+	}else
+		peekt = t;
+
+	v.val |= sz<<24 | pos<<30;
+	putv(v.val, v.rel);
 }
 
 int asciiz;
@@ -1309,25 +1557,6 @@ sixbitOp(void)
 }
 
 void
-radixOp(void)
-{
-	int r;
-	Value v;
-
-	skipwhite();
-	if(*lp == '\0' || *lp == ';')
-		return;
-	r = radix;
-	radix = 10;
-	v = expr(1, nil);
-	radix = r;
-	if(v.val < 2 || v.val > 10)
-		err(1, "error: invalid radix %d", v.val);
-	else
-		radix = v.val;
-}
-
-void
 blockOp(void)
 {
 	Value v;
@@ -1340,28 +1569,31 @@ blockOp(void)
 }
 
 void
-endOp(void)
+locOp(void)
 {
 	skipwhite();
-	start = expr(2, nil);
-	hadstart = 1;
+	if(dot->v.rel) reldot = dot->v;
+	else absdot = dot->v;
+	if(*lp && *lp != ';'){
+		dot->v = expr(1, nil);
+		dot->v.val &= 0777777;
+		dot->v.rel = 0;
+	}else
+		dot->v = absdot;
 }
 
 void
-litOp(void)
+relocOp(void)
 {
-	Litword *l, *next;
-	if(litlist)
-		littabs[nlit] = dot->v;
-	for(l = litlist; l; l = next){
-		next = l->next;
-		printf("L: %012lo %d\n", l->v.val, l->v.rel);
-		putv(l->v.val, l->v.rel);
-		free(l);
-	}
-	if(litlist)
-		nlit++;
-	litlist = nil;
+	skipwhite();
+	if(dot->v.rel) reldot = dot->v;
+	else absdot = dot->v;
+	if(*lp && *lp != ';'){
+		dot->v = expr(1, nil);
+		dot->v.val &= 0777777;
+		dot->v.rel = 1;
+	}else
+		dot->v = reldot;
 }
 
 void
@@ -1440,15 +1672,18 @@ statement(void)
 			}else if(s->type == Pseudo){
 				s->f();
 				return;
-			}else
-				goto exp;
+			}else{
+				err(1, "error: unknown operator %s", name);
+				return;
+			}
 			break;
 
-		exp:
+		case ',':
+			return;
+
 		case Word:
 		case Radix10: case Radix8: case Radix2:
 		case Minus:
-		case '[':
 			peekt = t;
 			ext = nil;
 			val = expr(0, &ext);
@@ -1744,29 +1979,32 @@ initsymtab(void)
 }
 
 Ps pslist[] = {
-	{ "INTERNAL", internal },
-	{ "EXTERNAL", external },
-	{ "XWD",      xwd },
+	{ "INTERN",   internOp },
+	{ "EXTERN",   externOp },
 	{ "TITLE",    title },
 	{ "SUBTTL",   subttl },
-	{ "LOC",      locOp },
-	{ "RELOC",    relocOp },
+	{ "RADIX",    radixOp },
+	{ "END",      endOp },
+	{ "LIT",      litOp },
+
+	{ "EXP",      expOp },
+	{ "DEC",      decOp },
+	{ "OCT",      octOp },
+	{ "BYTE",     byteOp },
+	{ "XWD",      xwd },
+	{ "IOWD",     iowd },
+	{ "POINT",    pointOp },
+
 	{ "ASCII",    ascii },
 	{ "ASCIZ",    asciz },
 	{ "SIXBIT",   sixbitOp },
-	{ "RADIX",    radixOp },
 	{ "BLOCK",    blockOp },
-	{ "END",      endOp },
-	{ "LIT",      litOp },
+
+	{ "LOC",      locOp },
+	{ "RELOC",    relocOp },
+
 /*
-   " '
    RADIX50 SQUOZE
-   DEC
-   OCT
-   EXP
-   BYTE
-   POINT
-   IOWD
     INTEGER
     ARRAY
    ENTRY
