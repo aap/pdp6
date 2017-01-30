@@ -1,4 +1,5 @@
-SRC=main.c apr.c mem.c tty.c pt.c
+SRC=main.c cmd.c apr.c mem.c tty.c pt.c ../tools/pdp6common.c
+H=pdp6.h ../tools/pdp6common.h
 # clang
 #CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses \
 #        -Wno-bitwise-op-parentheses
@@ -8,6 +9,6 @@ CFLAGS=  -g -fno-diagnostics-show-caret \
 LIBS=	`sdl-config --libs` `pkg-config SDL_image --libs` -lpthread
 
 
-pdp6: $(SRC) pdp6.h
+pdp6: $(SRC) $(H)
 	$(CC) $(CFLAGS) $(SRC) $(LIBS) -o pdp6
 

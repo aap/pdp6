@@ -535,16 +535,21 @@ getms(void)
 }
 
 void
+quit(int code)
+{
+	//SDL_Quit();
+	putchar('\n');
+	exit(code);
+}
+
+void
 usage(void)
 {
 	fprintf(stderr, "usage: %s [-t] [-d debugfile] [-c ttyfile]\n", argv0);
 	exit(1);
 }
 
-Apr apr;
-Tty tty;
-Ptr ptr;
-Ptp ptp;
+Apr *aprs[4];
 Mem *coremems[4];
 
 int
@@ -559,7 +564,13 @@ main(int argc, char *argv[])
 	int delay;
 	int i;
 	int w, h;
+	pthread_t cmd_thread;
 	const char *outfile, *ttyfile;
+
+	Apr *apr;
+	Ptr *ptr;
+	Ptp *ptp;
+	Tty *tty;
 
 	outfile = "/dev/null";
 	ttyfile = "/tmp/6tty";
@@ -670,22 +681,23 @@ main(int argc, char *argv[])
 
 	extra_l = e; e += 1;
 
-	initapr(&apr);
+	aprs[0] = apr = makeapr();
 	coremems[0] = makecoremem("mem_0");
 	coremems[1] = makecoremem("mem_1");
 	coremems[2] = makecoremem("mem_2");
 	coremems[3] = makecoremem("mem_3");
-	attachmem(makefastmem(0), 0, &apr.membus, -1);
-	attachmem(coremems[0], 0, &apr.membus, 0);
-	attachmem(coremems[1], 0, &apr.membus, 1);
-	attachmem(coremems[2], 0, &apr.membus, 2);
-	attachmem(coremems[3], 0, &apr.membus, 3);
-	inittty(&tty, &apr.iobus);
-	initptr(&ptr, &apr.iobus);
-	initptp(&ptp, &apr.iobus);
+	attachmem(makefastmem(0), 0, &apr->membus, -1);
+	attachmem(coremems[0], 0, &apr->membus, 0);
+	attachmem(coremems[1], 0, &apr->membus, 1);
+	attachmem(coremems[2], 0, &apr->membus, 2);
+	attachmem(coremems[3], 0, &apr->membus, 3);
+	tty = maketty(&apr->iobus);
+	ptr = makeptr(&apr->iobus);
+	ptp = makeptp(&apr->iobus);
 	if(ttyfile)
-		attachdevtty(&tty, ttyfile);
-	showmem(&apr.membus);
+		attachdevtty(tty, ttyfile);
+
+	pthread_create(&cmd_thread, nil, cmdthread, nil);
 
 	for(;;){
 		start = SDL_GetTicks();
@@ -701,13 +713,12 @@ main(int argc, char *argv[])
 				mouse(mbev->button, mbev->state, mbev->x, mbev->y);
 				break;
 			case SDL_QUIT:
-				SDL_Quit();
-				return 0;
+				quit(0);
 			}
 
-		updateapr(&apr, &ptr);
-		updatetty(&tty);
-		updatept(&ptp, &ptr);
+		updateapr(apr, ptr);
+		updatetty(tty);
+		updatept(ptp, ptr);
 
 		SDL_FillRect(screen, nil, SDL_MapRGBA(screen->format, 0xe6, 0xe6, 0xe6, 0xff));
 		SDL_BlitSurface(indpanel1.surf, nil, screen, &indpanel1.pos);
@@ -717,11 +728,11 @@ main(int argc, char *argv[])
 		SDL_BlitSurface(oppanel.surf, nil, screen, &oppanel.pos);
 
 		for(i = 0, e = lamps; i < nelem(lamps); i++, e++)
-			drawelement(screen, e, apr.sw_power);
+			drawelement(screen, e, apr->sw_power);
 		for(i = 0, e = keys; i < nelem(keys); i++, e++)
-			drawelement(screen, e, apr.sw_power);
+			drawelement(screen, e, apr->sw_power);
 		for(i = 0, e = switches; i < nelem(switches); i++, e++)
-			drawelement(screen, e, apr.sw_power);
+			drawelement(screen, e, apr->sw_power);
 
 //		SDL_LockSurface(screen);
 //		drawgrid(&opgrid1, screen, 0xFFFFFF00);

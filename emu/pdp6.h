@@ -3,16 +3,16 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <string.h>
+#include <ctype.h>
 #include <assert.h>
 #include <pthread.h>
+#include "../tools/pdp6common.h"
 
 #define nelem(a) (sizeof(a)/sizeof(a[0]))
 #define nil NULL
 #define print printf
 #define fprint fprintf
 
-typedef uint64_t word;
-typedef uint32_t hword;
 typedef uint32_t u32;
 typedef uint16_t u16;
 typedef int8_t   i8;
@@ -24,6 +24,9 @@ extern FILE *debugfp;
 extern int dotrace;
 void trace(char *fmt, ...);
 void debug(char *fmt, ...);
+
+void quit(int code);
+void *cmdthread(void *);
 
 enum {
 	MAXPULSE = 5
@@ -203,6 +206,7 @@ Mem *makecoremem(const char *file);
 void attachmem(Mem *mem, int p, Membus *bus, int n);
 void readmem(const char *file, word *mem, word size);
 void showmem(Membus *bus);
+word *getmemref(Membus *bus, hword addr, int fastmem);
 
 /*
  * IO bus
@@ -395,7 +399,8 @@ struct Apr
 	Pulse **clist, **nlist;
 	int ncurpulses, nnextpulses;
 };
-void initapr(Apr *apr);
+extern Apr *aprs[4];
+Apr *makeapr(void);
 void curpulse(Apr *apr, Pulse *p);
 void nextpulse(Apr *apr, Pulse *p);
 void *aprmain(void *p);
@@ -414,7 +419,7 @@ struct Ptp
 	FILE *fp;
 	int waitdatao;
 };
-void initptp(Ptp *ptp, IOBus *bus);
+Ptp *makeptp(IOBus *bus);
 
 
 /* Paper tape reader 760 */
@@ -431,7 +436,7 @@ struct Ptr
 
 	FILE *fp;
 };
-void initptr(Ptr *ptr, IOBus *bus);
+Ptr *makeptr(IOBus *bus);
 void ptr_setmotor(Ptr *ptr, int m);
 
 
@@ -447,7 +452,7 @@ struct Tty
 	int pia;
 	int fd;
 };
-void inittty(Tty *tty, IOBus *bus);
+Tty *maketty(IOBus *bus);
 void attachdevtty(Tty *tty, const char *path);
 
 

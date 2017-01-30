@@ -239,6 +239,7 @@ makecoremem(const char *file)
 	Mem *mem;
 
 	core = malloc(sizeof(CMem));
+	memset(core, 0, sizeof(CMem));
 	core->filename = file;
 	pthread_mutex_init(&core->mutex, nil);
 
@@ -303,6 +304,23 @@ showmem(Membus *bus)
 	for(i = 0; i < 16; i++)
 		if(bus->cmem[i]){
 			core = bus->cmem[i]->module;
-			printf("%06o %06o %s\n", i<<14, (i+1 << 14)-1, core->filename);
+			printf("%s: %06o %06o\n", core->filename, i<<14, (i+1 << 14)-1);
 		}
+}
+
+word*
+getmemref(Membus *bus, hword addr, int fastmem)
+{
+	CMem *core;
+	FMem *ff;
+
+	if(fastmem && addr < 020 && bus->fmem){
+		ff = bus->fmem->module;
+		return &ff->ff[addr];
+	}
+	if(bus->cmem[addr>>14]){
+		core = bus->cmem[addr>>14]->module;
+		return &core->core[addr & 037777];
+	}
+	return nil;
 }

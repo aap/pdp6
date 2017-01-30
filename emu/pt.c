@@ -190,21 +190,30 @@ ptr_setmotor(Ptr *ptr, int m)
 	recalc_ptr_req(ptr);
 }
 
-void
-initptp(Ptp *ptp, IOBus *bus)
+Ptp*
+makeptp(IOBus *bus)
 {
 	pthread_t thread_id;
+	Ptp *ptp;
+
+	ptp = malloc(sizeof(Ptp));
+	memset(ptp, 0, sizeof(Ptp));
 	ptp->bus = bus;
 	bus->dev[PTP] = (Busdev){ ptp, wake_ptp, 0 };
 	pthread_create(&thread_id, nil, ptpthread, ptp);
 
 	ptp->fp = fopen("../code/ptp.out", "wb");
+	return ptp;
 }
 
-void
-initptr(Ptr *ptr, IOBus *bus)
+Ptr*
+makeptr(IOBus *bus)
 {
 	pthread_t thread_id;
+	Ptr *ptr;
+
+	ptr = malloc(sizeof(Ptr));
+	memset(ptr, 0, sizeof(Ptr));
 	ptr->bus = bus;
 	bus->dev[PTR] = (Busdev){ ptr, wake_ptr, 0 };
 	pthread_create(&thread_id, nil, ptrthread, ptr);

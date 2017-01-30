@@ -120,12 +120,17 @@ fail:
 	fprintf(stderr, "couldn't open tty %s\n", path);
 }
 
-void
-inittty(Tty *tty, IOBus *bus)
+Tty*
+maketty(IOBus *bus)
 {
 	pthread_t thread_id;
+	Tty *tty;
+
+	tty = malloc(sizeof(Tty));
+	memset(tty, 0, sizeof(Tty));
 	tty->fd = -1;
 	tty->bus = bus;
 	bus->dev[TTY] = (Busdev){ tty, wake_tty, 0 };
 	pthread_create(&thread_id, nil, ttythread, tty);
+	return tty;
 }

@@ -3034,11 +3034,15 @@ nextpulse(Apr *apr, Pulse *p)
 	apr->nlist[apr->nnextpulses++] = p;
 }
 
-void
-initapr(Apr *apr)
+Apr*
+makeapr(void)
 {
+	Apr *apr;
+	apr = malloc(sizeof(Apr));
+	memset(apr, 0, sizeof(Apr));
 	apr->iobus.dev[CPA] = (Busdev){ apr, wake_cpa, 0 };
 	apr->iobus.dev[PI] = (Busdev){ apr, wake_pi, 0 };
+	return apr;
 }
 
 /* find out which bits were turned on */
