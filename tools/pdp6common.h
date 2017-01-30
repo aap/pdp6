@@ -7,8 +7,11 @@ hword left(word w);
 hword right(word w);
 word negw(word w);
 int isneg(word w);
+
 void writew(word w, FILE *fp);
 word readw(FILE *fp);
+void writewbak(word w, FILE *fp);
+word readwbak(FILE *fp);
 
 void decompdbl(double d, int *s, word *e, uint64_t *m);
 word dtopdp(double d);

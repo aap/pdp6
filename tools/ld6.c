@@ -414,7 +414,8 @@ saverim(const char *filename)
 	fclose(out);
 }
 
-/* Saves in RIM10 format. Only one block is written.
+/* Saves in RIM10 format. Begins with the RIM10B loader,
+ *  after that only one block is written.
  *	IOWD count,origin
  *	word
  *	...
@@ -423,6 +424,23 @@ saverim(const char *filename)
  *	...
  *	JRST start
  */
+word rim10b[] = {
+	0777762000000,
+	0710600000060,
+	0541400000004,
+	0710740000010,
+	0254000000003,
+	0710470000007,
+	0256010000007,
+	0256010000012,
+	0364400000000,
+	0312740000016,
+	0270756000001,
+	0331740000016,
+	0254200000001,
+	0253700000003,
+	0254000000002,
+};
 void
 saverim10(const char *filename)
 {
@@ -434,6 +452,10 @@ saverim10(const char *filename)
 	out = mustopen(filename, "wb");
 	checksum = 0;
 
+	/* write RIM10B loader */
+	for(i = 0; i < 017; i++)
+		writew(rim10b[i], out);
+
 	w = fw(-(locmax+1-locmin), locmin-1);
 	writew(w, out);	/* IOWD count,origin */
 	checksum += w;
@@ -441,21 +463,12 @@ saverim10(const char *filename)
 		writew(mem[i], out);
 		checksum += mem[i];
 	}
-	writew(-checksum, out);
+	checksum &= 0777777777777;
+//	writew(-checksum, out);	/* this was apparently wrong? */
+	writew(checksum, out);
 
 	writew(fw(0254000, start), out);	/* JRST start */
 	fclose(out);
-}
-
-void
-writeww(word w, FILE *fp)
-{
-	unsigned char c;
-	putc((w >> 29) & 0177, fp);
-	putc((w >> 22) & 0177, fp);
-	putc((w >> 15) & 0177, fp);
-	putc((w >> 8) & 0177, fp);
-	putc((w>>1) & 0177 | (w & 1) << 7, fp);
 }
 
 /* Saves in SAV format. Only one block is saved.
@@ -472,10 +485,10 @@ savesav(const char *filename)
 	FILE *out;
 	hword i;
 	out = mustopen(filename, "wb");
-	writeww(fw(-(locmax+1-locmin), locmin-1), out);	/* IOWD count,origin */
+	writewbak(fw(-(locmax+1-locmin), locmin-1), out);	/* IOWD count,origin */
 	for(i = locmin; i <= locmax; i++)
-		writeww(mem[i], out);
-	writeww(fw(0254000, start), out);	/* JRST start */
+		writewbak(mem[i], out);
+	writewbak(fw(0254000, start), out);	/* JRST start */
 	fclose(out);
 }
 

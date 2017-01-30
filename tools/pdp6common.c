@@ -11,6 +11,7 @@ hword right(word w) { return w & 0777777; }
 word negw(word w) { return (~w + 1) & 0777777777777; }
 int isneg(word w) { return !!(w & 0400000000); }
 
+/* write word in rim format */
 void
 writew(word w, FILE *fp)
 {
@@ -35,6 +36,32 @@ readw(FILE *fp)
 		w = (w << 6) | (b & 077);
 	}
 	return w;
+}
+
+/* write word in backup format. This is what pdp10-ka expects. */
+void
+writewbak(word w, FILE *fp)
+{
+	unsigned char c;
+	putc((w >> 29) & 0177, fp);
+	putc((w >> 22) & 0177, fp);
+	putc((w >> 15) & 0177, fp);
+	putc((w >> 8) & 0177, fp);
+	putc((w>>1) & 0177 | (w & 1) << 7, fp);
+}
+
+word
+readwbak(FILE *fp)
+{
+	char buf[5];
+	if(fread(buf, 1, 5, fp) != 5)
+		return ~0;
+	return (word)buf[0] << 29 |
+	       (word)buf[1] << 22 |
+	       (word)buf[2] << 15 |
+	       (word)buf[3] << 8 |
+	       ((word)buf[4]&0177) << 1 |
+	       ((word)buf[4]&0200) >> 7;
 }
 
 /* decompose a double into sign, exponent and mantissa */
