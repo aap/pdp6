@@ -2,7 +2,6 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <termios.h>
-#include <pthread.h>
 #include <poll.h>
 
 static void
@@ -11,23 +10,23 @@ recalc_tty_req(Tty *tty)
 	setreq(tty->bus, TTY, tty->tto_flag || tty->tti_flag ? tty->pia : 0);
 }
 
-/* TODO: implement some kind of sleep if no tty is attached */
-static void*
-ttythread(void *dev)
+static void
+ttycycle(void *p)
 {
+	Tty *tty;
 	int n;
 	char c;
-	Tty *tty;
 
-	tty = dev;
-	for(;;){
-		while(tty->fd >= 0 && (n = read(tty->fd, &c, 1)) > 0){
-			tty->tti_busy = 1;
-			tty->tti = c|0200;
-			tty->tti_busy = 0;
-			tty->tti_flag = 1;
-			recalc_tty_req(tty);
-		}
+	tty = p;
+	if(tty->fd >= 0 && hasinput(tty->fd)){
+		tty->tti_busy = 1;
+		n = read(tty->fd, &c, 1);
+		tty->tti = c|0200;
+		tty->tti_busy = 0;
+		if(n < 0)
+			return;
+		tty->tti_flag = 1;
+		recalc_tty_req(tty);
 	}
 }
 
@@ -123,14 +122,17 @@ fail:
 Tty*
 maketty(IOBus *bus)
 {
-	pthread_t thread_id;
 	Tty *tty;
+	Thread th;
 
 	tty = malloc(sizeof(Tty));
 	memset(tty, 0, sizeof(Tty));
 	tty->fd = -1;
 	tty->bus = bus;
 	bus->dev[TTY] = (Busdev){ tty, wake_tty, 0 };
-	pthread_create(&thread_id, nil, ttythread, tty);
+
+	th = (Thread){ nil, ttycycle, tty, 1, 0 };
+	addthread(th);
+
 	return tty;
 }

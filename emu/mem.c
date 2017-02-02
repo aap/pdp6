@@ -46,7 +46,6 @@ wakecore(Mem *mem, Membus *bus)
 	 * Lower numbers have higher priority but proc 2 and 3 have
 	 * the same priority and requests are alternated between them.
 	 * If no request is made, we should already be connected to a bus */
-	pthread_mutex_lock(&core->mutex);
 	if(core->cmc_p_act < 0){
 		if(mem->bus[0]->c12 & MEMBUS_RQ_CYC)
 			core->cmc_p_act = 0;
@@ -65,18 +64,16 @@ wakecore(Mem *mem, Membus *bus)
 					core->cmc_p_act = 2;
 				else if(p3)
 					core->cmc_p_act = 3;
-				else{
-					pthread_mutex_unlock(&core->mutex);
+				else
 					return 1;	/* no request at all? */
-				}
 			}
 			core->cmc_last_proc = core->cmc_p_act;
 		}
 	}
-	pthread_mutex_unlock(&core->mutex);
 
 	/* The executing thread can only service requests from its own processor
 	 * due to synchronization with the processor's pulse cycle. */
+	/* TODO: is this still true after the removal of pthreads? */
 	if(bus != mem->bus[core->cmc_p_act])
 		return 1;
 
@@ -135,6 +132,7 @@ powercore(Mem *mem)
 {
 	CMem *core;
 
+	printf("[powercore]\n");
 	core = mem->module;
 	readmem(core->filename, core->core, 040000);
 	core->cmc_aw_rq = 1;
@@ -200,6 +198,7 @@ powerff(Mem *mem)
 {
 	FMem *ff;
 
+	printf("[powerff]\n");
 	ff = mem->module;
 	ff->fmc_act = 0;
 	ff->fmc_wr = 0;
@@ -241,7 +240,6 @@ makecoremem(const char *file)
 	core = malloc(sizeof(CMem));
 	memset(core, 0, sizeof(CMem));
 	core->filename = file;
-	pthread_mutex_init(&core->mutex, nil);
 
 	mem = malloc(sizeof(Mem));
 	mem->module = core;

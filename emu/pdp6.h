@@ -5,7 +5,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
-#include <pthread.h>
 #include "../tools/pdp6common.h"
 
 #define nelem(a) (sizeof(a)/sizeof(a[0]))
@@ -24,6 +23,9 @@ extern FILE *debugfp;
 extern int dotrace;
 void trace(char *fmt, ...);
 void debug(char *fmt, ...);
+void err(char *fmt, ...);
+u32 getms(void);
+int hasinput(int fd);
 
 void quit(int code);
 void *cmdthread(void *);
@@ -64,6 +66,20 @@ enum FullwordBits {
 	F30 = 0000000000040, F31 = 0000000000020, F32 = 0000000000010,
 	F33 = 0000000000004, F34 = 0000000000002, F35 = 0000000000001
 };
+
+typedef struct Thread Thread;
+struct Thread
+{
+	Thread *next;	/* link to next thread */
+	void (*f)(void*);
+	void *arg;
+	int freq;	/* how often the thread is serviced */
+	int cnt;
+};
+
+extern Thread *threads;
+void addthread(Thread th);
+
 
 /* external pulses, bits of Apr.extpulse */
 enum Extpulse {
@@ -120,8 +136,6 @@ typedef struct CMem CMem;
 typedef struct Busdev Busdev;
 typedef struct IOBus IOBus;
 typedef struct Apr Apr;
-
-u32 getms(void);
 
 
 /*
@@ -190,7 +204,6 @@ Mem *makefastmem(int p);
 struct CMem
 {
 	const char *filename;
-	pthread_mutex_t mutex;
 
 	word core[040000];
 	word cmb;
@@ -294,6 +307,7 @@ struct Apr
 {
 	IOBus iobus;
 	Membus membus;
+	int powered;
 
 	hword ir;
 	word mi;
@@ -391,6 +405,7 @@ struct Apr
 	bool pc_set;
 
 	/* needed for the emulation */
+	double lasttick, tick;
 	int extpulse;
 	bool ia_inh;	// this is asserted for some time
 	int pulsestepping;
@@ -401,9 +416,6 @@ struct Apr
 };
 extern Apr *aprs[4];
 Apr *makeapr(void);
-void curpulse(Apr *apr, Pulse *p);
-void nextpulse(Apr *apr, Pulse *p);
-void *aprmain(void *p);
 
 
 /* Paper tape punch 761 */
@@ -416,7 +428,7 @@ struct Ptp
 	bool busy, flag, b;
 	int pia;
 
-	FILE *fp;
+	int fd;
 	int waitdatao;
 };
 Ptp *makeptp(IOBus *bus);
@@ -434,7 +446,7 @@ struct Ptr
 	bool busy, flag, b;
 	int pia;
 
-	FILE *fp;
+	int fd;
 };
 Ptr *makeptr(IOBus *bus);
 void ptr_setmotor(Ptr *ptr, int m);
@@ -454,9 +466,3 @@ struct Tty
 };
 Tty *maketty(IOBus *bus);
 void attachdevtty(Tty *tty, const char *path);
-
-
-
-// for debugging
-char *names[0700];
-char *ionames[010];

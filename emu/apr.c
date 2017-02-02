@@ -1,6 +1,49 @@
 #include "pdp6.h"
 #include <unistd.h>
 
+static void aprcycle(void *p);
+static void wake_cpa(void *dev);
+static void wake_pi(void *dev);
+
+void
+curpulse(Apr *apr, Pulse *p)
+{
+	if(apr->ncurpulses >= MAXPULSE){
+		fprint(stderr, "error: too many current pulses\n");
+		exit(1);
+	}
+	apr->clist[apr->ncurpulses++] = p;
+}
+
+void
+nextpulse(Apr *apr, Pulse *p)
+{
+	if(apr->nnextpulses >= MAXPULSE){
+		fprint(stderr, "error: too many next pulses\n");
+		exit(1);
+	}
+	apr->nlist[apr->nnextpulses++] = p;
+}
+
+Apr*
+makeapr(void)
+{
+	Apr *apr;
+	Thread th;
+
+	apr = malloc(sizeof(Apr));
+	memset(apr, 0, sizeof(Apr));
+	apr->iobus.dev[CPA] = (Busdev){ apr, wake_cpa, 0 };
+	apr->iobus.dev[PI] = (Busdev){ apr, wake_pi, 0 };
+
+	th = (Thread){ nil, aprcycle, apr, 1, 0 };
+	addthread(th);
+
+	return apr;
+}
+
+
+
 #define DBG_AR debug("AR: %012llo\n", apr->ar)
 #define DBG_MB debug("MB: %012llo\n", apr->mb)
 #define DBG_MQ debug("MQ: %012llo\n", apr->mq)
@@ -655,7 +698,7 @@ pulse(mr_pwr_clr){
 
 /* CPA and PI devices */
 
-void
+static void
 wake_cpa(void *dev)
 {
 	Apr *apr;
@@ -708,7 +751,7 @@ wake_cpa(void *dev)
 		ex_set(apr);
 }
 
-void
+static void
 wake_pi(void *dev)
 {
 	Apr *apr;
@@ -2487,9 +2530,9 @@ pulse(et0a){
 	trace("ET0A\n");
 	debug("%o: ", apr->pc);
 	if((apr->inst & 0700) != 0700)
-		debug("%s\n", names[apr->inst]);
+		debug("%s\n", mnemonics[apr->inst]);
 	else
-		debug("%s\n", ionames[apr->io_inst>>5 & 7]);
+		debug("%s\n", iomnemonics[apr->io_inst>>5 & 7]);
 
 	if(PI_HOLD)
 		set_pih(apr, apr->pi_req);	// 8-3, 8-4
@@ -3014,36 +3057,6 @@ pulse(key_manual){
 	nextpulse(apr, kt0);		// 5-2
 }
 
-void
-curpulse(Apr *apr, Pulse *p)
-{
-	if(apr->ncurpulses >= MAXPULSE){
-		fprint(stderr, "error: too many current pulses\n");
-		exit(1);
-	}
-	apr->clist[apr->ncurpulses++] = p;
-}
-
-void
-nextpulse(Apr *apr, Pulse *p)
-{
-	if(apr->nnextpulses >= MAXPULSE){
-		fprint(stderr, "error: too many next pulses\n");
-		exit(1);
-	}
-	apr->nlist[apr->nnextpulses++] = p;
-}
-
-Apr*
-makeapr(void)
-{
-	Apr *apr;
-	apr = malloc(sizeof(Apr));
-	memset(apr, 0, sizeof(Apr));
-	apr->iobus.dev[CPA] = (Busdev){ apr, wake_cpa, 0 };
-	apr->iobus.dev[PI] = (Busdev){ apr, wake_pi, 0 };
-	return apr;
-}
 
 /* find out which bits were turned on */
 void
@@ -3057,16 +3070,10 @@ updatebus(void *bus)
 
 #define TIMESTEP (1000.0/60.0)
 
-void*
-aprmain(void *p)
+void
+aprstart(Apr *apr)
 {
-	Apr *apr;
-	Busdev *dev;
-	Pulse **tmp;
-	int i, devcode;
-	double lasttick, tick;
-
-	apr = (Apr*)p;
+	printf("[aprstart]\n");
 	apr->clist = apr->pulses1;
 	apr->nlist = apr->pulses2;
 	apr->ncurpulses = 0;
@@ -3080,262 +3087,144 @@ aprmain(void *p)
 	apr->membus.c34 = 0;
 	apr->iobus.c12 = 0;
 	apr->iobus.c34 = 0;
-	if(apr->membus.fmem)
-		apr->membus.fmem->poweron(apr->membus.fmem);
-	for(i = 0; i < 16; i++)
-		if(apr->membus.cmem[i])
-			apr->membus.cmem[i]->poweron(apr->membus.cmem[i]);
 
 	nextpulse(apr, mr_pwr_clr);
-	lasttick = getms();
-	while(apr->sw_power){
-		apr->ncurpulses = apr->nnextpulses;
-		apr->nnextpulses = 0;
-		tmp = apr->clist; apr->clist = apr->nlist; apr->nlist = tmp;
+	apr->lasttick = getms();
+	apr->powered = 1;
+}
 
-		if(apr->pulsestepping){
-			int c;
-			while(c = getchar(), c != EOF && c != '\n')
-				if(c == 'x')
-					apr->pulsestepping = 0;
-		}
+static void
+aprcycle(void *p)
+{
+	Apr *apr;
+	Busdev *dev;
+	Pulse **tmp;
+	int i, devcode;
 
-		tick = getms();
-		if(tick-lasttick >= TIMESTEP){
-			lasttick = lasttick+TIMESTEP;
-			apr->cpa_clock_flag = 1;
-			recalc_cpa_req(apr);
-		}
+	apr = p;
 
-		apr->iobus.c12_prev = apr->iobus.c12;
-		apr->iobus.c34_prev = apr->iobus.c34;
-		apr->membus.c12_prev = apr->membus.c12;
-		apr->membus.c34_prev = apr->membus.c34;
+	if(!apr->sw_power){
+		apr->powered = 0;
+		return;
+	}else if(!apr->powered)
+		aprstart(apr);
 
-		for(i = 0; i < apr->ncurpulses; i++)
-			apr->clist[i](apr);
+	apr->ncurpulses = apr->nnextpulses;
+	apr->nnextpulses = 0;
+	tmp = apr->clist; apr->clist = apr->nlist; apr->nlist = tmp;
 
-		updatebus(&apr->iobus);
-		updatebus(&apr->membus);
+	if(apr->pulsestepping){
+		int c;
+		while(c = getchar(), c != EOF && c != '\n')
+			if(c == 'x')
+				apr->pulsestepping = 0;
+	}
 
-		/* This is simplified, we have no IOT RESET,
-		 * IOT INIT SET UP or IOT FINAL SETUP really.
-		 * normally we'd have to wait for IOT RESET to clear here */
-		if(apr->iot_go)
-			nextpulse(apr, iot_t2);
+	apr->tick = getms();
+	if(apr->tick-apr->lasttick >= TIMESTEP){
+		apr->lasttick = apr->lasttick+TIMESTEP;
+		apr->cpa_clock_flag = 1;
+		recalc_cpa_req(apr);
+	}
+
+	apr->iobus.c12_prev = apr->iobus.c12;
+	apr->iobus.c34_prev = apr->iobus.c34;
+	apr->membus.c12_prev = apr->membus.c12;
+	apr->membus.c34_prev = apr->membus.c34;
+
+	for(i = 0; i < apr->ncurpulses; i++)
+		apr->clist[i](apr);
+
+	updatebus(&apr->iobus);
+	updatebus(&apr->membus);
+
+	/* This is simplified, we have no IOT RESET,
+	 * IOT INIT SET UP or IOT FINAL SETUP really.
+	 * normally we'd have to wait for IOT RESET to clear here */
+	if(apr->iot_go)
+		nextpulse(apr, iot_t2);
 
 
-		/* Key pulses */
-		if(apr->extpulse & EXT_KEY_MANUAL){
-			apr->extpulse &= ~EXT_KEY_MANUAL;
-			nextpulse(apr, key_manual);
-		}
-		if(apr->extpulse & EXT_KEY_INST_STOP){
-			apr->extpulse &= ~EXT_KEY_INST_STOP;
-			apr->run = 0;
-			// hack: cleared when the pulse list was empty
-			apr->ia_inh = 1;
-		}
+	/* Key pulses */
+	if(apr->extpulse & EXT_KEY_MANUAL){
+		apr->extpulse &= ~EXT_KEY_MANUAL;
+		nextpulse(apr, key_manual);
+	}
+	if(apr->extpulse & EXT_KEY_INST_STOP){
+		apr->extpulse &= ~EXT_KEY_INST_STOP;
+		apr->run = 0;
+		// hack: cleared when the pulse list was empty
+		apr->ia_inh = 1;
+	}
 
 
-		/* Pulses and signals through IO bus */
-		apr->iobus.devcode = -1;
-		if(apr->iobus.c34_pulse & (IOBUS_PULSES | IOBUS_IOB_STATUS | IOBUS_IOB_DATAI)){
-			devcode = 0;
-			if(apr->iobus.c34 & IOBUS_IOS3_1) devcode |= 0100;
-			if(apr->iobus.c34 & IOBUS_IOS4_1) devcode |= 0040;
-			if(apr->iobus.c34 & IOBUS_IOS5_1) devcode |= 0020;
-			if(apr->iobus.c34 & IOBUS_IOS6_1) devcode |= 0010;
-			if(apr->iobus.c34 & IOBUS_IOS7_1) devcode |= 0004;
-			if(apr->iobus.c34 & IOBUS_IOS8_1) devcode |= 0002;
-			if(apr->iobus.c34 & IOBUS_IOS9_1) devcode |= 0001;
-			apr->iobus.devcode = devcode;
-			dev = &apr->iobus.dev[devcode];
+	/* Pulses and signals through IO bus */
+	apr->iobus.devcode = -1;
+	if(apr->iobus.c34_pulse & (IOBUS_PULSES | IOBUS_IOB_STATUS | IOBUS_IOB_DATAI)){
+		devcode = 0;
+		if(apr->iobus.c34 & IOBUS_IOS3_1) devcode |= 0100;
+		if(apr->iobus.c34 & IOBUS_IOS4_1) devcode |= 0040;
+		if(apr->iobus.c34 & IOBUS_IOS5_1) devcode |= 0020;
+		if(apr->iobus.c34 & IOBUS_IOS6_1) devcode |= 0010;
+		if(apr->iobus.c34 & IOBUS_IOS7_1) devcode |= 0004;
+		if(apr->iobus.c34 & IOBUS_IOS8_1) devcode |= 0002;
+		if(apr->iobus.c34 & IOBUS_IOS9_1) devcode |= 0001;
+		apr->iobus.devcode = devcode;
+		dev = &apr->iobus.dev[devcode];
+		if(dev->wake)
+			dev->wake(dev->dev);
+	}
+	if(apr->iobus.c34_pulse & IOBUS_IOB_RESET){
+		int d;
+		for(d = 0; d < 128; d++){
+			dev = &apr->iobus.dev[d];
 			if(dev->wake)
 				dev->wake(dev->dev);
 		}
-		if(apr->iobus.c34_pulse & IOBUS_IOB_RESET){
-			int d;
-			for(d = 0; d < 128; d++){
-				dev = &apr->iobus.dev[d];
-				if(dev->wake)
-					dev->wake(dev->dev);
-			}
-		}
-		apr->iobus.c34 &= ~(IOBUS_PULSES | IOBUS_IOB_RESET);
-
-		/* Pulses to memory */
-		if(apr->membus.c12_pulse & (MEMBUS_WR_RS | MEMBUS_RQ_CYC)){
-			wakemem(&apr->membus);
-			apr->membus.c12 &= ~MEMBUS_WR_RS;
-		}
-
-		/* Pulses from memory  */
-		if(apr->membus.c12 & MEMBUS_MAI_ADDR_ACK){
-			apr->membus.c12 &= ~MEMBUS_MAI_ADDR_ACK;
-			apr->extpulse &= ~EXT_NONEXIT_MEM;
-			nextpulse(apr, mai_addr_ack);
-		}
-		if(apr->membus.c12 & MEMBUS_MAI_RD_RS){
-			apr->membus.c12 &= ~MEMBUS_MAI_RD_RS;
-			nextpulse(apr, mai_rd_rs);
-		}
-		if(apr->mc_rd && apr->membus.c34){
-			/* 7-6, 7-9 */
-			apr->mb |= apr->membus.c34;
-			apr->membus.c34 = 0;
-		}
-
-		/* TODO: do this differently because the
-		 * memory might have been busy. */
-		if(apr->extpulse & EXT_NONEXIT_MEM){
-			apr->extpulse &= ~EXT_NONEXIT_MEM;
-			if(apr->mc_rq && !apr->mc_stop)
-				nextpulse(apr, mc_non_exist_mem);	// 7-9
-		}
-
-		if(i)
-			trace("--------------\n");
-		else
-			/* no longer needed */
-			apr->ia_inh = 0;
 	}
-	debug("power off\n");
-	return nil;
+	apr->iobus.c34 &= ~(IOBUS_PULSES | IOBUS_IOB_RESET);
+
+	/* Pulses to memory */
+	if(apr->membus.c12_pulse & (MEMBUS_WR_RS | MEMBUS_RQ_CYC)){
+		wakemem(&apr->membus);
+		apr->membus.c12 &= ~MEMBUS_WR_RS;
+	}
+
+	/* Pulses from memory  */
+	if(apr->membus.c12 & MEMBUS_MAI_ADDR_ACK){
+		apr->membus.c12 &= ~MEMBUS_MAI_ADDR_ACK;
+		apr->extpulse &= ~EXT_NONEXIT_MEM;
+		nextpulse(apr, mai_addr_ack);
+	}
+	if(apr->membus.c12 & MEMBUS_MAI_RD_RS){
+		apr->membus.c12 &= ~MEMBUS_MAI_RD_RS;
+		nextpulse(apr, mai_rd_rs);
+	}
+	if(apr->mc_rd && apr->membus.c34){
+		/* 7-6, 7-9 */
+		apr->mb |= apr->membus.c34;
+		apr->membus.c34 = 0;
+	}
+
+	/* TODO: do this differently because the
+	 * memory might have been busy. */
+	if(apr->extpulse & EXT_NONEXIT_MEM){
+		apr->extpulse &= ~EXT_NONEXIT_MEM;
+		if(apr->mc_rq && !apr->mc_stop)
+			nextpulse(apr, mc_non_exist_mem);	// 7-9
+	}
+
+	if(i)
+		trace("--------------\n");
+	else
+		/* no longer needed */
+		apr->ia_inh = 0;
 }
 
 
-char *names[0700] = {
-	"UUO00", "UUO01", "UUO02", "UUO03",
-	"UUO04", "UUO05", "UUO06", "UUO07",
-	"UUO10", "UUO11", "UUO12", "UUO13",
-	"UUO14", "UUO15", "UUO16", "UUO17",
-	"UUO20", "UUO21", "UUO22", "UUO23",
-	"UUO24", "UUO25", "UUO26", "UUO27",
-	"UUO30", "UUO31", "UUO32", "UUO33",
-	"UUO34", "UUO35", "UUO36", "UUO37",
-	"UUO40", "UUO41", "UUO42", "UUO43",
-	"UUO44", "UUO45", "UUO46", "UUO47",
-	"UUO50", "UUO51", "UUO52", "UUO53",
-	"UUO54", "UUO55", "UUO56", "UUO57",
-	"UUO60", "UUO61", "UUO62", "UUO63",
-	"UUO64", "UUO65", "UUO66", "UUO67",
-	"UUO70", "UUO71", "UUO72", "UUO73",
-	"UUO74", "UUO75", "UUO76", "UUO77",
 
-	"XX100", "XX101", "XX102", "XX103",
-	"XX104", "XX105", "XX106", "XX107",
-	"XX110", "XX111", "XX112", "XX113",
-	"XX114", "XX115", "XX116", "XX117",
-	"XX120", "XX121", "XX122", "XX123",
-	"XX124", "XX125", "XX126", "XX127",
-	"XX130", "XX131", "FSC", "CAO",
-	"LDCI", "LDC", "DPCI", "DPC",
-	"FAD", "FADL", "FADM", "FADB",
-	"FADR", "FADLR", "FADMR", "FADBR",
-	"FSB", "FSBL", "FSBM", "FSBB",
-	"FSBR", "FSBLR", "FSBMR", "FSBBR",
-	"FMP", "FMPL", "FMPM", "FMPB",
-	"FMPR", "FMPLR", "FMPMR", "FMPBR",
-	"FDV", "FDVL", "FDVM", "FDVB",
-	"FDVR", "FDVLR", "FDVMR", "FDVBR",
 
-	"MOVE", "MOVEI", "MOVEM", "MOVES",
-	"MOVS", "MOVSI", "MOVSM", "MOVSS",
-	"MOVN", "MOVNI", "MOVNM", "MOVNS",
-	"MOVM", "MOVMI", "MOVMM", "MOVMS",
-	"IMUL", "IMULI", "IMULM", "IMULB",
-	"MUL", "MULI", "MULM", "MULB",
-	"IDIV", "IDIVI", "IDIVM", "IDIVB",
-	"DIV", "DIVI", "DIVM", "DIVB",
-	"ASH", "ROT", "LSH", "XX243",
-	"ASHC", "ROTC", "LSHC", "XX247",
-	"EXCH", "BLT", "AOBJP", "AOBJN",
-	"JRST", "JFCL", "XCT", "XX257",
-	"PUSHJ", "PUSH", "POP", "POPJ",
-	"JSR", "JSP", "JSA", "JRA",
-	"ADD", "ADDI", "ADDM", "ADDB",
-	"SUB", "SUBI", "SUBM", "SUBB",
 
-	"CAI", "CAIL", "CAIE", "CAILE",
-	"CAIA", "CAIGE", "CAIN", "CAIG",
-	"CAM", "CAML", "CAME", "CAMLE",
-	"CAMA", "CAMGE", "CAMN", "CAMG",
-	"JUMP", "JUMPL", "JUMPE", "JUMPLE",
-	"JUMPA", "JUMPGE", "JUMPN", "JUMPG",
-	"SKIP", "SKIPL", "SKIPE", "SKIPLE",
-	"SKIPA", "SKIPGE", "SKIPN", "SKIPG",
-	"AOJ", "AOJL", "AOJE", "AOJLE",
-	"AOJA", "AOJGE", "AOJN", "AOJG",
-	"AOS", "AOSL", "AOSE", "AOSLE",
-	"AOSA", "AOSGE", "AOSN", "AOSG",
-	"SOJ", "SOJL", "SOJE", "SOJLE",
-	"SOJA", "SOJGE", "SOJN", "SOJG",
-	"SOS", "SOSL", "SOSE", "SOSLE",
-	"SOSA", "SOSGE", "SOSN", "SOSG",
-
-	"SETZ", "SETZI", "SETZM", "SETZB",
-	"AND", "ANDI", "ANDM", "ANDB",
-	"ANDCA", "ANDCAI", "ANDCAM", "ANDCAB",
-	"SETM", "SETMI", "SETMM", "SETMB",
-	"ANDCM", "ANDCMI", "ANDCMM", "ANDCMB",
-	"SETA", "SETAI", "SETAM", "SETAB",
-	"XOR", "XORI", "XORM", "XORB",
-	"IOR", "IORI", "IORM", "IORB",
-	"ANDCB", "ANDCBI", "ANDCBM", "ANDCBB",
-	"EQV", "EQVI", "EQVM", "EQVB",
-	"SETCA", "SETCAI", "SETCAM", "SETCAB",
-	"ORCA", "ORCAI", "ORCAM", "ORCAB",
-	"SETCM", "SETCMI", "SETCMM", "SETCMB",
-	"ORCM", "ORCMI", "ORCMM", "ORCMB",
-	"ORCB", "ORCBI", "ORCBM", "ORCBB",
-	"SETO", "SETOI", "SETOM", "SETOB",
-
-	"HLL", "HLLI", "HLLM", "HLLS",
-	"HRL", "HRLI", "HRLM", "HRLS",
-	"HLLZ", "HLLZI", "HLLZM", "HLLZS",
-	"HRLZ", "HRLZI", "HRLZM", "HRLZS",
-	"HLLO", "HLLOI", "HLLOM", "HLLOS",
-	"HRLO", "HRLOI", "HRLOM", "HRLOS",
-	"HLLE", "HLLEI", "HLLEM", "HLLES",
-	"HRLE", "HRLEI", "HRLEM", "HRLES",
-	"HRR", "HRRI", "HRRM", "HRRS",
-	"HLR", "HLRI", "HLRM", "HLRS",
-	"HRRZ", "HRRZI", "HRRZM", "HRRZS",
-	"HLRZ", "HLRZI", "HLRZM", "HLRZS",
-	"HRRO", "HRROI", "HRROM", "HRROS",
-	"HLRO", "HLROI", "HLROM", "HLROS",
-	"HRRE", "HRREI", "HRREM", "HRRES",
-	"HLRE", "HLREI", "HLREM", "HLRES",
-
-	"TRN", "TLN", "TRNE", "TLNE",
-	"TRNA", "TLNA", "TRNN", "TLNN",
-	"TDN", "TSN", "TDNE", "TSNE",
-	"TDNA", "TSNA", "TDNN", "TSNN",
-	"TRZ", "TLZ", "TRZE", "TLZE",
-	"TRZA", "TLZA", "TRZN", "TLZN",
-	"TDZ", "TSZ", "TDZE", "TSZE",
-	"TDZA", "TSZA", "TDZN", "TSZN",
-	"TRC", "TLC", "TRCE", "TLCE",
-	"TRCA", "TLCA", "TRCN", "TLCN",
-	"TDC", "TSC", "TDCE", "TSCE",
-	"TDCA", "TSCA", "TDCN", "TSCN",
-	"TRO", "TLO", "TROE", "TLOE",
-	"TROA", "TLOA", "TRON", "TLON",
-	"TDO", "TSO", "TDOE", "TSOE",
-	"TDOA", "TSOA", "TDON", "TSON",
-};
-
-char *ionames[] = {
-	"BLKI",
-	"DATAI",
-	"BLKO",
-	"DATAO",
-	"CONO",
-	"CONI",
-	"CONSZ",
-	"CONSO"
-};
 
 void
 testinst(Apr *apr)
@@ -3346,7 +3235,7 @@ testinst(Apr *apr)
 //	for(inst = 0140; inst < 0141; inst++){
 		apr->ir = inst << 9 | 1 << 5;
 		decodeir(apr);
-		debug("%06o %6s ", apr->ir, names[inst]);
+		debug("%06o %6s ", apr->ir, mnemonics[inst]);
 /*
 		debug("%s ", FAC_INH ? "FAC_INH" : "       ");
 		debug("%s ", FAC2 ? "FAC2" : "    ");
@@ -3360,8 +3249,8 @@ testinst(Apr *apr)
 		debug("%s ", SAC2 ? "SAC2" : "    ");
 		debug("\n");
 // FC_E_PSE
-//debug("FC_E_PSE: %d %d %d %d %d %d %d %d %d %d\n", apr->hwt_10 , apr->hwt_11 , apr->fwt_11 , \
-//                  IOT_BLK , apr->inst == EXCH , CH_DEP , CH_INC_OP , \
+//debug("FC_E_PSE: %d %d %d %d %d %d %d %d %d %d\n", apr->hwt_10 , apr->hwt_11 , apr->fwt_11 ,
+//                  IOT_BLK , apr->inst == EXCH , CH_DEP , CH_INC_OP ,
 //                  MEMAC_MEM , apr->boole_as_10 , apr->boole_as_11);
 //debug("CH: %d %d %d %d %d\n", CH_INC, CH_INC_OP, CH_N_INC_OP, CH_LOAD, CH_DEP);
 //debug("FAC_INH: %d %d %d %d %d %d %d %d %d %d %d %d %d %d\n",

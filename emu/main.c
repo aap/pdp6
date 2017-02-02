@@ -74,6 +74,26 @@ err(char *fmt, ...)
 	exit(1);
 }
 
+u32
+getms(void)
+{
+	return SDL_GetTicks();
+}
+
+int
+hasinput(int fd)
+{
+	fd_set fds;
+	struct timeval timeout;
+
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 0;
+	FD_ZERO(&fds);
+	FD_SET(fd, &fds);
+	return select(fd+1, &fds, NULL, NULL, &timeout) > 0;
+}
+
+
 SDL_Surface*
 mustloadimg(const char *path)
 {
@@ -141,14 +161,6 @@ getswitches(Element *sw, int n)
 	return w;
 }
 
-void
-poweron(Apr *apr)
-{
-	pthread_t apr_thread;
-	apr->sw_power = 1;
-	pthread_create(&apr_thread, nil, aprmain, apr);
-}
-
 #define KEYPULSE(k) (apr->k && !oldapr.k)
 
 void
@@ -170,8 +182,6 @@ updateapr(Apr *apr, Ptr *ptr)
 	misc_l[3].state = apr->sw_repeat = misc_sw[0].state;
 	misc_l[4].state = apr->sw_addr_stop = misc_sw[1].state;
 	misc_l[5].state = apr->sw_power = misc_sw[2].state;
-	if(apr->sw_power && !oldapr.sw_power)
-		poweron(apr);
 	misc_l[6].state = apr->sw_mem_disable = misc_sw[3].state;
 	apr->data = getswitches(data_sw, 36);
 	apr->mas = getswitches(ma_sw, 18);
@@ -528,11 +538,37 @@ findlayout(int *w, int *h)
 	*h = oppanel.pos.y + oppanel.surf->h;
 }
 
-u32
-getms(void)
+
+Thread *threads;
+
+void
+addthread(Thread th)
 {
-	return SDL_GetTicks();
+	Thread *p;
+	p = malloc(sizeof(Thread));
+	*p = th;
+	p->next = threads;
+	threads = p;
 }
+
+void*
+simthread(void *p)
+{
+	Thread *th;
+
+	printf("[simthread] start\n");
+	for(;;)
+		for(th = threads; th; th = th->next){
+			th->cnt++;
+			if(th->cnt == th->freq){
+				th->cnt = 0;
+				th->f(th->arg);
+			}
+		}
+	err("can't happen");
+	return nil;
+}
+
 
 void
 quit(int code)
@@ -550,7 +586,6 @@ usage(void)
 }
 
 Apr *aprs[4];
-Mem *coremems[4];
 
 int
 main(int argc, char *argv[])
@@ -560,17 +595,17 @@ main(int argc, char *argv[])
 	SDL_MouseButtonEvent *mbev;
 	SDL_MouseMotionEvent *mmev;
 	Element *e;
-	Uint32 start, end;
-	int delay;
 	int i;
 	int w, h;
-	pthread_t cmd_thread;
+	pthread_t cmd_thread, sim_thread;
 	const char *outfile, *ttyfile;
 
 	Apr *apr;
 	Ptr *ptr;
 	Ptp *ptp;
 	Tty *tty;
+	Mem *coremems[4];
+	Mem *fastmem;
 
 	outfile = "/dev/null";
 	ttyfile = "/tmp/6tty";
@@ -681,12 +716,14 @@ main(int argc, char *argv[])
 
 	extra_l = e; e += 1;
 
-	aprs[0] = apr = makeapr();
+	fastmem = makefastmem(0);
 	coremems[0] = makecoremem("mem_0");
 	coremems[1] = makecoremem("mem_1");
 	coremems[2] = makecoremem("mem_2");
 	coremems[3] = makecoremem("mem_3");
-	attachmem(makefastmem(0), 0, &apr->membus, -1);
+
+	aprs[0] = apr = makeapr();
+	attachmem(fastmem, 0, &apr->membus, -1);
 	attachmem(coremems[0], 0, &apr->membus, 0);
 	attachmem(coremems[1], 0, &apr->membus, 1);
 	attachmem(coremems[2], 0, &apr->membus, 2);
@@ -697,10 +734,18 @@ main(int argc, char *argv[])
 	if(ttyfile)
 		attachdevtty(tty, ttyfile);
 
+	/* Power on memory */
+	// TODO: maybe do that somewhere else?
+	fastmem->poweron(fastmem);
+	coremems[0]->poweron(coremems[0]);
+	coremems[1]->poweron(coremems[1]);
+	coremems[2]->poweron(coremems[2]);
+	coremems[3]->poweron(coremems[3]);
+
+	pthread_create(&sim_thread, nil, simthread, apr);
 	pthread_create(&cmd_thread, nil, cmdthread, nil);
 
 	for(;;){
-		start = SDL_GetTicks();
 		while(SDL_PollEvent(&ev))
 			switch(ev.type){
 			case SDL_MOUSEMOTION:
@@ -744,10 +789,6 @@ main(int argc, char *argv[])
 //		SDL_UnlockSurface(screen);
 
 		SDL_Flip(screen);
-		end = SDL_GetTicks();
-		delay =  (1000 / 30) - (end-start);
-//		if(delay > 0)
-//			SDL_Delay(delay);
 	}
 	return 0;
 }

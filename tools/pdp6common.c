@@ -42,7 +42,6 @@ readw(FILE *fp)
 void
 writewbak(word w, FILE *fp)
 {
-	unsigned char c;
 	putc((w >> 29) & 0177, fp);
 	putc((w >> 22) & 0177, fp);
 	putc((w >> 15) & 0177, fp);

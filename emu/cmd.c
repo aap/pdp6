@@ -200,7 +200,7 @@ dep(word addr, int fastmem, word w)
 static void
 c_ex(int argc, char *argv[])
 {
-	char *argv0;
+	char *argv0 = nil;
 	word start, end;
 	int format, fastmem;
 
@@ -225,7 +225,7 @@ c_ex(int argc, char *argv[])
 static void
 c_dep(int argc, char *argv[])
 {
-	char *argv0;
+	char *argv0 = nil;
 	word start, end;
 	word w;
 	int fastmem;
@@ -276,6 +276,7 @@ loadsav(FILE *fp)
 static void
 c_load(int argc, char *argv[])
 {
+	char *argv0 = nil;
 	FILE *fp;
 	int fmt;
 

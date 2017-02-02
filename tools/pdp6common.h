@@ -28,3 +28,6 @@ int issixbit(char c);
 word sixbit(const char *s);
 void unsixbit(word sx, char *s);
 char *disasm(word w);
+
+extern char *mnemonics[448];
+extern char *iomnemonics[8];

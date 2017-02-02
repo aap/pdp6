@@ -1,10 +1,10 @@
 #include "pdp6.h"
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h> 
-#include <pthread.h>    
 #include <poll.h>
 
 /* TODO? implement motor delays */
@@ -24,66 +24,61 @@ recalc_ptr_req(Ptr *ptr)
 /* We have to punch after DATAO SET has happened. But BUSY is set by
  * DATAO CLEAR. So we use waitdatao to record when SET has happened */
 
-static void*
-ptpthread(void *dev)
+static void
+ptpcycle(void *p)
 {
 	Ptp *ptp;
+	uchar c;
 
-	ptp = dev;
-	for(;;){
-		if(ptp->busy && ptp->waitdatao){
-			if(ptp->fp){
-				if(ptp->b)
-					putc((ptp->ptp & 077) | 0200, ptp->fp);
-				else
-					putc(ptp->ptp, ptp->fp);
-				fflush(ptp->fp);
-			}
-			ptp->busy = 0;
-			ptp->flag = 1;
-			recalc_ptp_req(ptp);
+	ptp = p;
+	if(ptp->busy && ptp->waitdatao){
+		if(ptp->fd >= 0){
+			if(ptp->b)
+				c = (ptp->ptp & 077) | 0200;
+			else
+				c = ptp->ptp;
+			write(ptp->fd, &c, 1);
 		}
+		ptp->busy = 0;
+		ptp->flag = 1;
+		recalc_ptp_req(ptp);
 	}
-	return nil;
 }
 
-static void*
-ptrthread(void *dev)
+static void
+ptrcycle(void *p)
 {
 	Ptr *ptr;
-	int c;
+	uchar c;
 
-	ptr = dev;
-	for(;;){
-		if(ptr->busy && ptr->motor_on){
-			// PTR CLR
-			ptr->sr = 0;
-			ptr->ptr = 0;
-	next:
-			if(ptr->fp)
-				c = getc(ptr->fp);
-			else
-				c = 0;
-			if(c == EOF)
-				c = 0;
-			if(!ptr->b || c & 0200){
-				// PTR STROBE
-				ptr->sr <<= 1;
-				ptr->ptr <<= 6;
-				ptr->sr |= 1;
-				ptr->ptr |= c & 077;
-				if(!ptr->b)
-					ptr->ptr |= c & 0300;
-			}
-			if(!ptr->b || ptr->sr & 040){
-				ptr->busy = 0;
-				ptr->flag = 1;
-			}else
-				goto next;
-			recalc_ptr_req(ptr);
-		}
+	ptr = p;
+	if(!ptr->busy || !ptr->motor_on)
+		return;
+
+	// PTR CLR
+	ptr->sr = 0;
+	ptr->ptr = 0;
+next:
+	if(ptr->fd >= 0 && hasinput(ptr->fd)){
+		if(read(ptr->fd, &c, 1) != 1)
+			c = 0;
+	}else
+		c = 0;
+	if(!ptr->b || c & 0200){
+		// PTR STROBE
+		ptr->sr <<= 1;
+		ptr->ptr <<= 6;
+		ptr->sr |= 1;
+		ptr->ptr |= c & 077;
+		if(!ptr->b)
+			ptr->ptr |= c & 0300;
 	}
-	return nil;
+	if(!ptr->b || ptr->sr & 040){
+		ptr->busy = 0;
+		ptr->flag = 1;
+	}else
+		goto next;
+	recalc_ptr_req(ptr);
 }
 
 static void
@@ -193,30 +188,35 @@ ptr_setmotor(Ptr *ptr, int m)
 Ptp*
 makeptp(IOBus *bus)
 {
-	pthread_t thread_id;
 	Ptp *ptp;
+	Thread th;
 
 	ptp = malloc(sizeof(Ptp));
 	memset(ptp, 0, sizeof(Ptp));
 	ptp->bus = bus;
 	bus->dev[PTP] = (Busdev){ ptp, wake_ptp, 0 };
-	pthread_create(&thread_id, nil, ptpthread, ptp);
 
-	ptp->fp = fopen("../code/ptp.out", "wb");
+	th = (Thread){ nil, ptpcycle, ptp, 1, 0 };
+	addthread(th);
+
+	ptp->fd = open("../code/ptp.out", O_WRONLY | O_CREAT, 0666);
 	return ptp;
 }
 
 Ptr*
 makeptr(IOBus *bus)
 {
-	pthread_t thread_id;
 	Ptr *ptr;
+	Thread th;
 
 	ptr = malloc(sizeof(Ptr));
 	memset(ptr, 0, sizeof(Ptr));
 	ptr->bus = bus;
 	bus->dev[PTR] = (Busdev){ ptr, wake_ptr, 0 };
-	pthread_create(&thread_id, nil, ptrthread, ptr);
 
-	ptr->fp = fopen("../code/test.rim", "rb");
+	th = (Thread){ nil, ptrcycle, ptr, 1, 0 };
+	addthread(th);
+
+	ptr->fd = open("../code/test.rim", O_RDONLY);
+	return ptr;
 }
