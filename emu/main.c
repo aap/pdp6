@@ -168,6 +168,8 @@ updateapr(Apr *apr, Ptr *ptr)
 {
 	Apr oldapr;
 
+	if(apr == nil)
+		return;
 	oldapr = *apr;
 	setlights(apr->ir, ir_l, 18);
 	setlights(apr->mi, mi_l, 36);
@@ -352,30 +354,36 @@ updateapr(Apr *apr, Ptr *ptr)
 void
 updatetty(Tty *tty)
 {
-	tty_l[0].state = tty->tti_busy;
-	tty_l[1].state = tty->tti_flag;
-	tty_l[2].state = tty->tto_busy;
-	tty_l[3].state = tty->tto_flag;
-	setlights(tty->pia, &tty_l[4], 3);
-	setlights(tty->tti, ttibuf_l, 8);
+	if(tty){
+		tty_l[0].state = tty->tti_busy;
+		tty_l[1].state = tty->tti_flag;
+		tty_l[2].state = tty->tto_busy;
+		tty_l[3].state = tty->tto_flag;
+		setlights(tty->pia, &tty_l[4], 3);
+		setlights(tty->tti, ttibuf_l, 8);
+	}
 }
 
 void
 updatept(Ptp *ptp, Ptr *ptr)
 {
-	ptp_l[0].state = ptp->b;
-	ptp_l[1].state = ptp->busy;
-	ptp_l[2].state = ptp->flag;
-	setlights(ptp->pia, &ptp_l[3], 3);
-	setlights(ptp->ptp, ptpbuf_l, 8);
+	if(ptp){
+		ptp_l[0].state = ptp->b;
+		ptp_l[1].state = ptp->busy;
+		ptp_l[2].state = ptp->flag;
+		setlights(ptp->pia, &ptp_l[3], 3);
+		setlights(ptp->ptp, ptpbuf_l, 8);
+	}
 
-	ptr_l[0].state = ptr->b;
-	ptr_l[1].state = ptr->busy;
-	ptr_l[2].state = ptr->flag;
-	setlights(ptr->pia, &ptr_l[3], 3);
-	setlights(ptr->ptr, ptrbuf_l, 36);
+	if(ptr){
+		ptr_l[0].state = ptr->b;
+		ptr_l[1].state = ptr->busy;
+		ptr_l[2].state = ptr->flag;
+		setlights(ptr->pia, &ptr_l[3], 3);
+		setlights(ptr->ptr, ptrbuf_l, 36);
 
-	extra_l[0].state = ptr->motor_on;
+		extra_l[0].state = ptr->motor_on;
+	}
 }
 
 void
@@ -569,6 +577,45 @@ simthread(void *p)
 	return nil;
 }
 
+Device *devlist;
+
+void
+adddevice(Device *dev)
+{
+	dev->next = devlist;
+	devlist = dev;
+};
+
+Device*
+getdevice(const char *name)
+{
+	Device *dev;
+	for(dev = devlist; dev; dev = dev->next)
+		if(strcmp(dev->name, name) == 0)
+			return dev;
+	return nil;
+}
+
+void
+printdevices(void)
+{
+	Device *dev;
+	for(dev = devlist; dev; dev = dev->next)
+		printf("%s %s\n", dev->name, dev->type);
+}
+
+
+void
+dofile(const char *path)
+{
+	FILE *f;
+	if(f = fopen(path, "r"), f == nil){
+		printf("Couldn't open file %s\n", path);
+		return;
+	}
+	cli(f);
+	fclose(f);
+}
 
 void
 quit(int code)
@@ -581,11 +628,9 @@ quit(int code)
 void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-t] [-d debugfile] [-c ttyfile]\n", argv0);
+	fprintf(stderr, "usage: %s [-t] [-d debugfile]\n", argv0);
 	exit(1);
 }
-
-Apr *aprs[4];
 
 int
 main(int argc, char *argv[])
@@ -598,26 +643,21 @@ main(int argc, char *argv[])
 	int i;
 	int w, h;
 	pthread_t cmd_thread, sim_thread;
-	const char *outfile, *ttyfile;
+	const char *outfile;
 
 	Apr *apr;
 	Ptr *ptr;
 	Ptp *ptp;
 	Tty *tty;
-	Mem *coremems[4];
-	Mem *fastmem;
+	Mem *mem;
 
 	outfile = "/dev/null";
-	ttyfile = "/tmp/6tty";
 	ARGBEGIN{
 	case 't':
 		dotrace = 1;
 		break;
 	case 'd':
 		outfile = EARGF(usage());
-		break;
-	case 'c':
-		ttyfile = EARGF(usage());
 		break;
 	default:
 		usage();
@@ -716,31 +756,13 @@ main(int argc, char *argv[])
 
 	extra_l = e; e += 1;
 
-	fastmem = makefastmem(0);
-	coremems[0] = makecoremem("mem_0");
-	coremems[1] = makecoremem("mem_1");
-	coremems[2] = makecoremem("mem_2");
-	coremems[3] = makecoremem("mem_3");
+	dofile("init.ini");
+	apr = (Apr*)getdevice("apr");
+	tty = (Tty*)getdevice("tty");
+	ptr = (Ptr*)getdevice("ptr");
+	ptp = (Ptp*)getdevice("ptp");
 
-	aprs[0] = apr = makeapr();
-	attachmem(fastmem, 0, &apr->membus, -1);
-	attachmem(coremems[0], 0, &apr->membus, 0);
-	attachmem(coremems[1], 0, &apr->membus, 1);
-	attachmem(coremems[2], 0, &apr->membus, 2);
-	attachmem(coremems[3], 0, &apr->membus, 3);
-	tty = maketty(&apr->iobus);
-	ptr = makeptr(&apr->iobus);
-	ptp = makeptp(&apr->iobus);
-	if(ttyfile)
-		attachdevtty(tty, ttyfile);
-
-	/* Power on memory */
-	// TODO: maybe do that somewhere else?
-	fastmem->poweron(fastmem);
-	coremems[0]->poweron(coremems[0]);
-	coremems[1]->poweron(coremems[1]);
-	coremems[2]->poweron(coremems[2]);
-	coremems[3]->poweron(coremems[3]);
+	printdevices();
 
 	pthread_create(&sim_thread, nil, simthread, apr);
 	pthread_create(&cmd_thread, nil, cmdthread, nil);

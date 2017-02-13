@@ -1,4 +1,3 @@
-extern char *argv0;
 #define USED(x) ((void)x)
 #define SET(x) ((x)=0)
 

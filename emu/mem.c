@@ -1,5 +1,8 @@
 #include "pdp6.h"
 
+char *fmem_ident = FMEM_IDENT;
+char *cmem_ident = CMEM_IDENT;
+
 Membus memterm;
 
 void
@@ -242,6 +245,12 @@ makecoremem(const char *file)
 	core->filename = file;
 
 	mem = malloc(sizeof(Mem));
+	mem->dev.type = cmem_ident;
+	mem->dev.name = "";
+	mem->dev.attach = nil;
+	mem->dev.ioconnect = nil;
+	mem->dev.next = nil;
+
 	mem->module = core;
 	mem->bus[0] = &memterm;
 	mem->bus[1] = &memterm;
@@ -261,9 +270,16 @@ makefastmem(int p)
 
 	ff = malloc(sizeof(FMem));
 	memset(ff, 0, sizeof(FMem));
+
 	ff->fmc_p_sel = p;
 
 	mem = malloc(sizeof(Mem));
+	mem->dev.type = fmem_ident;
+	mem->dev.name = "";
+	mem->dev.attach = nil;
+	mem->dev.ioconnect = nil;
+	mem->dev.next = nil;
+
 	mem->module = ff;
 	mem->bus[0] = &memterm;
 	mem->bus[1] = &memterm;
@@ -273,6 +289,35 @@ makefastmem(int p)
 	mem->poweron = powerff;
 
 	return mem;
+}
+
+Device*
+makefmem(int argc, char *argv[])
+{
+	Mem *m;
+	int p;
+
+	if(argc > 0)
+		p = atoi(argv[0]);
+	else
+		p = 0;
+	m = makefastmem(p);
+	m->poweron(m);
+	return &m->dev;
+}
+
+Device*
+makecmem(int argc, char *argv[])
+{
+	Mem *m;
+	char *path;
+	if(argc > 0)
+		path = argv[0];
+	else
+		path = "/dev/null";
+	m = makecoremem(path);
+	m->poweron(m);
+	return &m->dev;
 }
 
 /* Attach mem to bus for processor p.

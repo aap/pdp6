@@ -1,9 +1,52 @@
 #include "pdp6.h"
 #include <unistd.h>
 
+enum Opcode {
+	FSC    = 0132,
+	IBP    = 0133,
+	CAO    = 0133,
+	LDCI   = 0134,
+	LDC    = 0135,
+	DPCI   = 0136,
+	DPC    = 0137,
+	ASH    = 0240,
+	ROT    = 0241,
+        LSH    = 0242,
+	ASHC   = 0244,
+	ROTC   = 0245,
+	LSHC   = 0246,
+	EXCH   = 0250,
+	BLT    = 0251,
+	AOBJP  = 0252,
+	AOBJN  = 0253,
+	JRST   = 0254,
+	JFCL   = 0255,
+	XCT    = 0256,
+	PUSHJ  = 0260,
+	PUSH   = 0261,
+	POP    = 0262,
+	POPJ   = 0263,
+	JSR    = 0264,
+	JSP    = 0265,
+	JSA    = 0266,
+	JRA    = 0267,
+
+	BLKI   = 0700000,
+	DATAI  = 0700040,
+	BLKO   = 0700100,
+	DATAO  = 0700140,
+	CONO   = 0700200,
+	CONI   = 0700240,
+	CONSZ  = 0700300,
+	CONSO  = 0700340
+
+};
+
 static void aprcycle(void *p);
 static void wake_cpa(void *dev);
 static void wake_pi(void *dev);
+
+char *apr_ident = APR_IDENT;
 
 void
 curpulse(Apr *apr, Pulse *p)
@@ -25,21 +68,28 @@ nextpulse(Apr *apr, Pulse *p)
 	apr->nlist[apr->nnextpulses++] = p;
 }
 
-Apr*
-makeapr(void)
+Device*
+makeapr(int argc, char *argv[])
 {
 	Apr *apr;
 	Thread th;
 
 	apr = malloc(sizeof(Apr));
 	memset(apr, 0, sizeof(Apr));
+
+	apr->dev.type = apr_ident;
+	apr->dev.name = "";
+	apr->dev.attach = nil;
+	apr->dev.ioconnect = nil;
+	apr->dev.next = nil;
+
 	apr->iobus.dev[CPA] = (Busdev){ apr, wake_cpa, 0 };
 	apr->iobus.dev[PI] = (Busdev){ apr, wake_pi, 0 };
 
 	th = (Thread){ nil, aprcycle, apr, 1, 0 };
 	addthread(th);
 
-	return apr;
+	return &apr->dev;
 }
 
 
@@ -367,10 +417,12 @@ void
 setreq(IOBus *bus, int dev, u8 pia)
 {
 	u8 req;
-	req = (0200>>pia) & 0177;
-	if(bus->dev[dev].req != req){
-		bus->dev[dev].req = req;
-		recalc_req(bus);
+	if(bus){
+		req = (0200>>pia) & 0177;
+		if(bus->dev[dev].req != req){
+			bus->dev[dev].req = req;
+			recalc_req(bus);
+		}
 	}
 }
 

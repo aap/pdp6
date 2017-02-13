@@ -4,6 +4,8 @@
 #include <termios.h>
 #include <poll.h>
 
+char *tty_ident = TTY_IDENT;
+
 static void
 recalc_tty_req(Tty *tty)
 {
@@ -91,12 +93,14 @@ wake_tty(void *dev)
 	recalc_tty_req(tty);
 }
 
-void
-attachdevtty(Tty *tty, const char *path)
+static void
+ttyattach(Device *dev, const char *path)
 {
+	Tty *tty;
 	int fd;
 	struct termios tio;
 
+	tty = (Tty*)dev;
 	fd = tty->fd;
 	if(fd >= 0){
 		tty->fd = -1;
@@ -116,23 +120,36 @@ attachdevtty(Tty *tty, const char *path)
 
 fail:
 	if(fd >= 0) close(fd);
-	fprintf(stderr, "couldn't open tty %s\n", path);
+	fprintf(stderr, "couldn't open file %s\n", path);
 }
 
-Tty*
-maketty(IOBus *bus)
+static void
+ttyioconnect(Device *dev, IOBus *bus)
+{
+	Tty *tty;
+	tty = (Tty*)dev;
+	tty->bus = bus;
+	bus->dev[TTY] = (Busdev){ tty, wake_tty, 0 };
+}
+
+Device*
+maketty(int argc, char *argv[])
 {
 	Tty *tty;
 	Thread th;
 
 	tty = malloc(sizeof(Tty));
 	memset(tty, 0, sizeof(Tty));
+
+	tty->dev.type = tty_ident;
+	tty->dev.name = "";
+	tty->dev.attach = ttyattach;
+	tty->dev.ioconnect = ttyioconnect;
+
 	tty->fd = -1;
-	tty->bus = bus;
-	bus->dev[TTY] = (Busdev){ tty, wake_tty, 0 };
 
 	th = (Thread){ nil, ttycycle, tty, 1, 0 };
 	addthread(th);
 
-	return tty;
+	return &tty->dev;
 }

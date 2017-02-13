@@ -28,6 +28,7 @@ u32 getms(void);
 int hasinput(int fd);
 
 void quit(int code);
+void cli(FILE *f);
 void *cmdthread(void *);
 
 enum {
@@ -67,6 +68,15 @@ enum FullwordBits {
 	F33 = 0000000000004, F34 = 0000000000002, F35 = 0000000000001
 };
 
+typedef struct Mem Mem;
+typedef struct Membus Membus;
+typedef struct FMem FMem;
+typedef struct CMem CMem;
+typedef struct Busdev Busdev;
+typedef struct IOBus IOBus;
+typedef struct Apr Apr;
+
+
 typedef struct Thread Thread;
 struct Thread
 {
@@ -80,62 +90,22 @@ struct Thread
 extern Thread *threads;
 void addthread(Thread th);
 
-
-/* external pulses, bits of Apr.extpulse */
-enum Extpulse {
-	EXT_KEY_MANUAL       = 1,
-	EXT_KEY_INST_STOP    = 2,
-	EXT_NONEXIT_MEM      = 4
+/* not used yet */
+typedef struct Device Device;
+struct Device
+{
+	Device *next;
+	char *type;
+	char *name;
+	/* attach file to device */
+	void (*attach)(Device *dev, const char *path);
+	/* connect device to iobus */
+	void (*ioconnect)(Device *dev, IOBus *bus);
 };
 
-enum Opcode {
-	FSC    = 0132,
-	IBP    = 0133,
-	CAO    = 0133,
-	LDCI   = 0134,
-	LDC    = 0135,
-	DPCI   = 0136,
-	DPC    = 0137,
-	ASH    = 0240,
-	ROT    = 0241,
-        LSH    = 0242,
-	ASHC   = 0244,
-	ROTC   = 0245,
-	LSHC   = 0246,
-	EXCH   = 0250,
-	BLT    = 0251,
-	AOBJP  = 0252,
-	AOBJN  = 0253,
-	JRST   = 0254,
-	JFCL   = 0255,
-	XCT    = 0256,
-	PUSHJ  = 0260,
-	PUSH   = 0261,
-	POP    = 0262,
-	POPJ   = 0263,
-	JSR    = 0264,
-	JSP    = 0265,
-	JSA    = 0266,
-	JRA    = 0267,
-
-	BLKI   = 0700000,
-	DATAI  = 0700040,
-	BLKO   = 0700100,
-	DATAO  = 0700140,
-	CONO   = 0700200,
-	CONI   = 0700240,
-	CONSZ  = 0700300,
-	CONSO  = 0700340
-
-};
-
-typedef struct Mem Mem;
-typedef struct Membus Membus;
-typedef struct FMem FMem;
-typedef struct CMem CMem;
-typedef struct Busdev Busdev;
-typedef struct IOBus IOBus;
-typedef struct Apr Apr;
+extern Device *devlist;
+void adddevice(Device *dev);
+Device *getdevice(const char *name);
 
 
 /*
@@ -168,6 +138,7 @@ enum {
 /* A memory module connected to up to 4 Membuses */
 struct Mem
 {
+	Device dev;
 	void *module;
 	Membus *bus[4];
 	int (*wake)(Mem *mem, Membus *bus);
@@ -181,8 +152,6 @@ struct Membus
 	 * and c??_pulse is used to detect leading edges. */
 	word c12, c12_prev, c12_pulse;
 	word c34, c34_prev, c34_pulse;
-	/* cycle counter to implement NXM timeout  */
-	int numcyc;
 
 	Mem *fmem;	/* fast memory */
 	Mem *cmem[16];	/* 16 16k core modules */
@@ -198,7 +167,10 @@ struct FMem
 	bool fmc_act;
 	bool fmc_wr;
 };
+#define FMEM_IDENT "fmem162"
+extern char *fmem_ident;
 Mem *makefastmem(int p);
+Device *makefmem(int argc, char *argv[]);
 
 /* Core memory 161C, 16k words */
 struct CMem
@@ -214,7 +186,10 @@ struct CMem
 	u8 cmc_last_proc;
 	bool cmc_pse_sync;
 };
+#define CMEM_IDENT "cmem161C"
+extern char *cmem_ident;
 Mem *makecoremem(const char *file);
+Device *makecmem(int argc, char *argv[]);
 
 void attachmem(Mem *mem, int p, Membus *bus, int n);
 void readmem(const char *file, word *mem, word size);
@@ -300,11 +275,19 @@ void setreq(IOBus *bus, int dev, u8 pia);
 #define CPA (0000>>2)
 #define PI (0004>>2)
 
+/* external pulses, bits of Apr.extpulse */
+enum Extpulse {
+	EXT_KEY_MANUAL       = 1,
+	EXT_KEY_INST_STOP    = 2,
+	EXT_NONEXIT_MEM      = 4
+};
+
 typedef void Pulse(Apr *apr);
 #define pulse(p) static void p(Apr *apr)
 
 struct Apr
 {
+	Device dev;
 	IOBus iobus;
 	Membus membus;
 	int powered;
@@ -414,24 +397,9 @@ struct Apr
 	Pulse **clist, **nlist;
 	int ncurpulses, nnextpulses;
 };
-extern Apr *aprs[4];
-Apr *makeapr(void);
-
-
-/* Paper tape punch 761 */
-#define PTP (0100>>2)
-typedef struct Ptp Ptp;
-struct Ptp
-{
-	IOBus *bus;
-	uchar ptp;
-	bool busy, flag, b;
-	int pia;
-
-	int fd;
-	int waitdatao;
-};
-Ptp *makeptp(IOBus *bus);
+#define APR_IDENT "apr166"
+extern char *apr_ident;
+Device *makeapr(int argc, char *argv[]);
 
 
 /* Paper tape reader 760 */
@@ -439,6 +407,7 @@ Ptp *makeptp(IOBus *bus);
 typedef struct Ptr Ptr;
 struct Ptr
 {
+	Device dev;
 	IOBus *bus;
 	int motor_on;
 	word sr;
@@ -448,8 +417,29 @@ struct Ptr
 
 	int fd;
 };
-Ptr *makeptr(IOBus *bus);
+#define PTR_IDENT "ptr760"
+extern char *ptr_ident;
+Device *makeptr(int argc, char *argv[]);
 void ptr_setmotor(Ptr *ptr, int m);
+
+
+/* Paper tape punch 761 */
+#define PTP (0100>>2)
+typedef struct Ptp Ptp;
+struct Ptp
+{
+	Device dev;
+	IOBus *bus;
+	uchar ptp;
+	bool busy, flag, b;
+	int pia;
+
+	int fd;
+	int waitdatao;
+};
+#define PTP_IDENT "ptp761"
+extern char *ptp_ident;
+Device *makeptp(int argc, char *argv[]);
 
 
 /* Teletype 626 */
@@ -457,6 +447,7 @@ void ptr_setmotor(Ptr *ptr, int m);
 typedef struct Tty Tty;
 struct Tty
 {
+	Device dev;
 	IOBus *bus;
 	uchar tto, tti;
 	bool tto_busy, tto_flag;
@@ -464,5 +455,6 @@ struct Tty
 	int pia;
 	int fd;
 };
-Tty *maketty(IOBus *bus);
-void attachdevtty(Tty *tty, const char *path);
+#define TTY_IDENT "tty626"
+extern char *tty_ident;
+Device *maketty(int argc, char *argv[]);

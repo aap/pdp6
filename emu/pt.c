@@ -9,6 +9,9 @@
 
 /* TODO? implement motor delays */
 
+char *ptr_ident = PTR_IDENT;
+char *ptp_ident = PTP_IDENT;
+
 static void
 recalc_ptp_req(Ptp *ptp)
 {
@@ -185,38 +188,94 @@ ptr_setmotor(Ptr *ptr, int m)
 	recalc_ptr_req(ptr);
 }
 
-Ptp*
-makeptp(IOBus *bus)
+static void
+ptpattach(Device *dev, const char *path)
+{
+	Ptp *ptp;
+	int fd;
+
+	ptp = (Ptp*)dev;
+	fd = ptp->fd;
+	if(fd >= 0){
+		ptp->fd = -1;
+		close(fd);
+	}
+	ptp->fd = open(path, O_WRONLY | O_CREAT, 0666);
+	if(ptp->fd < 0)
+		fprintf(stderr, "couldn't open file %s\n", path);
+}
+
+static void
+ptrattach(Device *dev, const char *path)
+{
+	Ptr *ptr;
+	int fd;
+
+	ptr = (Ptr*)dev;
+	fd = ptr->fd;
+	if(fd >= 0){
+		ptr->fd = -1;
+		close(fd);
+	}
+	ptr->fd = open(path, O_RDONLY);
+	if(ptr->fd < 0)
+		fprintf(stderr, "couldn't open file %s\n", path);
+}
+
+static void
+ptrioconnect(Device *dev, IOBus *bus)
+{
+	Ptr *ptr;
+	ptr = (Ptr*)dev;
+	ptr->bus = bus;
+	bus->dev[PTR] = (Busdev){ ptr, wake_ptr, 0 };
+}
+
+static void
+ptpioconnect(Device *dev, IOBus *bus)
+{
+	Ptp *ptp;
+	ptp = (Ptp*)dev;
+	ptp->bus = bus;
+	bus->dev[PTP] = (Busdev){ ptp, wake_ptp, 0 };
+}
+
+Device*
+makeptp(int argc, char *argv[])
 {
 	Ptp *ptp;
 	Thread th;
 
 	ptp = malloc(sizeof(Ptp));
 	memset(ptp, 0, sizeof(Ptp));
-	ptp->bus = bus;
-	bus->dev[PTP] = (Busdev){ ptp, wake_ptp, 0 };
+
+	ptp->dev.type = ptp_ident;
+	ptp->dev.name = "";
+	ptp->dev.attach = ptpattach;
+	ptp->dev.ioconnect = ptpioconnect;
+	ptp->fd = -1;
 
 	th = (Thread){ nil, ptpcycle, ptp, 1, 0 };
 	addthread(th);
-
-	ptp->fd = open("../code/ptp.out", O_WRONLY | O_CREAT, 0666);
-	return ptp;
+	return &ptp->dev;
 }
 
-Ptr*
-makeptr(IOBus *bus)
+Device*
+makeptr(int argc, char *argv[])
 {
 	Ptr *ptr;
 	Thread th;
 
 	ptr = malloc(sizeof(Ptr));
 	memset(ptr, 0, sizeof(Ptr));
-	ptr->bus = bus;
-	bus->dev[PTR] = (Busdev){ ptr, wake_ptr, 0 };
+
+	ptr->dev.type = ptr_ident;
+	ptr->dev.name = "";
+	ptr->dev.attach = ptrattach;
+	ptr->dev.ioconnect = ptrioconnect;
+	ptr->fd = -1;
 
 	th = (Thread){ nil, ptrcycle, ptr, 1, 0 };
 	addthread(th);
-
-	ptr->fd = open("../code/test.rim", O_RDONLY);
-	return ptr;
+	return &ptr->dev;
 }

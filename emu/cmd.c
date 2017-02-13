@@ -197,6 +197,126 @@ dep(word addr, int fastmem, word w)
 
 /* Commands */
 
+typedef struct DevDef DevDef;
+struct DevDef
+{
+	char *type;
+	Device *(*make)(int argc, char *argv[]);
+};
+DevDef definitions[] = {
+	{ FMEM_IDENT, makefmem },
+	{ CMEM_IDENT, makecmem },
+	{ APR_IDENT, makeapr },
+	{ TTY_IDENT, maketty },
+	{ PTR_IDENT, makeptr },
+	{ PTP_IDENT, makeptp },
+	{ nil, nil }
+};
+
+static void
+c_mkdev(int argc, char *argv[])
+{
+	Device *dev;
+	DevDef *def;
+
+	if(argc < 3){
+		printf("Not enough arguments\n");
+		return;
+	}
+	for(def = definitions; def->type; def++)
+		if(strcmp(def->type, argv[2]) == 0){
+			dev = def->make(argc-3, argv+3);
+			goto found;
+		}
+	printf("No such device type: %s\n", argv[2]);
+	return;
+found:
+	dev->name = strdup(argv[1]);
+	adddevice(dev);
+}
+
+static void
+c_attach(int argc, char *argv[])
+{
+	Device *dev;
+
+	if(argc < 3){
+		printf("Not enough arguments\n");
+		return;
+	}
+	dev = getdevice(argv[1]);
+	if(dev == nil){
+		printf("No device: %s\n", argv[1]);
+		return;
+	}
+	if(dev->attach == nil){
+		printf("No attach for device type %s\n", dev->type);
+		return;
+	}
+	dev->attach(dev, argv[2]);
+}
+
+/* ioconnect dev busdev */
+static void
+c_ioconnect(int argc, char *argv[])
+{
+	Device *dev, *busdev;
+
+	if(argc < 3){
+		printf("Not enough arguments\n");
+		return;
+	}
+	dev = getdevice(argv[1]);
+	if(dev == nil){
+		printf("No device: %s\n", argv[1]);
+		return;
+	}
+	busdev = getdevice(argv[2]);
+	if(busdev == nil){
+		printf("No device: %s\n", argv[2]);
+		return;
+	}
+	if(busdev->type != apr_ident){
+		printf("No bus device: %s\n", busdev->type);
+		return;
+	}
+	if(dev->ioconnect == nil){
+		printf("No ioconnect for device type %s\n", dev->type);
+		return;
+	}
+	dev->ioconnect(dev, &((Apr*)busdev)->iobus);
+}
+
+/* memconnect dev proc busdev addr */
+static void
+c_memconnect(int argc, char *argv[])
+{
+	int proc, addr;
+	Device *dev, *busdev;
+
+	if(argc < 5){
+		printf("Not enough arguments\n");
+		return;
+	}
+	dev = getdevice(argv[1]);
+	if(dev == nil){
+		printf("No device: %s\n", argv[1]);
+		return;
+	}
+	proc = atoi(argv[2]);
+	busdev = getdevice(argv[3]);
+	if(busdev == nil){
+		printf("No device: %s\n", argv[3]);
+		return;
+	}
+	if(busdev->type != apr_ident){
+		printf("No bus device: %s\n", argv[3]);
+		return;
+	}
+	addr = strtol(argv[4], nil, 8);
+	attachmem((Mem*)dev, proc, &((Apr*)busdev)->membus, addr);
+}
+
 static void
 c_ex(int argc, char *argv[])
 {
@@ -316,6 +436,10 @@ struct {
 	char *cmd;
 	void (*f)(int, char **);
 } cmdtab[] = {
+	{ "mkdev", c_mkdev },
+	{ "attach", c_attach },
+	{ "ioconnect", c_ioconnect },
+	{ "memconnect", c_memconnect },
 	{ "examine", c_ex },
 	{ "deposit", c_dep },
 	{ "load", c_load },
@@ -324,55 +448,72 @@ struct {
 	{ "", nil}
 };
 
-void*
-cmdthread(void *p)
+void
+commandline(char *line)
 {
-	size_t len, l;
-	char *line, *cmd;
 	int i, n;
 	int nfound;
+	size_t l;
+	char *cmd;
+
+	lp = line;
+	splitops();
+
+	if(numops && ops[0][0] != '#'){
+		nfound = 0;
+		for(i = 0; cmdtab[i].cmd[0]; i++){
+			cmd = cmdtab[i].cmd;
+			l = strlen(ops[0]);
+			if(strncmp(ops[0], cmd, l) == 0){
+				n = i;
+				nfound++;
+			}
+		}
+		if(nfound == 0)
+			printf("%s: not found\n", ops[0]);
+		else if(nfound == 1)
+			cmdtab[n].f(numops, ops);
+		else{
+			printf("Ambiguous command: %s\n", ops[0]);
+			for(i = 0; cmdtab[i].cmd[0]; i++){
+				cmd = cmdtab[i].cmd;
+				l = strlen(ops[0]);
+				if(strncmp(ops[0], cmd, l) == 0)
+					printf("	%s\n", cmd);
+			}
+		}
+	}
+}
+
+void
+cli(FILE *in)
+{
+	Device *dev;
+	size_t len;
+	char *line;
 
 	apr = nil;
-	for(i = 0; i < 4; i++)
-		if(aprs[i]){
-			apr = aprs[i];
+	for(dev = devlist; dev; dev = dev->next)
+		if(dev->type == apr_ident){
+			apr = (Apr*)dev;
 			break;
 		}
 	for(;;){
 		line = nil;
 		len = 0;
-		printf("> ");
-		if(getline(&line, &len, stdin) < 0)
-			quit(0);
-
-		lp = line;
-		splitops();
-
-		if(numops){
-			nfound = 0;
-			for(i = 0; cmdtab[i].cmd[0]; i++){
-				cmd = cmdtab[i].cmd;
-				l = strlen(ops[0]);
-				if(strncmp(ops[0], cmd, l) == 0){
-					n = i;
-					nfound++;
-				}
-			}
-			if(nfound == 0)
-				printf("%s: not found\n", ops[0]);
-			else if(nfound == 1)
-				cmdtab[n].f(numops, ops);
-			else{
-				printf("Ambiguous command: %s\n", ops[0]);
-				for(i = 0; cmdtab[i].cmd[0]; i++){
-					cmd = cmdtab[i].cmd;
-					l = strlen(ops[0]);
-					if(strncmp(ops[0], cmd, l) == 0)
-						printf("	%s\n", cmd);
-				}
-			}
-		}
+		if(in == stdin)
+			printf("> ");
+		if(getline(&line, &len, in) < 0)
+			return;
+		commandline(line);
 		free(line);
 	}
+}
+
+void*
+cmdthread(void *p)
+{
+	cli(stdin);
+	quit(0);
 	return nil;
 }
