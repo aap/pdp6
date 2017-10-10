@@ -38,6 +38,9 @@ reset(int fd)
 
 struct timespec slp = { 0, 1000*1000*1000 / BAUD };
 
+//#define SLEEP nanosleep(&slp, NULL)
+#define SLEEP
+
 void
 readwrite(int ttyin, int ttyout, int ptyin, int ptyout)
 {
@@ -63,7 +66,7 @@ readwrite(int ttyin, int ttyout, int ptyin, int ptyout)
 				return;
 			else{
 				write(ttyout, &c, 1);
-				nanosleep(&slp, NULL);
+				SLEEP;
 			}
 		}
 		/* read from tty, write to pty */
@@ -74,7 +77,7 @@ readwrite(int ttyin, int ttyout, int ptyin, int ptyout)
 				if(c == 035)
 					return;
 				write(ptyout, &c, 1);
-				nanosleep(&slp, NULL);
+				SLEEP;
 			}
 		}
 	}

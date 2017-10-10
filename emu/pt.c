@@ -1,11 +1,7 @@
 #include "pdp6.h"
 #include <string.h>
-#include <unistd.h>
 #include <fcntl.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h> 
-#include <poll.h>
+#include <unistd.h>
 
 /* TODO? implement motor delays */
 

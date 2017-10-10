@@ -210,6 +210,7 @@ DevDef definitions[] = {
 	{ TTY_IDENT, maketty },
 	{ PTR_IDENT, makeptr },
 	{ PTP_IDENT, makeptp },
+	{ DC_IDENT, makedc },
 	{ nil, nil }
 };
 

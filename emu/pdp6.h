@@ -458,3 +458,40 @@ struct Tty
 #define TTY_IDENT "tty626"
 extern char *tty_ident;
 Device *maketty(int argc, char *argv[]);
+
+/* Data Control 136 */
+#define DC (0200>>2)
+typedef struct Dc136 Dc136;
+struct Dc136
+{
+	Device dev;
+	IOBus *bus;
+	int pia;
+	int device;
+	int ch_mode;
+	void *devp[8];
+
+	word da;
+	word db;
+	int cct;
+	int sct;
+
+	int data_clbd;	/* data clobbered */
+	int dbda_move;
+	int da_rq;
+	int db_rq;
+	int inout;
+
+	/* lines between dc and devices 1/2:
+	 * tk/gv rt
+	 * tk/gv lt
+	 * clr cct 1
+	 * darq(1)
+	 * sel 1
+	 */
+};
+#define DC_IDENT "dc136"
+extern char *dc_ident;
+Device *makedc(int argc, char *argv[]);
+void dcgv(Dc136 *dc, word c, int n, int rev);
+word dctk(Dc136 *dc, int n, int rev);
