@@ -242,8 +242,7 @@ makecoremem(const char *file)
 
 	core = malloc(sizeof(CMem));
 	memset(core, 0, sizeof(CMem));
-	core->filename = file;
-
+	core->filename = strdup(file);
 	mem = malloc(sizeof(Mem));
 	mem->dev.type = cmem_ident;
 	mem->dev.name = "";

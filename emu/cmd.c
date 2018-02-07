@@ -211,6 +211,8 @@ DevDef definitions[] = {
 	{ PTR_IDENT, makeptr },
 	{ PTP_IDENT, makeptp },
 	{ DC_IDENT, makedc },
+	{ DT_IDENT, makedt },
+	{ DX_IDENT, makedx },
 	{ nil, nil }
 };
 
@@ -318,6 +320,44 @@ c_memconnect(int argc, char *argv[])
 	attachmem((Mem*)dev, proc, &((Apr*)busdev)->membus, addr);
 }
 
+/* devconnect dev1 dev2 */
+// TODO: not quite sure this is the right way to do it
+static void
+c_devconnect(int argc, char *argv[])
+{
+	Device *dev1, *dev2;
+
+	if(argc < 3){
+args:
+		printf("Not enough arguments\n");
+		return;
+	}
+	dev1 = getdevice(argv[1]);
+	if(dev1 == nil){
+		printf("No device: %s\n", argv[1]);
+		return;
+	}
+	dev2 = getdevice(argv[2]);
+	if(dev2 == nil){
+		printf("No device: %s\n", argv[2]);
+		return;
+	}
+	if(dev1->type == dc_ident && dev2->type == dt_ident)
+		dtconn((Dc136*)dev1, (Dt551*)dev2);
+	else if(dev1->type == dt_ident && dev2->type == dx_ident){
+		int n;
+		if(argc < 4)
+			goto args;
+		n = atoi(argv[3]);
+		if(n < 1 || n > 8){
+			printf("Invalid device number %d\n", n);
+			return;
+		}
+		dxconn((Dt551*)dev1, (Dx555*)dev2, n);
+	}else
+		printf("Cannot connect %s to %s\n", dev2->type, dev1->type);
+}
+
 static void
 c_ex(int argc, char *argv[])
 {
@@ -423,6 +463,8 @@ c_load(int argc, char *argv[])
 static void
 c_show(int argc, char *argv[])
 {
+	printf("Devices:\n");
+	showdevices();
 	printf("Memory:\n");
 	showmem(&apr->membus);
 }
@@ -441,6 +483,7 @@ struct {
 	{ "attach", c_attach },
 	{ "ioconnect", c_ioconnect },
 	{ "memconnect", c_memconnect },
+	{ "devconnect", c_devconnect },
 	{ "examine", c_ex },
 	{ "deposit", c_dep },
 	{ "load", c_load },

@@ -179,9 +179,13 @@ fixadd(void)
 			continue;
 		}
 		if(a->l)
-			mem[a->addr] += fw(right(s[1]), 0);
+			mem[a->addr] = fw(
+				left(mem[a->addr]) + right(s[1]),
+				right(mem[a->addr]));
 		else
-			mem[a->addr] += fw(0, right(s[1]));
+			mem[a->addr] = fw(
+				left(mem[a->addr]),
+				right(mem[a->addr]) + right(s[1]));
 	}
 }
 
@@ -299,9 +303,13 @@ readblock(int doreloc)
 		reloc <<= 2;
 		if(doreloc){
 			if(bits & 1)
-				block[i] += fw(0, rel);
+				block[i] = fw(
+					left(block[i]),
+					right(block[i]) + rel);
 			if(bits & 2)
-				block[i] += fw(rel, 0);
+				block[i] = fw(
+					left(block[i]) + rel,
+					right(block[i]));
 		}
 	}
 }
@@ -570,7 +578,7 @@ main(int argc, char *argv[])
 	}
 	fixadd();
 
-//	dumpsym();
+	dumpsym();
 
 	checkundef();
 	if(error)

@@ -47,6 +47,7 @@ cp0:
 
 	// DASH CP1
 	if(DC_CCT_DONE){
+//printf("Full DA: %012lo\n", dc->da);
 		dc->cct = 0;
 		if(dc->da_rq == 0){
 			dc->da_rq = 1;
@@ -73,8 +74,9 @@ cp0:
 }
 
 void
-dcgv(Dc136 *dc, word c, int n, int rev)
+dcgv(Dc136 *dc, int n, word c, int rev)
 {
+//printf("DC Taking %06lo from dev %d\n", c, n);
 	switch(n){
 	case 1: case 2:
 		if(rev)
@@ -121,6 +123,7 @@ dctk(Dc136 *dc, int n, int rev)
 	}
 	dash_cp0(dc);
 	recalc_dc_req(dc);
+//printf("DC Giving %06lo to dev %d\n", c, n);
 	return c;
 }
 

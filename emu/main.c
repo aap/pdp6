@@ -597,7 +597,7 @@ getdevice(const char *name)
 }
 
 void
-printdevices(void)
+showdevices(void)
 {
 	Device *dev;
 	for(dev = devlist; dev; dev = dev->next)
@@ -761,8 +761,6 @@ main(int argc, char *argv[])
 	tty = (Tty*)getdevice("tty");
 	ptr = (Ptr*)getdevice("ptr");
 	ptp = (Ptp*)getdevice("ptp");
-
-	printdevices();
 
 	pthread_create(&sim_thread, nil, simthread, apr);
 	pthread_create(&cmd_thread, nil, cmdthread, nil);

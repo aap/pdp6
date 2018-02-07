@@ -90,7 +90,6 @@ struct Thread
 extern Thread *threads;
 void addthread(Thread th);
 
-/* not used yet */
 typedef struct Device Device;
 struct Device
 {
@@ -106,6 +105,7 @@ struct Device
 extern Device *devlist;
 void adddevice(Device *dev);
 Device *getdevice(const char *name);
+void showdevices(void);
 
 
 /*
@@ -493,5 +493,98 @@ struct Dc136
 #define DC_IDENT "dc136"
 extern char *dc_ident;
 Device *makedc(int argc, char *argv[]);
-void dcgv(Dc136 *dc, word c, int n, int rev);
+void dcgv(Dc136 *dc, int n, word c, int rev);
 word dctk(Dc136 *dc, int n, int rev);
+
+/* Microtape/DECtape */
+
+/* 555 has:
+ *  move tape fwd, rev, auto
+ *  unit selection (1-8)
+ *  motor off, write lock on/off
+*/
+
+typedef struct Dx555 Dx555;
+typedef struct Dt551 Dt551;
+
+/* Transport 555,
+ * a half of it really */
+struct Dx555
+{
+	Device dev;
+
+	Dt551 *dt;
+
+	int unit;
+	int wrlock;
+
+	int fd;
+	uchar *start;
+	uchar *cur;
+	uchar *end;
+};
+#define DX_IDENT "dx555"
+extern char *dx_ident;
+Device *makedx(int argc, char *argv[]);
+void dxconn(Dt551 *dt, Dx555 *dx, int n);
+/*
+void dxatt(Dx555 *dx, uchar *buf, int size);
+void dxff(Dx555 *dx);
+void dxrew(Dx555 *dx);
+*/
+
+/* Control 551 */
+#define UTC (0210>>2)
+#define UTS (0214>>2)
+struct Dt551
+{
+	Device dev;
+	IOBus *bus;
+
+	Dc136 *dc;
+	Dx555 *dx[8];
+	Dx555 *seldx;
+
+	/* enable time and mark track writing */
+	int ut_btm_switch;
+
+	int ut_pia;
+	int ut_units;
+	int ut_units_select;
+	int ut_fcn;
+	int ut_time;
+	int ut_wren;
+	int ut_go;
+	int ut_rev;
+	int ut_tape_end_flag;
+	int ut_tape_end_enable;
+	int ut_jb_done_flag;
+	int ut_jb_done_enable;
+	int time_enable;
+	int time_flag;
+	int ut_illegal_op;
+	int ut_info_error;
+	int ut_incomp_block;
+
+	int tmk;	/* 9 bits */
+	int rwb;	/* 6 bits */
+	int lb;		/* 6 bits */
+	int tbm;	/* 4 bits */
+	int tdata;	/* 8 bits */
+	int tct;	/* 1 bit  */
+	int utek;	/* 6 bits */
+	int uteck;
+
+	int rw_state;	/* null, rq, active */
+
+
+//	int req;
+};
+#define DT_IDENT "dt551"
+extern char *dt_ident;
+Device *makedt(int argc, char *argv[]);
+void dtconn(Dc136 *dc, Dt551 *dt);
+/*
+void dtcono(Dt551 *dt, word iob);
+void dtcycle(Dt551 *dt);
+*/

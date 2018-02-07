@@ -37,6 +37,7 @@ reset(int fd)
 #define BAUD 30
 
 struct timespec slp = { 0, 1000*1000*1000 / BAUD };
+struct timespec hupslp = { 0, 100*1000*1000 };
 
 //#define SLEEP nanosleep(&slp, NULL)
 #define SLEEP
@@ -60,6 +61,8 @@ readwrite(int ttyin, int ttyout, int ptyin, int ptyout)
 		}
 		if(n == 0)
 			return;
+		if(pfd[0].revents & POLLHUP)
+			nanosleep(&hupslp, NULL);
 		/* read from pty, write to tty */
 		if(pfd[0].revents & POLLIN){
 			if(n = read(ptyin, &c, 1), n <= 0)
