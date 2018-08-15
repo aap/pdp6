@@ -213,6 +213,7 @@ DevDef definitions[] = {
 	{ DC_IDENT, makedc },
 	{ DT_IDENT, makedt },
 	{ DX_IDENT, makedx },
+	{ NETMEM_IDENT, makenetmem },
 	{ nil, nil }
 };
 
@@ -408,6 +409,79 @@ c_dep(int argc, char *argv[])
 		dep(start, fastmem, w);
 }
 
+/* parse "devname.reg".
+ * look up "devname" and return it.
+ * also remove "devname." from original string.
+ * if "devname." is missing, return last device.
+ * return apr if anything goes wrong */
+Device*
+getexdepdev(char *dev)
+{
+	static Device *exdepdev;
+	char *s;
+	Device *d;
+
+	s = strchr(dev, '.');
+	if(s == nil){
+		if(exdepdev == nil)
+			exdepdev = &apr->dev;
+		return exdepdev;
+	}
+	*s++ = '\0';
+	d = getdevice(dev);
+	exdepdev = d ? d : &apr->dev;
+	while(*dev++ = *s++);
+	return exdepdev;
+}
+
+static void
+c_xex(int argc, char *argv[])
+{
+	int i;
+	Device *dev;
+	word w;
+	for(i = 1; i < argc; i++){
+		dev = getexdepdev(argv[i]);
+		if(dev->examine){
+			strtolower(argv[i]);
+			w = dev->examine(dev, argv[i]);
+			if(w == ~0)
+				printf("can't examine %s\n", argv[i]);
+			else
+				printf("%012lo\n", w);
+		}else
+			printf("no examine on %s\n", dev->type);
+	}
+}
+
+static void
+c_xdep(int argc, char *argv[])
+{
+	int i;
+	Device *dev;
+	word w;
+
+	if(argc < 3)
+		return;
+
+	w = parsen(&argv[argc-1]);
+	if(w == ~0)
+		return;
+
+	for(i = 1; i < argc-1; i++){
+		dev = getexdepdev(argv[i]);
+		if(dev->deposit){
+			strtolower(argv[i]);
+			if(dev->deposit(dev, argv[i], w))
+				printf("can't deposit %s\n", argv[i]);
+		}else
+			printf("no deposit on %s\n", dev->type);
+	}
+
+void updatepanel(Apr *apr);
+	updatepanel(apr);
+}
+
 enum
 {
 	FmtUnk, FmtSav
@@ -475,22 +549,50 @@ c_quit(int argc, char *argv[])
 	quit(0);
 }
 
+static void c_help(int argc, char *argv[]);
+
 struct {
 	char *cmd;
 	void (*f)(int, char **);
+	char *desc;
 } cmdtab[] = {
-	{ "mkdev", c_mkdev },
-	{ "attach", c_attach },
-	{ "ioconnect", c_ioconnect },
-	{ "memconnect", c_memconnect },
-	{ "devconnect", c_devconnect },
-	{ "examine", c_ex },
-	{ "deposit", c_dep },
-	{ "load", c_load },
-	{ "show", c_show },
-	{ "quit", c_quit },
+	{ "mkdev", c_mkdev,
+		"make a device: mkdev name type [args]" },
+	{ "attach", c_attach,
+		"attach a file to a devie: attach name filename" },
+	{ "connectio", c_ioconnect,
+		"connect device to IO bus: connectio devname procname" },
+	{ "connectmem", c_memconnect,
+		"connect memory to mem bus: connectmem memname memport procname address/16k" },
+	{ "connectdev", c_devconnect,
+		"connect devices: connectdev dev1name dev2name [args]" },
+	{ "examine", c_ex,
+		"examine memory: examine [-sm] memrange" },
+	{ "deposit", c_dep,
+		"deposit memory: deposit [-s] memrange word" },
+	{ "xexamine", c_xex,
+		"examine device" },
+	{ "xdeposit", c_xdep,
+		"deposit device" },
+	{ "load", c_load,
+		"load file into memory: load [-s] filename" },
+	{ "show", c_show,
+		"show configuration" },
+	{ "quit", c_quit,
+		"quit emulator" },
+	{ "help", c_help,
+		"print help" },
 	{ "", nil}
 };
+
+static void
+c_help(int argc, char *argv[])
+{
+	int i;
+
+	for(i = 0; cmdtab[i].cmd[0]; i++)
+		printf(" %s:\t%s\n", cmdtab[i].cmd, cmdtab[i].desc);
+}
 
 void
 commandline(char *line)

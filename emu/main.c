@@ -80,20 +80,6 @@ getms(void)
 	return SDL_GetTicks();
 }
 
-int
-hasinput(int fd)
-{
-	fd_set fds;
-	struct timeval timeout;
-
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 0;
-	FD_ZERO(&fds);
-	FD_SET(fd, &fds);
-	return select(fd+1, &fds, NULL, NULL, &timeout) > 0;
-}
-
-
 SDL_Surface*
 mustloadimg(const char *path)
 {
@@ -143,7 +129,7 @@ Element *extra_l;
 #include "elements.inc"
 
 void
-setlights(word w, Element *l, int n)
+setelements(word w, Element *l, int n)
 {
 	int i;
 	for(i = 0; i < n; i++)
@@ -151,7 +137,7 @@ setlights(word w, Element *l, int n)
 }
 
 word
-getswitches(Element *sw, int n)
+getelements(Element *sw, int n)
 {
 	word w;
 	int i;
@@ -163,6 +149,20 @@ getswitches(Element *sw, int n)
 
 #define KEYPULSE(k) (apr->k && !oldapr.k)
 
+/* Set panel from internal APR state */
+void
+updatepanel(Apr *apr)
+{
+	setelements(apr->data, data_sw, 36);
+	setelements(apr->mas, ma_sw, 18);
+
+	extra_sw[0].state = apr->sw_rim_maint;
+	extra_sw[1].state = apr->sw_rpt_bypass;
+	extra_sw[2].state = apr->sw_art3_maint;
+	extra_sw[3].state = apr->sw_sct_maint;
+	extra_sw[4].state = apr->sw_spltcyc_override;
+}
+
 void
 updateapr(Apr *apr, Ptr *ptr)
 {
@@ -171,13 +171,13 @@ updateapr(Apr *apr, Ptr *ptr)
 	if(apr == nil)
 		return;
 	oldapr = *apr;
-	setlights(apr->ir, ir_l, 18);
-	setlights(apr->mi, mi_l, 36);
-	setlights(apr->pc, pc_l, 18);
-	setlights(apr->ma, ma_l, 18);
-	setlights(apr->pih, pih_l, 7);
-	setlights(apr->pir, pir_l, 7);
-	setlights(apr->pio, pio_l, 7);
+	setelements(apr->ir, ir_l, 18);
+	setelements(apr->mi, mi_l, 36);
+	setelements(apr->pc, pc_l, 18);
+	setelements(apr->ma, ma_l, 18);
+	setelements(apr->pih, pih_l, 7);
+	setelements(apr->pir, pir_l, 7);
+	setelements(apr->pio, pio_l, 7);
 	misc_l[0].state = apr->pi_active;
 	misc_l[1].state = apr->mc_stop;
 	misc_l[2].state = apr->run;
@@ -185,8 +185,8 @@ updateapr(Apr *apr, Ptr *ptr)
 	misc_l[4].state = apr->sw_addr_stop = misc_sw[1].state;
 	misc_l[5].state = apr->sw_power = misc_sw[2].state;
 	misc_l[6].state = apr->sw_mem_disable = misc_sw[3].state;
-	apr->data = getswitches(data_sw, 36);
-	apr->mas = getswitches(ma_sw, 18);
+	apr->data = getelements(data_sw, 36);
+	apr->mas = getelements(ma_sw, 18);
 
 	apr->sw_rim_maint = extra_sw[0].state;
 	if(apr->sw_rim_maint)
@@ -229,9 +229,9 @@ updateapr(Apr *apr, Ptr *ptr)
 		}
 	}
 
-	setlights(apr->mb, mb_l, 36);
-	setlights(apr->ar, ar_l, 36);
-	setlights(apr->mq, mq_l, 36);
+	setelements(apr->mb, mb_l, 36);
+	setelements(apr->ar, ar_l, 36);
+	setelements(apr->mq, mq_l, 36);
 
 	ff_l[0].state = apr->key_ex_st;
 	ff_l[1].state = apr->key_ex_sync;
@@ -314,9 +314,9 @@ updateapr(Apr *apr, Ptr *ptr)
 	ff_l[70].state = apr->uuo_f1;
 	ff_l[71].state = apr->cpa_pdl_ov;
 
-	setlights(apr->fe, &ff_l[72], 8);
+	setelements(apr->fe, &ff_l[72], 8);
 
-	setlights(apr->sc, &ff_l[80], 8);
+	setelements(apr->sc, &ff_l[80], 8);
 
 	ff_l[88].state = !apr->ex_user;
 	ff_l[89].state = apr->cpa_illeg_op;
@@ -345,10 +345,10 @@ updateapr(Apr *apr, Ptr *ptr)
 	ff_l[110].state = !!(apr->cpa_pia&2);
 	ff_l[111].state = !!(apr->cpa_pia&1);
 
-	setlights(apr->pr, pr_l, 8);
-	setlights(apr->rlr, rlr_l, 8);
-	setlights(apr->rla, rla_l, 8);
-	setlights(apr->iobus.c12, iobus_l, 36);
+	setelements(apr->pr, pr_l, 8);
+	setelements(apr->rlr, rlr_l, 8);
+	setelements(apr->rla, rla_l, 8);
+	setelements(apr->iobus.c12, iobus_l, 36);
 }
 
 void
@@ -359,8 +359,8 @@ updatetty(Tty *tty)
 		tty_l[1].state = tty->tti_flag;
 		tty_l[2].state = tty->tto_busy;
 		tty_l[3].state = tty->tto_flag;
-		setlights(tty->pia, &tty_l[4], 3);
-		setlights(tty->tti, ttibuf_l, 8);
+		setelements(tty->pia, &tty_l[4], 3);
+		setelements(tty->tti, ttibuf_l, 8);
 	}
 }
 
@@ -371,16 +371,16 @@ updatept(Ptp *ptp, Ptr *ptr)
 		ptp_l[0].state = ptp->b;
 		ptp_l[1].state = ptp->busy;
 		ptp_l[2].state = ptp->flag;
-		setlights(ptp->pia, &ptp_l[3], 3);
-		setlights(ptp->ptp, ptpbuf_l, 8);
+		setelements(ptp->pia, &ptp_l[3], 3);
+		setelements(ptp->ptp, ptpbuf_l, 8);
 	}
 
 	if(ptr){
 		ptr_l[0].state = ptr->b;
 		ptr_l[1].state = ptr->busy;
 		ptr_l[2].state = ptr->flag;
-		setlights(ptr->pia, &ptr_l[3], 3);
-		setlights(ptr->ptr, ptrbuf_l, 36);
+		setelements(ptr->pia, &ptr_l[3], 3);
+		setelements(ptr->ptr, ptrbuf_l, 36);
 
 		extra_l[0].state = ptr->motor_on;
 	}
@@ -649,7 +649,6 @@ main(int argc, char *argv[])
 	Ptr *ptr;
 	Ptp *ptp;
 	Tty *tty;
-	Mem *mem;
 
 	outfile = "/dev/null";
 	ARGBEGIN{

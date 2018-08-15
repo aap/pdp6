@@ -25,7 +25,12 @@ void trace(char *fmt, ...);
 void debug(char *fmt, ...);
 void err(char *fmt, ...);
 u32 getms(void);
+
+void strtolower(char *s);
 int hasinput(int fd);
+int writen(int fd, void *data, int n);
+int readn(int fd, void *data, int n);
+int dial(const char *host, int port);
 
 void quit(int code);
 void cli(FILE *f);
@@ -100,6 +105,8 @@ struct Device
 	void (*attach)(Device *dev, const char *path);
 	/* connect device to iobus */
 	void (*ioconnect)(Device *dev, IOBus *bus);
+	word (*examine)(Device *dev, const char *reg);
+	int  (*deposit)(Device *dev, const char *reg, word data);
 };
 
 extern Device *devlist;
@@ -588,3 +595,16 @@ void dtconn(Dc136 *dc, Dt551 *dt);
 void dtcono(Dt551 *dt, word iob);
 void dtcycle(Dt551 *dt);
 */
+
+
+typedef struct Netmem Netmem;
+struct Netmem
+{
+	Device dev;
+	int fd;
+	// tmp?
+	Apr *apr;
+};
+#define NETMEM_IDENT "netmem"
+extern char *netmem_ident;
+Device *makenetmem(int argc, char *argv[]);

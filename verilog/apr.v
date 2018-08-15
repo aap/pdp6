@@ -3062,6 +3062,7 @@ module apr(
 	// requests coming from the bus
 	wire [1:7] iob_pi_req = iobus_pi_req | cpa_req;
 
+	// TODO: this can be simpler, same as in KA10 code
 	assign pi_ok[1] = pi_active;
 	genvar i;
 	generate
@@ -3178,6 +3179,7 @@ module apr(
 		cpa_pc_chg_enable & ar_pc_chg_flag |
 		cpa_arov_enable & ar_ov_flag;
 	wire [1:7] cpa_req;
+	// TODO: improve this
 	genvar j;
 	generate
 		for(j = 1; j <= 7; j = j + 1) begin: cpa_req_gen

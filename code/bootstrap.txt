@@ -50,16 +50,74 @@ PDP-10 RIM10 LOADER:
 
 
 MAC DECtape RIM loader:
-000000	JFCL
-000001	MOVSI	(JFCL)
-000002	CONO	635550
-000003	CONO	PI,11577
-000004	CONO	UTC,223110
-000005	CONO	DC,4010
-000006	CONSO	DC,1000
-000007	JRST	6
-000010	DATAI	DC,13
-000011	AOJGE	13,6
-000012	TRNE	13,-1
-000013	.
-000014	JRST	6
+00	255000 000000		JFCL			/ no-op, what for?
+01	205000 255000		MOVSI	(JFCL)		/ restore JFCL in 0
+02	700200 635550		CONO	635550		/ reset APR
+03	700600 011577		CONO	PI,11577	/ reset PI
+04	721200 223110		CONO	UTC,223110	/ read all forward
+05	720200 004010		CONO	DC,4010		/ read
+06	720340 001000	LUP%:	CONSO	DC,1000		/ wait for word
+07	254000 000006		 JRST	.-1
+10	720040 000013		DATAI	DC,A%		/ read word
+11	345540 000006		AOJGE	A%,LUP%	/ try next word if >= -1
+12	602540 777777		TRNE	A%,-1	/ execute if RH!=0 (was -1)
+13	000000 000013	A%:	.
+14	254000 000006		JRST	LUP%
+15
+16
+17
+11: like AOBJP without incrementing left half
+12: execute only if right half != 0
+
+0	DATAI	PTR,1
+1	.
+2	JRST	0
+
+Written by RIM loader loader (part of MACDMP)
+2	JRST	0
+10	CONO	1000	/ turn clock flag off
+11	JFCL	X
+12	JFCL	X
+13	JFCL	X
+14	JFCL	X
+15	CONSZ	1000	/ skip if clock flag off
+16	JRST	10	/ clock on, so still on repeat
+17	SKIPA	X	/ clock off, we're at full speed
+
+20	CONO	PTR,60
+21	CONSO	PTR,10
+22	JRST	21
+23	DATAI	PTR,26
+24	CONSO	PTR,10
+25	JRST	24
+26	XCT	26
+27	JRST	21
+
+37	37176
+
+
+PDP6 SBLK loader:
+1	MOVE	1,15
+2	JSP	17,30	/ wait for ready
+3	DATAI	PTR,16	/ get block header
+4	MOVE	15,16	/ save for checksum
+5	JUMPG	16,16	/ execute if not negative
+6	JSP	17,30	/ read block word
+7	DATAI	PTR,(16)
+10	ROT	15,1
+11	ADD	15,(16)
+12	AOBJN	16,6
+13	MOVEI	17,33
+14	JRST	30
+15	CONO	PTR,60	/ replaced by current checksum
+16	/ input word: header/aobjn pointer/checksum
+17	/ return address
+
+30	CONSO	PTR,10	/ wait for word
+31	JRST	30
+32	JRST	(17)
+
+33	DATAI	PTR,16	/ get checksum word
+34	CAMN	15,16
+35	JRST	2	/ go to next block if checksum ok
+36	JRST	4,1

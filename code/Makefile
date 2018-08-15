@@ -1,3 +1,6 @@
+sysgen.rim: sysgen.rel sysgen.lst
+	ld6 -o sysgen.rim sysgen.rel
+
 test.rim: main.rel tty.rel pt.rel dt.rel
 	ld6 -o test.rim main.rel tty.rel pt.rel dt.rel
 

@@ -1,7 +1,7 @@
 #define USED(x) ((void)x)
 #define SET(x) ((x)=0)
 
-#define	ARGBEGIN	for((argv0||(argv0=*argv)),argv++,argc--;\
+#define	ARGBEGIN	for((void)(argv0||(argv0=*argv)),argv++,argc--;\
 			    argv[0] && argv[0][0]=='-' && argv[0][1];\
 			    argc--, argv++) {\
 				char *_args, *_argt;\

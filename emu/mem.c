@@ -101,6 +101,7 @@ wakecore(Mem *mem, Membus *bus)
 		/* read and send read restart */
 		if(core->cma_rd_rq){
 			core->cmb |= core->core[core->cma];
+			core->core[core->cma] = 0;
 			bus->c34 |= core->cmb & FW;
 			bus->c12 |= MEMBUS_MAI_RD_RS;
 			//trace("	sending RD RS\n");

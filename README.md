@@ -71,5 +71,5 @@ The TTY is connected to UART over GPIO pins 4 (RX) and 5 (TX)
 
 - repeat and maint. switches
 - test thoroughly!
-- devices
+- devices (test UT, implement 340)
 - timing

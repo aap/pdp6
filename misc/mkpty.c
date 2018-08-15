@@ -68,6 +68,7 @@ readwrite(int ttyin, int ttyout, int ptyin, int ptyout)
 			if(n = read(ptyin, &c, 1), n <= 0)
 				return;
 			else{
+//if(c == '\a') c = '.';
 				write(ttyout, &c, 1);
 				SLEEP;
 			}

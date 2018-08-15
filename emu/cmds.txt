@@ -2,17 +2,21 @@ mkdev name type
 	creates a device and gives it a name
 attach name path
 	attaches a file to a device
-ioconnect name busdevname
+connectio name busdevname
 	connects a device to the IO bus of a processor
-memconnect name procnum busdevname addr
+connectmem name procnum busdevname addr
 	connects a memory module to the memory bus of a processor
+connectdev dev1name dev2name [args]
+	connects two devices in the appropriate way if possible
 examine [-sm] address(range)
 	examines memory (s: shadow mode, m: mnemonic)
 deposit [-sm] address(range) word
 	deposits word into memory (s: shadow mode, m: mnemonic)
-load filename
+load [-s] filename
 	loads file into memory (see source for which format)
 show
 	shows device configuration
+help
+	print help
 quit
 	take a guess

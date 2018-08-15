@@ -68,6 +68,38 @@ nextpulse(Apr *apr, Pulse *p)
 	apr->nlist[apr->nnextpulses++] = p;
 }
 
+// TODO This is WIP
+
+#define EXDEPREGS \
+	X(ir)\
+	X(mi)\
+	X(data)\
+	X(pc)\
+	X(ma)\
+	X(mas)\
+	X(mb)\
+	X(ar)\
+	X(mq)
+
+static word
+ex_apr(Device *dev, const char *reg)
+{
+	Apr *apr = (Apr*)dev;
+#define X(name) if(strcmp(#name, reg) == 0) return apr->name;
+EXDEPREGS
+#undef X
+	return ~0;
+}
+static int
+dep_apr(Device *dev, const char *reg, word data)
+{
+	Apr *apr = (Apr*)dev;
+#define X(name) if(strcmp(#name, reg) == 0) { apr->name = data; return 0; }
+EXDEPREGS
+#undef X
+	return 1;
+}
+
 Device*
 makeapr(int argc, char *argv[])
 {
@@ -81,6 +113,8 @@ makeapr(int argc, char *argv[])
 	apr->dev.name = "";
 	apr->dev.attach = nil;
 	apr->dev.ioconnect = nil;
+	apr->dev.examine = ex_apr;
+	apr->dev.deposit = dep_apr;
 	apr->dev.next = nil;
 
 	apr->iobus.dev[CPA] = (Busdev){ apr, wake_cpa, 0 };
