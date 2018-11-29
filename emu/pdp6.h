@@ -37,7 +37,7 @@ void cli(FILE *f);
 void *cmdthread(void *);
 
 enum {
-	MAXPULSE = 5
+	MAXPULSE = 20
 };
 
 enum Mask {
@@ -274,6 +274,24 @@ struct IOBus
 void setreq(IOBus *bus, int dev, u8 pia);
 
 
+/* A pulse modeled as a function, and a name for debugging */
+typedef struct Pulse Pulse;
+struct Pulse
+{
+	void (*f)(void *arg);
+	char *n;
+};
+
+/* A timed pulse in a linked list.
+ * t is time difference since last pulse */
+typedef struct TPulse TPulse;
+struct TPulse
+{
+	TPulse *next;
+	Pulse *p;
+	int t;
+};
+
 /*
  * Devices
  */
@@ -289,8 +307,6 @@ enum Extpulse {
 	EXT_NONEXIT_MEM      = 4
 };
 
-typedef void Pulse(Apr *apr);
-#define pulse(p) static void p(Apr *apr)
 
 struct Apr
 {
@@ -348,6 +364,9 @@ struct Apr
 	int cpa_pia;
 
 	bool iot_go;
+	bool iot_init_setup, iot_final_setup;	// not used
+	bool iot_reset;
+	bool iot_go_pulse;	// for edge detection
 
 	/* ?? */
 	bool a_long;
@@ -400,9 +419,10 @@ struct Apr
 	bool ia_inh;	// this is asserted for some time
 	int pulsestepping;
 
-	Pulse *pulses1[MAXPULSE], *pulses2[MAXPULSE];
-	Pulse **clist, **nlist;
-	int ncurpulses, nnextpulses;
+	/* This could be abstracted away */
+	TPulse pulses[MAXPULSE];
+	TPulse *pfree;
+	TPulse *pulse;
 };
 #define APR_IDENT "apr166"
 extern char *apr_ident;

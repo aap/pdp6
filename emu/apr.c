@@ -42,31 +42,91 @@ enum Opcode {
 
 };
 
+#define declpulse(p) \
+	static void p##_p(Apr *apr); \
+	static Pulse p = { (void (*)(void*))p##_p, #p }
+
+#define defpulse_(p) \
+	static void p##_p(Apr *apr)
+
+#define defpulse(p) \
+	declpulse(p); \
+	defpulse_(p)
+
 static void aprcycle(void *p);
 static void wake_cpa(void *dev);
 static void wake_pi(void *dev);
 
 char *apr_ident = APR_IDENT;
 
-void
-curpulse(Apr *apr, Pulse *p)
+static void
+pulse(Apr *apr, Pulse *p, int t)
 {
-	if(apr->ncurpulses >= MAXPULSE){
-		fprint(stderr, "error: too many current pulses\n");
-		exit(1);
+	TPulse *tp, **pp;
+
+	assert(apr->pfree);
+	tp = apr->pfree;
+	apr->pfree = tp->next;
+	tp->p = p;
+	tp->t = t;
+	for(pp = &apr->pulse; *pp; pp = &(*pp)->next){
+		if(tp->t < (*pp)->t){
+			(*pp)->t -= tp->t;
+			break;
+		}
+		tp->t -= (*pp)->t;
 	}
-	apr->clist[apr->ncurpulses++] = p;
+	tp->next = *pp;
+	*pp = tp;
 }
 
-void
-nextpulse(Apr *apr, Pulse *p)
+static void
+pprint(Apr *apr)
 {
-	if(apr->nnextpulses >= MAXPULSE){
-		fprint(stderr, "error: too many next pulses\n");
-		exit(1);
+	int t;
+	TPulse *p;
+
+	t = 0;
+	for(p = apr->pulse; p; p = p->next){
+		t += p->t;
+		trace("%s %d %d\n", p->p->n, p->t, t);
 	}
-	apr->nlist[apr->nnextpulses++] = p;
 }
+static void
+pfree(Apr *apr, TPulse *p)
+{
+	p->next = apr->pfree;
+	apr->pfree = p;
+}
+
+static int
+stepone(Apr *apr)
+{
+	int i;
+	TPulse *p;
+
+	p = apr->pulse;
+	if(p == nil) return 0;
+	apr->pulse = p->next;
+	trace("pulse %s\n", p->p->n);
+	p->p->f(apr);
+	pfree(apr, p);
+
+	i = 1;
+	while(apr->pulse && apr->pulse->t == 0){
+		p = apr->pulse;
+		apr->pulse = p->next;
+		trace("pulse %s\n", p->p->n);
+		p->p->f(apr);
+		pfree(apr, p);
+		i++;
+	}
+// TODO
+//	apr->c = apr->n;
+	return i;
+}
+
+
 
 // TODO This is WIP
 
@@ -313,7 +373,7 @@ decodeir(Apr *apr)
 	apr->boole_as_00 = apr->boole_as_01 = 0;
 	apr->boole_as_10 = apr->boole_as_11 = 0;
 	apr->ir_boole = (apr->inst & 0700) == 0400;		// 5-8
-	if(apr->ir_boole)	
+	if(apr->ir_boole)
 		apr->ir_boole_op = apr->inst>>2 & 017;
 
 	/* HWT */
@@ -551,60 +611,61 @@ relocate(Apr *apr)
 #define cfac_ar_sub ar_ast0
 #define cfac_ar_negate ar_negate_t0
 
-pulse(kt1);
-pulse(kt4);
-pulse(mc_rs_t0);
-pulse(mc_addr_ack);
-pulse(key_rd_wr_ret);
-pulse(it0);
-pulse(it1);
-pulse(it1a);
-pulse(ft0);
-pulse(ft1a);
-pulse(at0);
-pulse(at1);
-pulse(at3a);
-pulse(iat0);
-pulse(et4);
-pulse(et5);
-pulse(et9);
-pulse(et10);
-pulse(st7);
-pulse(pir_stb);
-pulse(mc_wr_rs);
-pulse(mc_rd_rq_pulse);
-pulse(mc_split_rd_rq);
-pulse(mc_wr_rq_pulse);
-pulse(mc_rdwr_rq_pulse);
-pulse(mc_rd_wr_rs_pulse);
-pulse(ar_negate_t0);
-pulse(ar_pm1_t1);
-pulse(ar_ast0);
-pulse(ar_ast1);
-pulse(sht1a);
-pulse(cht3);
-pulse(cht3a);
-pulse(cht8a);
-pulse(lct0a);
-pulse(dct0a);
-pulse(mst2);
-pulse(mpt0a);
-pulse(fst0a);
-pulse(fmt0a);
-pulse(fmt0b);
-pulse(fdt0a);
-pulse(fdt0b);
-pulse(fpt1a);
-pulse(fpt1b);
-pulse(nrt0_5);
-pulse(fat1a);
-pulse(fat5a);
-pulse(fat10);
+declpulse(kt1);
+declpulse(kt4);
+declpulse(key_rd_wr_ret);
+declpulse(mc_rs_t0);
+declpulse(mc_addr_ack);
+declpulse(mc_wr_rs);
+declpulse(mc_rd_rq_pulse);
+declpulse(mc_split_rd_rq);
+declpulse(mc_wr_rq_pulse);
+declpulse(mc_rdwr_rq_pulse);
+declpulse(mc_rd_wr_rs_pulse);
+declpulse(it0);
+declpulse(iat0);
+declpulse(it1);
+declpulse(it1a);
+declpulse(at0);
+declpulse(at1);
+declpulse(at3a);
+declpulse(ft0);
+declpulse(ft1a);
+declpulse(et4);
+declpulse(et5);
+declpulse(et9);
+declpulse(et10);
+declpulse(st7);
+declpulse(pir_stb);
+declpulse(ar_negate_t0);
+declpulse(ar_pm1_t1);
+declpulse(ar_ast0);
+declpulse(ar_ast1);
+declpulse(sht1a);
+declpulse(cht3);
+declpulse(cht3a);
+declpulse(cht8a);
+declpulse(lct0a);
+declpulse(dst14);
+declpulse(dct0a);
+declpulse(mst2);
+declpulse(mpt0a);
+declpulse(fst0a);
+declpulse(fmt0a);
+declpulse(fmt0b);
+declpulse(fdt0a);
+declpulse(fdt0b);
+declpulse(fpt1a);
+declpulse(fpt1b);
+declpulse(nrt0_5);
+declpulse(fat1a);
+declpulse(fat5a);
+declpulse(fat10);
 
 // TODO: find A LONG, it probably doesn't exist
 
-pulse(pi_reset){
-	trace("PI RESET\n");
+defpulse(pi_reset)
+{
 	apr->pi_active = 0;	// 8-4
 	apr->pih = 0;		// 8-4
 	apr->pir = 0;		// 8-4
@@ -612,8 +673,8 @@ pulse(pi_reset){
 	apr->pio = 0;		// 8-3
 }
 
-pulse(ar_flag_clr){
-	trace("AR FLAG CLR\n");
+defpulse(ar_flag_clr)
+{
 	apr->ar_ov_flag = 0;		// 6-10
 	apr->ar_cry0_flag = 0;		// 6-10
 	apr->ar_cry1_flag = 0;		// 6-10
@@ -622,8 +683,8 @@ pulse(ar_flag_clr){
 	recalc_cpa_req(apr);
 }
 
-pulse(ar_flag_set){
-	trace("AR FLAG SET\n");
+defpulse(ar_flag_set)
+{
 	apr->ar_ov_flag     = !!(apr->mb & F0); // 6-10
 	apr->ar_cry0_flag   = !!(apr->mb & F1); // 6-10
 	apr->ar_cry1_flag   = !!(apr->mb & F2); // 6-10
@@ -634,7 +695,8 @@ pulse(ar_flag_set){
 	recalc_cpa_req(apr);
 }
 
-pulse(mp_clr){
+defpulse(mp_clr)
+{
 	// 6-19
 	apr->chf1 = 0;
 	apr->chf2 = 0;
@@ -667,7 +729,8 @@ pulse(mp_clr){
 	apr->nrf3 = 0;
 }
 
-pulse(ds_clr){
+defpulse(ds_clr)
+{
 	// 6-25, 6-26
 	apr->dsf1 = 0;
 	apr->dsf2 = 0;
@@ -680,8 +743,8 @@ pulse(ds_clr){
 	apr->fsf1 = 0;	// 6-19
 }
 
-pulse(mr_clr){
-	trace("MR CLR\n");
+defpulse(mr_clr)
+{
 	apr->ir = 0;	// 5-7
 	apr->mq = 0;	// 6-13
 	apr->mq36 = 0;	// 6-13
@@ -703,10 +766,14 @@ pulse(mr_clr){
 
 	apr->a_long = 0;	// ?? nowhere to be found
 	apr->ar_com_cont = 0;	// 6-9
-	mp_clr(apr);		// 6-21
-	ds_clr(apr);		// 6-26
+	mp_clr_p(apr);		// 6-21
+	ds_clr_p(apr);		// 6-26
 
 	apr->iot_go = 0;	// 8-1
+	apr->iot_init_setup = 0;
+	apr->iot_final_setup = 0;
+	apr->iot_reset = 0;
+	apr->iot_go_pulse = 0;
 
 	/* sbr flip-flops */
 	apr->key_rd_wr = 0;	// 5-2
@@ -733,19 +800,20 @@ pulse(mr_clr){
 	decodeir(apr);
 }
 
-pulse(ex_clr){
+defpulse(ex_clr)
+{
 	apr->pr = 0;		// 7-4
 	apr->rlr = 0;		// 7-5
 }
 
-pulse(ex_set){
+defpulse(ex_set)
+{
 	apr->pr  = apr->iobus.c12>>28 & 0377;	// 7-4
 	apr->rlr = apr->iobus.c12>>10 & 0377;	// 7-5
 }
 
-pulse(mr_start){
-	trace("MR START\n");
-
+defpulse(mr_start)
+{
 	// 8-1
 	apr->iobus.c34 |= IOBUS_IOB_RESET;
 
@@ -764,22 +832,22 @@ pulse(mr_start){
 	// PI
 	apr->pi_ov = 0;		// 8-4
 	set_pi_cyc(apr, 0);	// 8-4
-	nextpulse(apr, pi_reset);	// 8-4
-	ar_flag_clr(apr);	// 6-10
+	pulse(apr, &pi_reset, 0);	// 8-4
+	ar_flag_clr_p(apr);	// 6-10
 
-	nextpulse(apr, ex_clr); 
+	pulse(apr, &ex_clr, 0);
 	apr->ex_user = 0;	// 5-13
 	apr->ex_ill_op = 0;	// 5-13
 	apr->rla = 0;
 }
 
-pulse(mr_pwr_clr){
-	trace("MR PWR CLR\n");
+defpulse(mr_pwr_clr)
+{
 	apr->run = 0;	// 5-1
 	/* order seems to matter.
 	 * better call directly before external pulses can trigger stuff */
-	mr_start(apr);	// 5-2
-	mr_clr(apr);	// 5-2
+	mr_start_p(apr);	// 5-2
+	mr_clr_p(apr);	// 5-2
 }
 
 /* CPA and PI devices */
@@ -832,9 +900,9 @@ wake_cpa(void *dev)
 		apr->ar = apr->data;
 	// 5-13
 	if(IOB_DATAO_CLEAR)
-		ex_clr(apr);
+		ex_clr_p(apr);
 	if(IOB_DATAO_SET)
-		ex_set(apr);
+		ex_set_p(apr);
 }
 
 static void
@@ -859,7 +927,7 @@ wake_pi(void *dev)
 		trace("PI CONO CLEAR %llo\n", bus->c12);
 		if(bus->c12 & F23)
 			// can call directly
-			pi_reset(apr);
+			pi_reset_p(apr);
 	}
 	if(IOB_CONO_SET){
 		trace("PI CONO SET %llo\n", bus->c12);
@@ -878,59 +946,48 @@ wake_pi(void *dev)
 
 /*
  * IOT
- * Here be dragons.
  */
 
-pulse(iot_t4){
-	trace("IOT T4\n");
+defpulse(iot_t4)
+{
+	apr->iot_reset = 0;	// 8-1
+}
+
+defpulse(iot_t3a)
+{
+	apr->iot_reset = 1;	// 8-1
 	/* Clear what was set in IOT T2 */
 	apr->iobus.c34 &= ~(IOBUS_IOB_STATUS | IOBUS_IOB_DATAI);
 	/* and do something like IOB BUS RESET */
 	apr->iobus.c12 = 0;
+	pulse(apr, &iot_t4, 2000);
 }
 
-pulse(iot_t3a){
-	trace("IOT T3A\n");
-	/* delay before reset in IOT T4. Otherwise bus will be
-	 * reset before bus-pulses triggered by IOT T3 are executed. */
-	nextpulse(apr, iot_t4);
-}
-
-pulse(iot_t3){
-	trace("IOT T3\n");
+defpulse(iot_t3)
+{
 	// 8-1
 	/* Pulses, cleared in the main loop. */
-	if(IOT_DATAO)
-		apr->iobus.c34 |= IOBUS_DATAO_SET;
-	if(IOT_CONO)
-		apr->iobus.c34 |= IOBUS_CONO_SET;
+	if(IOT_DATAO)	apr->iobus.c34 |= IOBUS_DATAO_SET;
+	if(IOT_CONO)	apr->iobus.c34 |= IOBUS_CONO_SET;
 	apr->ar |= apr->iobus.c12;	// 6-8
-	nextpulse(apr, et5);		// 5-5
+	pulse(apr, &et5, 200);		// 5-5
 }
 
-pulse(iot_t2){
-	trace("IOT T2\n");
+defpulse(iot_t2)
+{
 	// 8-1
 	apr->iot_go = 0;
-	/* These are asserted during INIT SETUP, IOT T2 and FINAL SETUP.
-	 * We clear them in IOT T4 which happens after FINAL SETUP */
-	if(IOT_OUTGOING)
-		apr->iobus.c12 |= apr->ar;
-	if(IOT_STATUS)
-		apr->iobus.c34 |= IOBUS_IOB_STATUS;
-	if(IOT_DATAI)
-		apr->iobus.c34 |= IOBUS_IOB_DATAI;
+	apr->iot_init_setup = 0;
+	apr->iot_final_setup = 1;
 	/* Pulses, cleared in the main loop. */
-	if(IOT_DATAO)
-		apr->iobus.c34 |= IOBUS_DATAO_CLEAR;
-	if(IOT_CONO)
-		apr->iobus.c34 |= IOBUS_CONO_CLEAR;
-	nextpulse(apr, iot_t3);
-	nextpulse(apr, iot_t3a);
+	if(IOT_DATAO)	apr->iobus.c34 |= IOBUS_DATAO_CLEAR;
+	if(IOT_CONO)	apr->iobus.c34 |= IOBUS_CONO_CLEAR;
+	pulse(apr, &iot_t3, 1000);
+	pulse(apr, &iot_t3a, 1500);
 }
 
-pulse(iot_t0a){
-	trace("IOT T0A\n");
+defpulse(iot_t0a)
+{
 	apr->iot_f0a = 0;			// 8-1
 	apr->ir |= H12;				// 5-8
 	decodeir(apr);
@@ -939,102 +996,102 @@ pulse(iot_t0a){
 		apr->pi_ov = 1;			// 8-4
 	if(!apr->pi_cyc && !apr->ar_cry0)
 		apr->pc = apr->pc+1 & RT;	// 5-12
-	nextpulse(apr, ft0);			// 5-4
+	pulse(apr, &ft0, 200);			// 5-4
 }
 
-pulse(iot_t0){
-	trace("IOT T0\n");
+defpulse(iot_t0)
+{
 	apr->iot_f0a = 1;			// 8-1
-	nextpulse(apr, mc_rd_wr_rs_pulse);	// 7-8
+	pulse(apr, &mc_rd_wr_rs_pulse, 0);	// 7-8
 }
 
 /*
  * UUO subroutine
  */
 
-pulse(uuo_t2){
-	trace("UUO T2\n");
+defpulse(uuo_t2)
+{
 	apr->if1a = 1;			// 5-3
-	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
+	pulse(apr, &mc_rd_rq_pulse, 0);	// 7-8
 }
 
-pulse(uuo_t1){
-	trace("UUO T1\n");
+defpulse(uuo_t1)
+{
 	apr->uuo_f1 = 0;		// 5-10
 	apr->ma = apr->ma+1 & RT;	// 7-3
-	nextpulse(apr, mr_clr);		// 5-2
-	nextpulse(apr, uuo_t2);		// 5-10
+	pulse(apr, &mr_clr, 0);		// 5-2
+	pulse(apr, &uuo_t2, 100);	// 5-10
 }
 
 /*
  * BLT subroutine
  */
 
-pulse(blt_t6){
-	trace("BLT T6\n");
+defpulse(blt_t6)
+{
 	swap(&apr->mb, &apr->ar);	// 6-3
-	nextpulse(apr, ft1a);		// 5-4
+	pulse(apr, &ft1a, 100);		// 5-4
 }
 
-pulse(blt_t5a){
-	trace("BLT T5A\n");
+defpulse(blt_t5a)
+{
 	apr->blt_f5a = 0;			// 6-18
 	if(!(apr->mq & F0))
 		apr->pc = apr->pc+1 & RT;	// 5-12
-	nextpulse(apr, BLT_DONE ? et10 : blt_t6);	// 5-5, 6-18
+	pulse(apr, BLT_DONE ? &et10 : &blt_t6, 0);	// 5-5, 6-18
 }
 
-pulse(blt_t5){
-	trace("BLT T5\n");
+defpulse(blt_t5)
+{
 	swap(&apr->mb, &apr->mq);	// 6-17
 	apr->blt_f5a = 1;		// 6-18
-	nextpulse(apr, ar_pm1_t1);	// 6-9
+	pulse(apr, &ar_pm1_t1, 0);	// 6-9
 }
 
-pulse(blt_t4){
-	trace("BLT T4\n");
+defpulse(blt_t4)
+{
 	swap(&apr->mb, &apr->ar);	// 6-3
-	nextpulse(apr, pir_stb);	// 8-4
-	nextpulse(apr, blt_t5);		// 6-18
+	pulse(apr, &pir_stb, 0);	// 8-4
+	pulse(apr, &blt_t5, 100);	// 6-18
 }
 
-pulse(blt_t3a){
-	trace("BLT T3A\n");
+defpulse(blt_t3a)
+{
 	apr->blt_f3a = 0;		// 6-18
 	swap(&apr->mb, &apr->mq);	// 6-17
-	nextpulse(apr, blt_t4);		// 6-18
+	pulse(apr, &blt_t4, 100);	// 6-18
 }
 
-pulse(blt_t3){
-	trace("BLT T3\n");
+defpulse(blt_t3)
+{
 	apr->blt_f3a = 1;		// 6-18
-	nextpulse(apr, ar_ast0);	// 6-9
+	pulse(apr, &ar_ast0, 0);	// 6-9
 }
 
-pulse(blt_t2){
-	trace("BLT T2\n");
+defpulse(blt_t2)
+{
 	apr->ar &= RT;			// 6-8
-	nextpulse(apr, blt_t3);		// 6-18
+	pulse(apr, &blt_t3, 100);	// 6-18
 }
 
-pulse(blt_t1){
-	trace("BLT T1\n");
+defpulse(blt_t1)
+{
 	swap(&apr->mb, &apr->ar);	// 6-3
-	nextpulse(apr, blt_t2);		// 6-18
+	pulse(apr, &blt_t2, 100);	// 6-18
 }
 
-pulse(blt_t0a){
-	trace("BLT T0A\n");
+defpulse(blt_t0a)
+{
 	apr->blt_f0a = 0;		// 6-18
 	apr->mb = apr->mq;		// 6-3
-	nextpulse(apr, blt_t1);		// 6-18
+	pulse(apr, &blt_t1, 100);	// 6-18
 }
 
-pulse(blt_t0){
-	trace("BLT T0\n");
+defpulse(blt_t0)
+{
 	swap(&apr->mb, &apr->mq);	// 6-17
 	apr->blt_f0a = 1;		// 6-18
-	nextpulse(apr, mc_wr_rq_pulse);	// 7-8
+	pulse(apr, &mc_wr_rq_pulse, 0);	// 7-8
 }
 
 /*
@@ -1065,19 +1122,20 @@ pulse(blt_t0){
 #define MQ_SH_RT apr->mq36 = apr->mq&F35, \
                  apr->mq = apr->mq>>1 & 0177777777777 | mq0_shr_inp | mq1_shr_inp
 
-pulse(sct2){
-	trace("SCT2\n");
-	if(apr->shf1) nextpulse(apr, sht1a);	// 6-20
-	if(apr->chf4) nextpulse(apr, cht8a);	// 6-19
-	if(apr->lcf1) nextpulse(apr, lct0a);	// 6-20
-	if(apr->dcf1) nextpulse(apr, dct0a);	// 6-20
-	if(apr->faf3) nextpulse(apr, fat5a);	// 6-22
+defpulse(sct2)
+{
+	if(apr->shf1) pulse(apr, &sht1a, 0);	// 6-20
+	if(apr->chf4) pulse(apr, &cht8a, 0);	// 6-19
+	if(apr->lcf1) pulse(apr, &lct0a, 0);	// 6-20
+	if(apr->dcf1) pulse(apr, &dct0a, 0);	// 6-20
+	if(apr->faf3) pulse(apr, &fat5a, 0);	// 6-22
 }
 
-pulse(sct1){
+defpulse(sct1)
+{
 	word ar0_shl_inp, ar0_shr_inp, ar35_shl_inp;
 	word mq0_shl_inp, mq0_shr_inp, mq1_shr_inp, mq35_shl_inp;
-	trace("SCT1\n");
+
 	SC_INC;		// 6-16
 
 	// 6-7 What a mess, and many things aren't even used here
@@ -1150,68 +1208,68 @@ pulse(sct1){
 		apr->ar_ov_flag = 1;			// 6-10
 		recalc_cpa_req(apr);
 	}
-	nextpulse(apr, apr->sc == 0777 ? sct2 : sct1);	// 6-15, 6-16
+	pulse(apr, apr->sc == 0777 ? &sct2 : &sct1, 75);	// 6-15, 6-16
 }
 
-pulse(sct0){
-	trace("SCT0\n");
-	nextpulse(apr, apr->sc == 0777 ? sct2 : sct1);	// 6-15, 6-16
+defpulse(sct0)
+{
+	pulse(apr, apr->sc == 0777 ? &sct2 : &sct1, 200);	// 6-15, 6-16
 }
 
 /* Shift adder */
 
-pulse(sat3){
-	trace("SAT3\n");
-	if(apr->chf2) nextpulse(apr, cht3a);	// 6-19
-	if(apr->fsf1) nextpulse(apr, fst0a);	// 6-19
-	if(apr->fpf1) nextpulse(apr, fpt1a);	// 6-23
-	if(apr->fpf2) nextpulse(apr, fpt1b);	// 6-23
-	if(apr->faf2) nextpulse(apr, fat1a);	// 6-22
+defpulse(sat3)
+{
+	if(apr->chf2) pulse(apr, &cht3a, 0);	// 6-19
+	if(apr->fsf1) pulse(apr, &fst0a, 0);	// 6-19
+	if(apr->fpf1) pulse(apr, &fpt1a, 0);	// 6-23
+	if(apr->fpf2) pulse(apr, &fpt1b, 0);	// 6-23
+	if(apr->faf2) pulse(apr, &fat1a, 0);	// 6-22
 }
 
-pulse(sat2_1){
-	trace("SAT2,1\n");
+defpulse(sat2_1)
+{
 	SC_CRY;			// 6-15
-	nextpulse(apr, sat3);	// 6-16
+	pulse(apr, &sat3, 100);	// 6-16
 }
 
-pulse(sat2){
-	trace("SAT2\n");
-	nextpulse(apr, sat2_1);	// 6-16
+defpulse(sat2)
+{
+	pulse(apr, &sat2_1, 50);	// 6-16
 }
 
-pulse(sat1){
-	trace("SAT1\n");
+defpulse(sat1)
+{
 	SC_PAD;			// 6-15
-	nextpulse(apr, sat2);	// 6-16
+	pulse(apr, &sat2, 200);	// 6-16
 }
 
-pulse(sat0){
-	trace("SAT0\n");
+defpulse(sat0)
+{
 	apr->chf1 = 0;		// 6-19
-	nextpulse(apr, sat1);	// 6-16
+	pulse(apr, &sat1, 150);	// 6-16
 }
 
 /*
  * Shift operations subroutine
  */
 
-pulse(sht1a){
-	trace("SHT1A\n");
+defpulse_(sht1a)
+{
 	apr->shf1 = 0;			// 6-20
-	nextpulse(apr, et10);		// 5-5
+	pulse(apr, &et10, 0);		// 5-5
 }
 
-pulse(sht1){
-	trace("SHT1\n");
+defpulse(sht1)
+{
 	if(apr->mb & F18)
 		SC_COM;			// 6-15
 	apr->shf1 = 1;			// 6-20
-	nextpulse(apr, sct0);		// 6-16
+	pulse(apr, &sct0, 0);		// 6-16
 }
 
-pulse(sht0){
-	trace("SHT0\n");
+defpulse(sht0)
+{
 	SC_INC;				// 6-16
 }
 
@@ -1219,161 +1277,162 @@ pulse(sht0){
  * Character subroutines
  */
 
-pulse(dct3){
-	trace("DCT3\n");
+defpulse(dct3)
+{
 	apr->mb &= apr->ar;		// 6-3
 	apr->chf7 = 0;			// 6-19
-	nextpulse(apr, et10);		// 5-5
+	pulse(apr, &et10, 0);		// 5-5
 }
 
-pulse(dct2){
-	trace("DCT2\n");
+defpulse(dct2)
+{
 	apr->ar = ~apr->ar & FW;	// 6-17
-	nextpulse(apr, dct3);		// 6-20
+	pulse(apr, &dct3, 100);		// 6-20
 }
 
-pulse(dct1){
-	trace("DCT1\n");
+defpulse(dct1)
+{
 	apr->ar &= apr->mb;		// 6-8
 	apr->mb = apr->mq;		// 6-17
-	nextpulse(apr, dct2);		// 6-20
+	pulse(apr, &dct2, 100);		// 6-20
 }
 
-pulse(dct0a){
+defpulse_(dct0a)
+{
 	word mb;
-	trace("DCT0A\n");
+
 	apr->dcf1 = 0;			// 6-20
 	mb = apr->mq;			// 6-13
 	apr->mq |= apr->mb;		// 6-17 dct0b
 	apr->mb = mb;
 	apr->ar = ~apr->ar & FW;	// 6-17
-	nextpulse(apr, dct1);		// 6-20
+	pulse(apr, &dct1, 150);		// 6-20
 }
 
-pulse(dct0){
-	trace("DCT0\n");
+defpulse(dct0)
+{
 	apr->dcf1 = 1;			// 6-20
 	SC_COM;				// 6-15
-	nextpulse(apr, sct0);		// 6-16
+	pulse(apr, &sct0, 0);		// 6-16
 }
 
-pulse(lct0a){
-	trace("LCT0A\n");
+defpulse_(lct0a)
+{
 	apr->lcf1 = 0;			// 6-20
 	apr->ar &= apr->mb;		// 6-8
 	apr->chf7 = 0;			// 6-19
-	nextpulse(apr, et10);		// 5-5
+	pulse(apr, &et10, 0);		// 5-5
 }
 
-pulse(lct0){
-	trace("LCT0\n");
+defpulse(lct0)
+{
 	apr->ar = apr->mb;		// 6-8
 	apr->mb = apr->mq;		// 6-17
 	SC_COM;				// 6-15
 	apr->lcf1 = 1;			// 6-20
-	nextpulse(apr, sct0);		// 6-16
+	pulse(apr, &sct0, 0);		// 6-16
 }
 
-pulse(cht9){
-	trace("CHT9\n");
+defpulse(cht9)
+{
 	apr->sc = apr->fe;		// 6-15
 	apr->chf5 = 1;			// 6-19
 	apr->chf7 = 1;			// 6-19
-	nextpulse(apr, at0);		// 5-3
+	pulse(apr, &at0, 0);		// 5-3
 }
 
-pulse(cht8a){
-	trace("CHT8A\n");
+defpulse_(cht8a)
+{
 	apr->chf4 = 0;			// 6-19
 	apr->sc = 0;			// 6-15
 	apr->ir &= ~037;		// 5-7
-	nextpulse(apr, cht9);
+	pulse(apr, &cht9, 100);		// 6-19
 }
 
-pulse(cht8b){
-	trace("CHT8B\n");
+defpulse(cht8b)
+{
 	apr->chf2 = 0;			// 6-19
 	apr->chf6 = 0;			// 6-19
 	apr->fe = apr->mb>>30 & 077;	// 6-14, 6-15
 	SC_COM;				// 6-15
 	if(apr->inst == CAO)
-		nextpulse(apr, st7);	// 5-6
+		pulse(apr, &st7, 0);	// 5-6
 	else{
 		apr->chf4 = 1;		// 6-19
-		nextpulse(apr, sct0);	// 6-16
+		pulse(apr, &sct0, 0);	// 6-16
 	}
 }
 
-pulse(cht8){
-	trace("CHT8\n");
+defpulse(cht8)
+{
 	apr->chf6 = 1;		// 6-19
-	nextpulse(apr, mc_rd_wr_rs_pulse);	// 7-8
+	pulse(apr, &mc_rd_wr_rs_pulse, 0);	// 7-8
 }
 
-pulse(cht7){
-	trace("CHT7\n");
+defpulse(cht7)
+{
 	SC_PAD;				// 6-15
 	if(CH_INC_OP){
 		swap(&apr->mb, &apr->ar);	// 6-17
-		nextpulse(apr, cht8);		// 6-19
+		pulse(apr, &cht8, 100);		// 6-19
 	}
 	if(CH_N_INC_OP)
-		nextpulse(apr, cht8b);		// 6-19
+		pulse(apr, &cht8b, 100);	// 6-19
 }
 
-pulse(cht6){
-	trace("CHT6\n");
+defpulse(cht6)
+{
 	apr->ar = apr->ar & 0007777777777 |
 		(((word)apr->sc & 077) << 30);	// 6-9, 6-4
 	if(CH_INC_OP)
 		apr->sc = 0;		// 6-15
 	apr->chf2 = 1;			// 6-19
-	nextpulse(apr, cht7);		// 6-19
+	pulse(apr, &cht7, 150);		// 6-19
 }
 
-pulse(cht5){
-	trace("CHT5\n");
+defpulse(cht5)
+{
 	SC_COM;				// 6-15
-	nextpulse(apr, cht6);		// 6-19
+	pulse(apr, &cht6, 100);		// 6-19
 }
 
-pulse(cht4a){
-	trace("CHT4A\n");
+defpulse(cht4a)
+{
 	apr->chf3 = 0;			// 6-19
 	apr->sc |= 0433;
-	nextpulse(apr, cht3);		// 6-19
+	pulse(apr, &cht3, 0);		// 6-19
 }
 
-pulse(cht4){
-	trace("CHT4\n");
+defpulse(cht4)
+{
 	apr->sc = 0;			// 6-15
 	apr->chf3 = 1;			// 6-19
-	nextpulse(apr, ar_pm1_t1);	// 6-9
+	pulse(apr, &ar_pm1_t1, 0);	// 6-9
 }
 
-pulse(cht3a){
-	trace("CHT3A\n");
+defpulse_(cht3a)
+{
 	apr->chf2 = 0;			// 6-19
-	nextpulse(apr, apr->sc & 0400 ? cht5 : cht4);	// 6-19
+	pulse(apr, apr->sc & 0400 ? &cht5 : &cht4, 0);	// 6-19
 }
 
-pulse(cht3){
-	trace("CHT3\n");
+defpulse_(cht3)
+{
 	apr->chf2 = 1;			// 6-19
-	nextpulse(apr, sat0);		// 6-16
+	pulse(apr, &sat0, 0);		// 6-16
 }
 
-pulse(cht2){
-	trace("CHT2\n");
+defpulse(cht2)
+{
 	SC_PAD;				// 6-15
-	nextpulse(apr, cht3);		// 6-19
+	pulse(apr, &cht3, 0);		// 6-19
 }
 
-pulse(cht1){
-	trace("CHT1\n");
+defpulse(cht1)
+{
 	apr->ar = apr->mb;		// 6-8
 	apr->chf1 = 1;			// 6-19
-	nextpulse(apr, cht2);		// 6-19
+	pulse(apr, &cht2, 100);		// 6-19
 }
 
 /*
@@ -1383,43 +1442,45 @@ pulse(cht1){
 // 6-13
 #define MQ35_EQ_MQ36 ((apr->mq&F35) == apr->mq36)
 
-pulse(mst6){
-	trace("MST6\n");
-	if(apr->mpf1) nextpulse(apr, mpt0a);	// 6-21
-	if(apr->fmf2) nextpulse(apr, fmt0b);	// 6-22
+defpulse(mst6)
+{
+	if(apr->mpf1) pulse(apr, &mpt0a, 0);	// 6-21
+	if(apr->fmf2) pulse(apr, &fmt0b, 0);	// 6-22
 }
 
-pulse(mst5){
+defpulse(mst5)
+{
 	word mq0_shr_inp, mq1_shr_inp;
-	trace("MST5\n");
+
 	mq0_shr_inp = apr->ar & F0;	// 6-17
 	mq1_shr_inp = (apr->mq & F0) >> 1;	// 6-17
 	MQ_SH_RT;			// 6-17
 	apr->sc = 0;			// 6-15
-	nextpulse(apr, mst6);		// 6-24
+	pulse(apr, &mst6, 100);		// 6-24
 }
 
-pulse(mst4){
-	trace("MST4\n");
+defpulse(mst4)
+{
 	apr->msf1 = 1;			// 6-24
-	nextpulse(apr, cfac_ar_sub);	// 6-17
+	pulse(apr, &cfac_ar_sub, 0);	// 6-17
 }
 
-pulse(mst3a){
-	trace("MST3A\n");
+defpulse(mst3a)
+{
 	apr->msf1 = 0;			// 6-24
-	nextpulse(apr, apr->sc == 0777 ? mst5 : mst2);	// 6-24
+	pulse(apr, apr->sc == 0777 ? &mst5 : &mst2, 0);	// 6-24
 }
 
-pulse(mst3){
-	trace("MST3\n");
+defpulse(mst3)
+{
 	apr->msf1 = 1;			// 6-24
-	nextpulse(apr, cfac_ar_add);	// 6-17
+	pulse(apr, &cfac_ar_add, 0);	// 6-17
 }
 
-pulse(mst2){
+defpulse_(mst2)
+{
 	word ar0_shr_inp, mq0_shr_inp, mq1_shr_inp;
-	trace("MST2\n");
+
 	ar0_shr_inp = apr->ar & F0;		// 6-7
 	mq0_shr_inp = (apr->ar & F35) << 35;	// 6-7
 	mq1_shr_inp = (apr->mq & F0) >> 1;	// 6-7
@@ -1427,24 +1488,24 @@ pulse(mst2){
 	MQ_SH_RT;	// 6-17
 	SC_INC;		// 6-16
 	if(MQ35_EQ_MQ36)
-		nextpulse(apr, apr->sc == 0777 ? mst5 : mst2);	// 6-24
+		pulse(apr, apr->sc == 0777 ? &mst5 : &mst2, 150);	// 6-24
 	if(!(apr->mq&F35) && apr->mq36)
-		nextpulse(apr, mst3);	// 6-24
+		pulse(apr, &mst3, 150);	// 6-24
 	if(apr->mq&F35 && !apr->mq36)
-		nextpulse(apr, mst4);	// 6-24
+		pulse(apr, &mst4, 150);	// 6-24
 }
 
-pulse(mst1){
-	trace("MST1\n");
+defpulse(mst1)
+{
 	apr->mq = apr->mb;		// 6-13
 	apr->mb = apr->ar;		// 6-3
 	apr->ar = 0;			// 6-8
 	if(MQ35_EQ_MQ36 && apr->sc != 0777)
-		nextpulse(apr, mst2);	// 6-24
+		pulse(apr, &mst2, 200);	// 6-24
 	if(!(apr->mq&F35) && apr->mq36)
-		nextpulse(apr, mst3);	// 6-24
+		pulse(apr, &mst3, 200);	// 6-24
 	if(apr->mq&F35 && !apr->mq36)
-		nextpulse(apr, mst4);	// 6-24
+		pulse(apr, &mst4, 200);	// 6-24
 }
 
 /*
@@ -1456,62 +1517,63 @@ pulse(mst1){
 
 #define DSF7_XOR_MQ0 (apr->dsf7 != !!(apr->mq & F0))
 
-pulse(dst21a){
-	trace("DST21A\n");
+defpulse(dst21a)
+{
 	apr->dsf9 = 0;			// 6-26
 	swap(&apr->mb, &apr->mq);	// 6-17
 	if(IR_DIV)
-		nextpulse(apr, et9);	// 5-5
-	if(apr->fdf2) nextpulse(apr, fdt0b);	// 6-22
+		pulse(apr, &et9, 0);	// 5-5
+	if(apr->fdf2) pulse(apr, &fdt0b, 0);	// 6-22
 }
 
-pulse(dst21){
-	trace("DST21\n");
+defpulse(dst21)
+{
 	apr->dsf9 = 1;			// 6-26
-	nextpulse(apr, cfac_ar_negate);	// 6-17
+	pulse(apr, &cfac_ar_negate, 0);	// 6-17
 }
 
-pulse(dst20){
-	trace("DST20\n");
+defpulse(dst20)
+{
 	apr->sc = 0;			// 6-15
 	swap(&apr->mb, &apr->ar);	// 6-17
-	nextpulse(apr, DSF7_XOR_MQ0 ? dst21 : dst21a);	// 6-26
+	pulse(apr, DSF7_XOR_MQ0 ? &dst21 : &dst21a, 100);	// 6-26
 }
 
-pulse(dst19a){
-	trace("DST19A\n");
+defpulse(dst19a)
+{
 	apr->dsf8 = 0;			// 6-26
 	swap(&apr->mb, &apr->mq);	// 6-17
-	nextpulse(apr, dst20);		// 6-26
+	pulse(apr, &dst20, 100);	// 6-26
 }
 
-pulse(dst19){
-	trace("DST19\n");
+defpulse(dst19)
+{
 	apr->dsf8 = 1;			// 6-26 DST19B
-	nextpulse(apr, cfac_ar_negate);	// 6-17
+	pulse(apr, &cfac_ar_negate, 0);	// 6-17
 }
 
-pulse(dst18){
-	trace("DST18\n");
+defpulse(dst18)
+{
 	apr->dsf6 = 1;			// 6-26
-	nextpulse(apr, cfac_ar_sub);	// 6-17
+	pulse(apr, &cfac_ar_sub, 0);	// 6-17
 }
 
-pulse(dst17a){
-	trace("DST17A\n");
+defpulse(dst17a)
+{
 	apr->dsf6 = 0;		// 6-26
-	nextpulse(apr, apr->dsf7 ? dst19 : dst19a);	// 6-26
+	pulse(apr, apr->dsf7 ? &dst19 : &dst19a, 0);	// 6-26
 }
 
-pulse(dst17){
-	trace("DST17\n");
+defpulse(dst17)
+{
 	apr->dsf6 = 1;		// 6-26
-	nextpulse(apr, cfac_ar_add);	// 6-17
+	pulse(apr, &cfac_ar_add, 0);	// 6-17
 }
 
-pulse(dst16){
+defpulse(dst16)
+{
 	word ar0_shr_inp;
-	trace("DST16\n");
+
 	// 6-7
 	if(IR_FDV)
 		ar0_shr_inp = apr->ar & F0;
@@ -1519,31 +1581,30 @@ pulse(dst16){
 		ar0_shr_inp = (~apr->mq & F35) << 35;
 	AR_SH_RT;	// 6-17
 	if(apr->ar & F0)
-		nextpulse(apr, apr->mb & F0 ? dst18 : dst17);	// 6-26
+		pulse(apr, apr->mb & F0 ? &dst18 : &dst17, 100);	// 6-26
 	else
-		nextpulse(apr, dst17a);				// 6-26
+		pulse(apr, &dst17a, 0);				// 6-26
 }
 
-pulse(dst15){
-	trace("DST15\n");
+defpulse(dst15)
+{
 	apr->dsf5 = 1;			// 6-26
-	nextpulse(apr, cfac_ar_add);	// 6-17
+	pulse(apr, &cfac_ar_add, 0);	// 6-17
 }
 
-pulse(dst14);
-
-pulse(dst14b){
-	trace("DST14B\n");
+defpulse(dst14b)
+{
 	if(apr->sc == 0777)
-		nextpulse(apr, dst16);	// 6-26
+		pulse(apr, &dst16, 100);	// 6-26
 	else
-		nextpulse(apr, MQ35_XOR_MB0 ? dst14 : dst15);	// 6-26
+		pulse(apr, MQ35_XOR_MB0 ? &dst14 : &dst15, 100);	// 6-26
 }
 
-pulse(dst14a){
+defpulse(dst14a)
+{
 	word ar0_shl_inp, ar35_shl_inp;
 	word mq0_shl_inp, mq35_shl_inp;
-	trace("DST14A\n");
+
 	apr->dsf5 = 0;		// 6-26
 	SC_INC;			// 6-16
 	// 6-7
@@ -1553,146 +1614,148 @@ pulse(dst14a){
 	mq35_shl_inp = (~apr->ar & F0) >> 35;
 	AR_SH_LT;	// 6-17
 	MQ_SH_LT;	// 6-17
-	nextpulse(apr, dst14b);	// 6-26
+	pulse(apr, &dst14b, 0);	// 6-26
 }
 
-pulse(dst14){
-	trace("DST14\n");
+defpulse_(dst14)
+{
 	apr->dsf5 = 1;			// 6-26
-	nextpulse(apr, cfac_ar_sub);	// 6-17
+	pulse(apr, &cfac_ar_sub, 0);	// 6-17
 }
 
-pulse(dst13){
-	trace("DST13\n");
+defpulse(dst13)
+{
 	SET_OVERFLOW;		// 6-17
-	nextpulse(apr, st7);	// 5-6
+	pulse(apr, &st7, 0);	// 5-6
 }
 
-pulse(dst12){
-	trace("DST12\n");
+defpulse(dst12)
+{
 	apr->dsf4 = 1;			// 6-25
-	nextpulse(apr, cfac_ar_sub);	// 6-17
+	pulse(apr, &cfac_ar_sub, 0);	// 6-17
 }
 
-pulse(dst11a){
-	trace("DST11A\n");
+defpulse(dst11a)
+{
 	apr->dsf4 = 0;		// 6-25
-	nextpulse(apr, apr->ar & F0 ? dst14a : dst13);	// 6-25, 6-26
+	pulse(apr, apr->ar & F0 ? &dst14a : &dst13, 0);	// 6-25, 6-26
 }
 
-pulse(dst11){
-	trace("DST11\n");
+defpulse(dst11)
+{
 	apr->dsf4 = 1;			// 6-25
-	nextpulse(apr, cfac_ar_add);	// 6-17
+	pulse(apr, &cfac_ar_add, 0);	// 6-17
 }
 
-pulse(dst10b){
+defpulse(dst10b)
+{
 	word mq0_shl_inp, mq35_shl_inp;
-	trace("DST10B\n");
+
 	mq0_shl_inp = (apr->mq & F1) << 1;	// 6-7
 	mq35_shl_inp = (~apr->ar & F0) >> 35;	// 6-7
 	MQ_SH_LT;				// 6-17
-	nextpulse(apr, apr->mb & F0 ? dst11 : dst12);	// 6-15
+	pulse(apr, apr->mb & F0 ? &dst11 : &dst12, 200);	// 6-15
 }
 
-pulse(dst10a){
+defpulse(dst10a)
+{
 	word ar0_shr_inp;
-	trace("DST10A\n");
+
 	apr->mq = apr->mq & ~F0 | ((apr->ar & F35) << 35);	// 6-13
 	ar0_shr_inp = apr->ar & F0;	// 6-7
 	AR_SH_RT;			// 6-17
-	nextpulse(apr, apr->mb & F0 ? dst11 : dst12);	// 6-15
+	pulse(apr, apr->mb & F0 ? &dst11 : &dst12, 200);	// 6-15
 }
 
-pulse(dst10){
-	trace("DST10\n");
+defpulse(dst10)
+{
 	apr->dsf3 = 0;			// 6-25
 	if(IR_FDV)
-		nextpulse(apr, dst10a);	// 6-25
+		pulse(apr, &dst10a, 100);	// 6-25
 	if(IR_DIV)
-		nextpulse(apr, dst10b);	// 6-25
+		pulse(apr, &dst10b, 100);	// 6-25
 }
 
-pulse(dst9){
-	trace("DST9\n");
+defpulse(dst9)
+{
 	swap(&apr->mb, &apr->mq);	// 6-17
 	apr->dsf3 = 1;			// 6-25
-	nextpulse(apr, cfac_ar_negate);	// 6-17
+	pulse(apr, &cfac_ar_negate, 0);	// 6-17
 }
 
-pulse(dst8){
-	trace("DST8\n");
+defpulse(dst8)
+{
 	swap(&apr->mb, &apr->ar);	// 6-17
-	nextpulse(apr, dst9);		// 6-25
+	pulse(apr, &dst9, 100);		// 6-25
 }
 
-pulse(dst7){
-	trace("DST7\n");
+defpulse(dst7)
+{
 	swap(&apr->mb, &apr->mq);	// 6-17
 	apr->ar = ~apr->ar & FW;	// 6-17
-	nextpulse(apr, dst10);		// 6-25
+	pulse(apr, &dst10, 0);		// 6-25
 }
 
-pulse(dst6){
-	trace("DST6\n");
+defpulse(dst6)
+{
 	swap(&apr->mb, &apr->ar);	// 6-17
-	nextpulse(apr, dst7);		// 6-25
+	pulse(apr, &dst7, 100);		// 6-25
 }
 
-pulse(dst5a){
-	trace("DST5A\n");
+defpulse(dst5a)
+{
 	apr->dsf2 = 0;				// 6-25
-	nextpulse(apr, apr->ar ? dst6 : dst8);	// 6-25
+	pulse(apr, apr->ar ? &dst6 : &dst8, 100);	// 6-25
 }
 
-pulse(dst5){
-	trace("DST5\n");
+defpulse(dst5)
+{
 	apr->dsf2 = 1;			// 6-25
-	nextpulse(apr, cfac_ar_negate);	// 6-17
+	pulse(apr, &cfac_ar_negate, 0);	// 6-17
 }
 
-pulse(dst4){
-	trace("DST4\n");
+defpulse(dst4)
+{
 	swap(&apr->mb, &apr->ar);	// 6-17
-	nextpulse(apr, dst5);		// 6-25
+	pulse(apr, &dst5, 100);		// 6-25
 }
 
-pulse(dst3){
-	trace("DST3\n");
+defpulse(dst3)
+{
 	swap(&apr->mb, &apr->mq);	// 6-17
 	apr->dsf7 = 1;			// 6-25
-	nextpulse(apr, dst4);		// 6-25
+	pulse(apr, &dst4, 100);		// 6-25
 }
 
-pulse(dst2){
-	trace("DST2\n");
+defpulse(dst2)
+{
 	swap(&apr->mb, &apr->mq);	// 6-17
 	apr->ar = 0;			// 6-8
-	nextpulse(apr, dst10);		// 6-25
+	pulse(apr, &dst10, 0);		// 6-25
 }
 
-pulse(dst1){
-	trace("DST1\n");
+defpulse(dst1)
+{
 	apr->mq = apr->mb;		// 6-13
 	apr->mb = apr->ar;		// 6-3
-	nextpulse(apr, dst2);		// 6-25
+	pulse(apr, &dst2, 150);		// 6-25
 }
 
-pulse(dst0a){
-	trace("DST0A\n");
+defpulse(dst0a)
+{
 	apr->dsf1 = 0;				// 6-25
-	nextpulse(apr, DS_DIVI ? dst1 : dst10);	// 6-25
+	pulse(apr, DS_DIVI ? &dst1 : &dst10, 0);	// 6-25
 }
 
-pulse(dst0){
-	trace("DST0\n");
+defpulse(dst0)
+{
 	apr->dsf7 = 1;			// 6-25
 	apr->dsf1 = 1;			// 6-25
-	nextpulse(apr, cfac_ar_negate);	// 6-17
+	pulse(apr, &cfac_ar_negate, 0);	// 6-17
 }
 
-pulse(ds_div_t0){
-	trace("DS DIV T0\n");
+defpulse(ds_div_t0)
+{
 	apr->sc = 0733;			// 6-14
 }
 
@@ -1707,43 +1770,44 @@ pulse(ds_div_t0){
 #define AR9_EQ_AR0 (!!(apr->ar & F9) == !!(apr->ar & F0))
 #define NR_ROUND (apr->ir & H6 && apr->mq & F1 && !apr->nrf3)
 
-pulse(nrt6){
-	trace("NRT6\n");
-	nextpulse(apr, et10);	// 5-5
+defpulse(nrt6)
+{
+	pulse(apr, &et10, 0);	// 5-5
 }
 
-pulse(nrt5a){
-	trace("NRT5A\n");
+defpulse(nrt5a)
+{
 	apr->nrf1 = 0;		// 6-27
 	apr->nrf3 = 1;		// 6-27
-	nextpulse(apr, nrt0_5);	// 6-27
+	pulse(apr, &nrt0_5, 0);	// 6-27
 }
 
-pulse(nrt5){
-	trace("NRT5\n");
+defpulse(nrt5)
+{
 	apr->nrf1 = 1;			// 6-27
-	nextpulse(apr, ar_pm1_t1);	// 6-9
+	pulse(apr, &ar_pm1_t1, 0);	// 6-9
 }
 
-pulse(nrt4){
-	trace("NRT4\n");
+defpulse(nrt4)
+{
 	apr->ar |= apr->ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4, 6-9
-	nextpulse(apr, nrt6);		// 6-27
+	pulse(apr, &nrt6, 0);		// 6-27
 }
 
-pulse(nrt3){
-	trace("NRT3\n");
+defpulse(nrt3)
+{
 	if(!(apr->sc & 0400))
 		SET_OVERFLOW;		// 6-17
 	if(!(apr->ar & F0) || NR_ROUND)
 		SC_COM;			// 6-15
-	nextpulse(apr, NR_ROUND ? nrt5 : nrt4);	// 6-27
+	pulse(apr, NR_ROUND ? &nrt5 : &nrt4, 100);	// 6-27
 }
 
-pulse(nrt2){
+defpulse(nrt2)
+{
 	word ar0_shl_inp, ar35_shl_inp;
 	word mq0_shl_inp, mq35_shl_inp;
-	trace("NRT2\n");
+
 	SC_INC;		// 6-16
 	// 6-7
 	ar0_shl_inp = apr->ar & F0;
@@ -1752,25 +1816,20 @@ pulse(nrt2){
 	mq35_shl_inp = 0;
 	AR_SH_LT;	// 6-17
 	MQ_SH_LT;	// 6-17
-	if(AR_EQ_FP_HALF || !AR9_EQ_AR0)
-		nextpulse(apr, nrt3);	// 6-27
-	else
-		nextpulse(apr, nrt2);	// 6-27
+	pulse(apr, AR_EQ_FP_HALF || !AR9_EQ_AR0 ? &nrt3 : &nrt2, 150);	// 6-27
 }
 
-pulse(nrt1){
-	trace("NRT1\n");
+defpulse(nrt1)
+{
 	SC_COM;			// 6-15
-	if(AR_EQ_FP_HALF || !AR9_EQ_AR0)
-		nextpulse(apr, nrt3);	// 6-27
-	else
-		nextpulse(apr, nrt2);	// 6-27
+	pulse(apr, AR_EQ_FP_HALF || !AR9_EQ_AR0 ? &nrt3 : &nrt2, 100);	// 6-27
 }
 
-pulse(nrt0){
+defpulse(nrt0)
+{
 	word ar0_shr_inp;
 	word mq0_shr_inp, mq1_shr_inp;
-	trace("NRT0\n");
+
 	SC_INC;			// 6-16
 	// 6-7
 	ar0_shr_inp = apr->ar & F0;
@@ -1778,38 +1837,35 @@ pulse(nrt0){
 	mq1_shr_inp = (apr->ar & F35) << 34;
 	AR_SH_RT;	// 6-17
 	MQ_SH_RT;	// 6-17
-	if(AR_0_AND_MQ1_0)
-		nextpulse(apr, nrt6);	// 6-27
-	else
-		nextpulse(apr, nrt1);	// 6-27
+	pulse(apr, AR_0_AND_MQ1_0 ? &nrt6 : &nrt1, 200);	// 6-27
 }
 
-pulse(nrt0_5){
-	trace("NRT0.5\n");
+defpulse_(nrt0_5)
+{
 	apr->nrf2 = 1;		// 6-27
-	nextpulse(apr, nrt0);	// 6-27
+	pulse(apr, &nrt0, 100);	// 6-27
 }
 
 /* Scale */
 
-pulse(fst1){
-	trace("FST1\n");
+defpulse(fst1)
+{
 	SC_INC;		// 6-16
 }
 
-pulse(fst0a){
-	trace("FST0A\n");
+defpulse_(fst0a)
+{
 	apr->fsf1 = 0;	// 6-19
 	if(!AR0_EQ_SC0)
 		SET_OVERFLOW;	// 6-17
 	apr->ar |= apr->ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4, 6-9
-	nextpulse(apr, et10);	// 5-5
+	pulse(apr, &et10, 0);	// 5-5
 }
 
-pulse(fst0){
-	trace("FST0\n");
+defpulse(fst0)
+{
 	apr->fsf1 = 1;		// 6-19
-	nextpulse(apr, sat0);	// 6-16
+	pulse(apr, &sat0, 0);	// 6-16
 }
 
 /* Exponent calculate */
@@ -1819,15 +1875,15 @@ pulse(fst0){
 #define AR0_XOR_MB0_XOR_FMF1 (AR0_XOR_FMF1 != !!(apr->mb & F0))
 #define MB0_EQ_FMF1 (!!(apr->mb & F0) == !!apr->fmf1)
 
-pulse(fpt4){
-	trace("FPT4\n");
+defpulse(fpt4)
+{
 	// 6-22
-	if(apr->fmf1) nextpulse(apr, fmt0a);
-	if(apr->fdf1) nextpulse(apr, fdt0a);
+	if(apr->fmf1) pulse(apr, &fmt0a, 0);
+	if(apr->fdf1) pulse(apr, &fdt0a, 0);
 }
 
-pulse(fpt3){
-	trace("FPT3\n");
+defpulse(fpt3)
+{
 	apr->fe |= apr->sc;	// 6-15
 	apr->sc = 0;		// 6-15
 	// 6-3, 6-4
@@ -1836,256 +1892,257 @@ pulse(fpt3){
 	// 6-9, 6-4
 	if(apr->ar & F0) apr->ar |= 0377000000000LL;
 	else             apr->ar &= ~0377000000000LL;
-	nextpulse(apr, fpt4);	// 6-23
+	pulse(apr, &fpt4, 100);	// 6-23
 }
 
-pulse(fpt2){
-	trace("FPT2\n");
+defpulse(fpt2)
+{
 	SC_INC;			// 6-17
 }
 
-pulse(fpt1b){
-	trace("FPT1B\n");
+defpulse_(fpt1b)
+{
 	apr->fpf2 = 0;		// 6-23
 	if(MB0_EQ_FMF1)
 		SC_COM;		// 6-15
-	nextpulse(apr, fpt3);	// 6-23
+	pulse(apr, &fpt3, 100);	// 6-23
 }
 
-pulse(fpt1aa){
-	trace("FPT1AA\n");
+defpulse(fpt1aa)
+{
 	apr->fpf2 = 1;		// 6-23
-	nextpulse(apr, sat0);	// 6-15
+	pulse(apr, &sat0, 0);	// 6-15
 }
 
-pulse(fpt1a){
-	trace("FPT1A\n");
+defpulse_(fpt1a)
+{
 	apr->fpf1 = 0;		// 6-23
 	if(AR0_XOR_MB0_XOR_FMF1)
-		nextpulse(apr, fpt2);	// 6-23
+		pulse(apr, &fpt2, 0);	// 6-23
 	else
 		SC_COM;		// 6-15
-	nextpulse(apr, fpt1aa);	// 6-23
+	pulse(apr, &fpt1aa, 100);	// 6-23
 }
 
-pulse(fpt1){
-	trace("FPT1\n");
+defpulse(fpt1)
+{
 	apr->fpf1 = 1;		// 6-23
 	if(AR0_XOR_FMF1)
 		SC_COM;		// 6-15
-	nextpulse(apr, sat0);	// 6-16
+	pulse(apr, &sat0, 0);	// 6-16
 }
 
-pulse(fpt0){
-	trace("FPT0\n");
+defpulse(fpt0)
+{
 	apr->sc |= 0200;	// 6-14
-	nextpulse(apr, fpt1);	// 6-23
+	pulse(apr, &fpt1, 100);	// 6-23
 }
 
 /* Multiply */
 
-pulse(fmt0b){
-	trace("FMT0B\n");
+defpulse_(fmt0b)
+{
 	apr->fmf2 = 0;		// 6-22
 	apr->sc |= apr->fe;	// 6-15
 	apr->nrf2 = 1;		// 6-27
-	if(AR_0_AND_MQ1_0)
-		nextpulse(apr, nrt6);	// 6-27
-	else
-		nextpulse(apr, nrt1);	// 6-27
+	pulse(apr, AR_0_AND_MQ1_0 ? &nrt6 : &nrt1, 200);	// 6-27
 }
 
-pulse(fmt0a){
-	trace("FMT0A\n");
+defpulse_(fmt0a)
+{
 	apr->fmf1 = 0;		// 6-22
 	apr->fmf2 = 1;		// 6-22
 	apr->sc |= 0744;	// 6-14
-	nextpulse(apr, mst1);	// 6-24
+	pulse(apr, &mst1, 0);	// 6-24
 }
 
-pulse(fmt0){
-	trace("FMT0\n");
+defpulse(fmt0)
+{
 	apr->fmf1 = 1;		// 6-22
-	nextpulse(apr, fpt0);	// 6-23
+	pulse(apr, &fpt0, 0);	// 6-23
 }
 
 /* Divide */
 
-pulse(fdt1){
+defpulse(fdt1)
+{
 	word ar0_shr_inp;
 	word mq0_shr_inp, mq1_shr_inp;
-	trace("FDT1\n");
+
 	// 6-7
 	ar0_shr_inp = apr->ar & F0;
 	mq0_shr_inp = apr->ar & F0;
 	mq1_shr_inp = (apr->ar & F35) << 34;
 	AR_SH_RT;	// 6-17
 	MQ_SH_RT;	// 6-17
-	nextpulse(apr, nrt0_5);	// 6-27
+	pulse(apr, &nrt0_5, 150);	// 6-27
 }
 
-pulse(fdt0b){
-	trace("FDT0B\n");
+defpulse_(fdt0b)
+{
 	apr->fdf2 = 0;		// 6-22
 	apr->sc = apr->fe;	// 6-15
 	apr->nrf2 = 1;		// 6-27
-	nextpulse(apr, fdt1);	// 6-22
+	pulse(apr, &fdt1, 100);	// 6-22
 }
 
-pulse(fdt0a){
-	trace("FDT0A\n");
+defpulse_(fdt0a)
+{
 	apr->fdf1 = 0;		// 6-22
 	apr->fdf2 = 1;		// 6-22
 	apr->sc = 0741;		// 6-14
-	nextpulse(apr, apr->ar & F0 ? dst0 : dst10);	// 6-25
+	pulse(apr, apr->ar & F0 ? &dst0 : &dst10, 0);	// 6-25
 }
 
-pulse(fdt0){
-	trace("FDT0\n");
+defpulse(fdt0)
+{
 	apr->fdf1 = 1;		// 6-22
-	nextpulse(apr, fpt0);	// 6-23
+	pulse(apr, &fpt0, 0);	// 6-23
 }
 
 /* Add/Subtract */
 
-pulse(fat10){
-	trace("FAT10\n");
+defpulse_(fat10)
+{
 	apr->faf4 = 0;		// 6-22
 	apr->faf1 = 0;		// 6-22
-	nextpulse(apr, nrt0_5);	// 6-27
+	pulse(apr, &nrt0_5, 0);	// 6-27
 }
 
-pulse(fat9){
-	trace("FAT9\n");
+defpulse(fat9)
+{
 	apr->faf4 = 1;		// 6-22
-	nextpulse(apr, cfac_ar_add);	// 6-17
+	pulse(apr, &cfac_ar_add, 0);	// 6-17
 }
 
-pulse(fat8a){
-	trace("FAT8A\n");
+defpulse(fat8a)
+{
 	// 6-3, 6-4
 	if(apr->mb & F0) apr->mb |= 0377000000000;
 	else             apr->mb &= ~0377000000000;
-	nextpulse(apr, fat9);	// 6-22
+	pulse(apr, &fat9, 100);	// 6-22
 }
 
-pulse(fat8){
-	trace("FAT8\n");
+defpulse(fat8)
+{
 	SC_PAD;			// 6-15
-	nextpulse(apr, fat8a);	// 6-22
+	pulse(apr, &fat8a, 50);	// 6-22
 }
 
-pulse(fat7){
-	trace("FAT7\n");
+defpulse(fat7)
+{
 	if(apr->mb & F0)
 		SC_COM;		// 6-15
-	nextpulse(apr, fat8);	// 6-22
+	pulse(apr, &fat8, 100);	// 6-22
 }
 
-pulse(fat6){
-	trace("FAT6\n");
+defpulse(fat6)
+{
 	apr->ar = 0;		// 6-8
-	nextpulse(apr, fat5a);	// 6-22
+	pulse(apr, &fat5a, 0);	// 6-22
 }
 
-pulse(fat5a){
-	trace("FAT5A\n");
+defpulse_(fat5a)
+{
 	apr->faf3 = 0;		// 6-22
 	apr->sc = 0;		// 6-15
 	apr->faf1 = 1;		// 6-22
-	nextpulse(apr, fat7);	// 6-22
+	pulse(apr, &fat7, 100);	// 6-22
 }
 
-pulse(fat5){
-	trace("FAT5\n");
+defpulse(fat5)
+{
 	// 6-9, 6-4
 	if(apr->ar & F0) apr->ar |= 0377000000000;
 	else             apr->ar &= ~0377000000000;
 	apr->faf3 = 1;		// 6-22
-	nextpulse(apr, sct0);	// 6-16
+	pulse(apr, &sct0, 0);	// 6-16
 }
 
-pulse(fat4){
-	trace("FAT4\n");
-	nextpulse(apr, (apr->sc & 0700) == 0700 ? fat5 : fat6);	// 6-22
+defpulse(fat4)
+{
+	pulse(apr, (apr->sc & 0700) == 0700 ? &fat5 : &fat6, 100);	// 6-22
 }
 
-pulse(fat3){
-	trace("FAT3\n");
+defpulse(fat3)
+{
 	SC_COM;			// 6-15
-	nextpulse(apr, (apr->sc & 0700) == 0700 ? fat5 : fat6);	// 6-22
+	pulse(apr, (apr->sc & 0700) == 0700 ? &fat5 : &fat6, 150);	// 6-22
 }
 
-pulse(fat2){
-	trace("FAT2\n");
+defpulse(fat2)
+{
 	SC_INC;			// 6-16
-	nextpulse(apr, fat3);	// 6-22
+	pulse(apr, &fat3, 150);	// 6-22
 }
 
-pulse(fat1b){
-	trace("FAT1B\n");
+defpulse(fat1b)
+{
 	apr->faf1 = 0;		// 6-22
 	apr->faf2 = 1;		// 6-22
 }
 
-pulse(fat1a){
-	trace("FAT1A\n");
+defpulse_(fat1a)
+{
 	apr->faf2 = 0;		// 6-22
 	if(!!(apr->ar & F0) == !!(apr->sc & 0400))
 		swap(&apr->mb, &apr->ar);	// 6-17
-	nextpulse(apr, apr->sc & 0400 ? fat4 : fat2);	// 6-22
+	pulse(apr, apr->sc & 0400 ? &fat4 : &fat2, 0);	// 6-22
 }
 
-pulse(fat1){
-	trace("FAT1\n");
+defpulse(fat1)
+{
 	SC_PAD;			// 6-15
-	nextpulse(apr, fat1b);	// 6-22
-	nextpulse(apr, sat0);	// 6-16
+	pulse(apr, &fat1b, 50);	// 6-22
+	pulse(apr, &sat0, 0);	// 6-16
 }
 
-pulse(fat0){
-	trace("FAT0\n");
+defpulse(fat0)
+{
 	if(!AR0_XOR_MB0)
 		SC_COM;		// 6-15
 	apr->faf1 = 1;		// 6-22
-	nextpulse(apr, fat1);	// 6-22
+	pulse(apr, &fat1, 100);	// 6-22
 }
 
 /*
  * Fixed point multiply
  */
 
-pulse(mpt2){
-	trace("MPT2\n");
+defpulse(mpt2)
+{
 	apr->ar = apr->mb;		// 6-8
-	nextpulse(apr, nrt6);		// 6-27
+	pulse(apr, &nrt6, 100);		// 6-27
 }
 
-pulse(mpt1){
-	trace("MPT1\n");
+defpulse(mpt1)
+{
 	apr->mb = apr->mq;		// 6-17
 	if(apr->ar != 0)
 		SET_OVERFLOW;		// 6-17
-	nextpulse(apr, mpt2);		// 6-21
+	pulse(apr, &mpt2, 100);		// 6-21
 }
 
-pulse(mpt0a){
-	trace("MPT0A\n");
+defpulse_(mpt0a)
+{
 	apr->mpf1 = 0;				// 6-21
 	if(!(apr->ir & H6) && apr->ar & F0)
 		apr->ar = ~apr->ar & FW;	// 6-17
 	if(apr->ar & F0 && apr->mpf2)
 		SET_OVERFLOW;			// 6-17
-	nextpulse(apr, apr->ir & H6 ? nrt6 : mpt1);	// 6-21, 6-27
+	if(apr->ir & H6)
+		pulse(apr, &nrt6, 0);	// 6-27
+	else
+		pulse(apr, &mpt1, 200);	// 6-21
 }
 
-pulse(mpt0){
-	trace("MPT0\n");
+defpulse(mpt0)
+{
 	apr->sc |= 0734;		// 6-14
 	apr->mpf1 = 1;			// 6-21
 	if(apr->ar & F0 && apr->mb & F0)
 		apr->mpf2 = 1;		// 6-21
-	nextpulse(apr, mst1);		// 6-24
+	pulse(apr, &mst1, 0);		// 6-24
 }
 
 /*
@@ -2102,85 +2159,87 @@ pulse(mpt0){
 	            apr->ir_jp && !(apr->inst & 0004))
 #define AR_SBR (FWT_NEGATE || AR_ADD || AR_SUB || AR_P1 || AR_M1 || IR_FSB)
 
-pulse(art3){
-	trace("ART3\n");
+defpulse(art3)
+{
 	apr->ar_com_cont = 0;		// 6-9
 
-	if(apr->af3a) nextpulse(apr, at3a);		// 5-3
-	if(apr->et4_ar_pse) nextpulse(apr, et4);	// 5-5
-	if(apr->blt_f3a) nextpulse(apr, blt_t3a);	// 6-18
-	if(apr->blt_f5a) nextpulse(apr, blt_t5a);	// 6-18
-	if(apr->chf3) nextpulse(apr, cht4a);		// 6-19
-	if(apr->msf1) nextpulse(apr, mst3a);		// 6-24
-	if(apr->dsf1) nextpulse(apr, dst0a);		// 6-25
-	if(apr->dsf2) nextpulse(apr, dst5a);		// 6-25
-	if(apr->dsf3) nextpulse(apr, dst10);		// 6-25
-	if(apr->dsf4) nextpulse(apr, dst11a);		// 6-25
-	if(apr->dsf5) nextpulse(apr, dst14a);		// 6-26
-	if(apr->dsf6) nextpulse(apr, dst17a);		// 6-26
-	if(apr->dsf8) nextpulse(apr, dst19a);		// 6-26
-	if(apr->dsf9) nextpulse(apr, dst21a);		// 6-26
-	if(apr->nrf1) nextpulse(apr, nrt5a);		// 6-27
-	if(apr->faf4) nextpulse(apr, fat10);		// 6-22
+	if(apr->af3a) pulse(apr, &at3a, 0);		// 5-3
+	if(apr->et4_ar_pse) pulse(apr, &et4, 0);	// 5-5
+	if(apr->blt_f3a) pulse(apr, &blt_t3a, 0);	// 6-18
+	if(apr->blt_f5a) pulse(apr, &blt_t5a, 0);	// 6-18
+	if(apr->chf3) pulse(apr, &cht4a, 0);		// 6-19
+	if(apr->msf1) pulse(apr, &mst3a, 0);		// 6-24
+	if(apr->dsf1) pulse(apr, &dst0a, 0);		// 6-25
+	if(apr->dsf2) pulse(apr, &dst5a, 0);		// 6-25
+	if(apr->dsf3) pulse(apr, &dst10, 0);		// 6-25
+	if(apr->dsf4) pulse(apr, &dst11a, 0);		// 6-25
+	if(apr->dsf5) pulse(apr, &dst14a, 0);		// 6-26
+	if(apr->dsf6) pulse(apr, &dst17a, 0);		// 6-26
+	if(apr->dsf8) pulse(apr, &dst19a, 0);		// 6-26
+	if(apr->dsf9) pulse(apr, &dst21a, 0);		// 6-26
+	if(apr->nrf1) pulse(apr, &nrt5a, 0);		// 6-27
+	if(apr->faf4) pulse(apr, &fat10, 0);		// 6-22
 }
 
-pulse(ar_cry_comp){
-	trace("AR CRY COMP\n");
+defpulse(ar_cry_comp)
+{
 	if(apr->ar_com_cont){
 		apr->ar = ~apr->ar & FW;	// 6-8
-		nextpulse(apr, art3);		// 6-9
+		pulse(apr, &art3, 100);		// 6-9
 	}
 }
 
-pulse(ar_pm1_t1){
-	trace("AR AR+-1 T1\n");
+defpulse_(ar_pm1_t1)
+{
 	ar_cry_in(apr, 1);			// 6-6
 	if(apr->inst == BLT || AR_PM1_LTRT)
 		ar_cry_in(apr, 01000000);	// 6-9
+	// TODO
 	if(!apr->ar_com_cont)
-		nextpulse(apr, art3);		// 6-9
-	nextpulse(apr, ar_cry_comp);		// 6-9
+		pulse(apr, &art3, 0);		// 6-9
+	pulse(apr, &ar_cry_comp, 0);		// 6-9
 }
 
-pulse(ar_pm1_t0){
-	trace("AR AR+-1 T0\n");
+defpulse(ar_pm1_t0)
+{
 	apr->ar = ~apr->ar & FW;	// 6-8
 	apr->ar_com_cont = 1;		// 6-9
-	nextpulse(apr, ar_pm1_t1);	// 6-9
+	pulse(apr, &ar_pm1_t1, 100);	// 6-9
 }
 
-pulse(ar_negate_t0){
-	trace("AR NEGATE T0\n");
+defpulse_(ar_negate_t0)
+{
 	apr->ar = ~apr->ar & FW;	// 6-8
-	nextpulse(apr, ar_pm1_t1);	// 6-9
+	pulse(apr, &ar_pm1_t1, 100);	// 6-9
 }
 
-pulse(ar_ast2){
-	trace("AR2\n");
+defpulse(ar_ast2)
+{
 	ar_cry_in(apr, (~apr->ar & apr->mb) << 1);	// 6-8
+	// TODO
 	if(!apr->ar_com_cont)
-		nextpulse(apr, art3);			// 6-9
-	nextpulse(apr, ar_cry_comp);			// 6-9
+		pulse(apr, &art3, 0);			// 6-9
+	pulse(apr, &ar_cry_comp, 0);			// 6-9
 }
 
-pulse(ar_ast1){
-	trace("AR AST1\n");
+defpulse_(ar_ast1)
+{
 	apr->ar ^= apr->mb;		// 6-8
-	nextpulse(apr, ar_ast2);	// 6-9
+	pulse(apr, &ar_ast2, 100);	// 6-9
 }
 
-pulse(ar_ast0){
-	trace("AR AST0\n");
+defpulse_(ar_ast0)
+{
 	apr->ar = ~apr->ar & FW;	// 6-8
 	apr->ar_com_cont = 1;		// 6-9
-	nextpulse(apr, ar_ast1);	// 6-9
+	pulse(apr, &ar_ast1, 100);	// 6-9
 }
 
 
-pulse(xct_t0){
-	trace("XCT T0\n");
-	nextpulse(apr, mr_clr);		// 5-2
-	nextpulse(apr, it1a);		// 5-3
+defpulse(xct_t0)
+{
+	pulse(apr, &mr_clr, 0);		// 5-2
+	pulse(apr, &it1a, 200);		// 5-3
 }
 
 /*
@@ -2194,20 +2253,20 @@ pulse(xct_t0){
 #define PI_RST (apr->ir_jrst && apr->ir & H9 || PI_BLK_RST && apr->pi_cyc)
 #define PI_HOLD ((!apr->ir_iot || PI_BLK_RST) && apr->pi_cyc)
 
-pulse(pir_stb){
-	trace("PIR STB\n");
+defpulse_(pir_stb)
+{
 	set_pir(apr, apr->pir | apr->pio & apr->iobus.c34);	// 8-3
 }
 
-pulse(pi_sync){
-	trace("PI SYNC\n");
+defpulse(pi_sync)
+{
 	/* Call directly, we need the result in this pulse */
 	if(!apr->pi_cyc)
-		pir_stb(apr);			// 8-4
+		pir_stb_p(apr);			// 8-4
 	if(apr->pi_req && !apr->pi_cyc)
-		nextpulse(apr, iat0);		// 5-3
+		pulse(apr, &iat0, 200);		// 5-3
 	if(IA_NOT_INT)
-		nextpulse(apr, apr->if1a ? it1 : at1);	// 5-3
+		pulse(apr, apr->if1a ? &it1 : &at1, 200);	// 5-3
 }
 
 // 5-1
@@ -2239,71 +2298,70 @@ pulse(pi_sync){
                  SAC_INH_IF_AC_0)
 #define SAC2 (SH_AC2 || IR_FP_REM || IR_MD_SAC2)
 
-pulse(st7){
-	trace("ST7\n");
-	trace("\n");
+defpulse_(st7)
+{
 	apr->sf7 = 0;		// 5-6
 	if(apr->run)
-		nextpulse(apr, apr->key_ex_st || apr->key_dep_st ? kt1 : it0);	// 5-1, 5-3
+		pulse(apr, apr->key_ex_st || apr->key_dep_st ? &kt1 : &it0, 0);	// 5-1, 5-3
 	if(apr->key_start || apr->key_readin || apr->key_inst_cont)
-		nextpulse(apr, kt4);	// 5-2
+		pulse(apr, &kt4, 0);	// 5-2
 }
 
-pulse(st6a){
-	trace("ST6A\n");
+defpulse(st6a)
+{
 	apr->sf7 = 1;		// 5-6
 }
 
-pulse(st6){
-	trace("ST6\n");
+defpulse(st6)
+{
 	/* We know SAC2 is asserted
 	 * so clamp to fast memory addresses */
 	apr->ma = apr->ma+1 & 017;	// 7-3
 	apr->mb = apr->mq;		// 6-3
-	nextpulse(apr, st6a);		// 5-6
-	nextpulse(apr, mc_wr_rq_pulse);	// 7-8
+	pulse(apr, &st6a, 50);		// 5-6
+	pulse(apr, &mc_wr_rq_pulse, 0);	// 7-8
 }
 
-pulse(st5a){
-	trace("ST5A\n");
+defpulse(st5a)
+{
 	apr->sf5a = 0;				// 5-6
-	nextpulse(apr, SAC2 ? st6 : st7);	// 5-6
+	pulse(apr, SAC2 ? &st6 : &st7, 0);	// 5-6
 }
 
-pulse(st5){
-	trace("ST5\n");
+defpulse(st5)
+{
 	apr->sf5a = 1;			// 5-6
 	apr->ma |= apr->ir>>5 & 017;	// 7-3
 	apr->mb = apr->ar;		// 6-3
-	nextpulse(apr, mc_wr_rq_pulse);	// 7-8
+	pulse(apr, &mc_wr_rq_pulse, 0);	// 7-8
 }
 
-pulse(st3a){
-	trace("ST3A\n");
-	nextpulse(apr, st5);
+defpulse(st3a)
+{
+	pulse(apr, &st5, 100);
 }
 
-pulse(st3){
-	trace("ST3\n");
+defpulse(st3)
+{
 	apr->sf3 = 0;			// 5-6
 	if(SAC_INH)
-		nextpulse(apr, st7);	// 5-6
+		pulse(apr, &st7, 0);	// 5-6
 	else{
 		apr->ma = 0;		// 7-3
-		nextpulse(apr, st3a);	// 5-6
+		pulse(apr, &st3a, 0);	// 5-6
 	}
 }
 
-pulse(st2){
-	trace("ST2\n");
+defpulse(st2)
+{
 	apr->sf3 = 1;		// 5-6
-	nextpulse(apr, mc_rd_wr_rs_pulse);	// 7-8
+	pulse(apr, &mc_rd_wr_rs_pulse, 0);	// 7-8
 }
 
-pulse(st1){
-	trace("ST1\n");
+defpulse(st1)
+{
 	apr->sf3 = 1;		// 5-6
-	nextpulse(apr, mc_wr_rq_pulse);	// 7-8
+	pulse(apr, &mc_wr_rq_pulse, 0);	// 7-8
 }
 
 /*
@@ -2335,9 +2393,9 @@ pulse(st1){
 #define E_LONG (IOT_CONSZ || apr->ir_jp || apr->ir_acbm || apr->pc_set || \
                 MB_PC_STO || PC_INC_ET9 || IOT_CONSO || IR_ACCP_MEMAC)
 
-pulse(et10){
+defpulse_(et10)
+{
 	bool sc_e = SC_E;
-	trace("ET10\n");
 
 	if(PI_HOLD){
 		// 8-4
@@ -2368,15 +2426,15 @@ pulse(et10){
 	}
 	if(apr->inst == JFCL)
 		ar_jfcl_clr(apr);			// 6-10
-	nextpulse(apr, sc_e          ? st1 :		// 5-6
-                       apr->fc_e_pse ? st2 :		// 5-6
-                                       st3);		// 5-6
+	pulse(apr, sc_e          ? &st1 :		// 5-6
+                   apr->fc_e_pse ? &st2 :		// 5-6
+                                   &st3, 0);		// 5-6
 }
 
-pulse(et9){
+defpulse_(et9)
+{
 	bool pc_inc;
 
-	trace("ET9\n");
 	pc_inc = PC_INC_ET9;
 	if(pc_inc)
 		apr->pc = apr->pc+1 & RT;	// 5-12
@@ -2391,31 +2449,31 @@ pulse(et9){
 		apr->ma = 0;			// 7-3
 	if(apr->inst == JSR)
 		apr->chf7 = 0;			// 6-19
-	nextpulse(apr, et10);			// 5-5
+	pulse(apr, &et10, 200);			// 5-5
 }
 
-pulse(et8){
-	trace("ET8\n");
+defpulse(et8)
+{
 	if(apr->pc_set)
 		apr->pc |= apr->ma;	// 5-12
 	if(apr->inst == JSR)
 		apr->ex_ill_op = 0;	// 5-13
-	nextpulse(apr, et9);		// 5-5
+	pulse(apr, &et9, 200);		// 5-5
 }
 
-pulse(et7){
-	trace("ET7\n");
+defpulse(et7)
+{
 	if(apr->pc_set)
 		apr->pc = 0;		// 5-12
 	if(apr->inst == JSR && (apr->ex_pi_sync || apr->ex_ill_op))
 		apr->ex_user = 0;	// 5-13
 	if(apr->ir_acbm)
 		apr->ar = ~apr->ar & FW;	// 6-8
-	nextpulse(apr, et8);			// 5-5
+	pulse(apr, &et8, 100);			// 5-5
 }
 
-pulse(et6){
-	trace("ET6\n");
+defpulse(et6)
+{
 	if(MB_PC_STO || apr->inst == JSA)
 		apr->mb |= apr->pc;	// 6-3
 	if(ACBM_CL)
@@ -2431,21 +2489,24 @@ pulse(et6){
 	}
 	if(IOT_CONSZ || IOT_CONSO)
 		apr->ar &= apr->mb;	// 6-8
-	nextpulse(apr, et7);		// 5-5
+	pulse(apr, &et7, 100);		// 5-5
 }
 
-pulse(et5){
-	trace("ET5\n");
+defpulse_(et5)
+{
 	if(MB_PC_STO)
 		apr->mb = 0;			// 6-3
 	if(apr->ir_acbm)
 		apr->ar = ~apr->ar & FW;	// 6-8
 	apr->pc_set = PC_SET;
-	nextpulse(apr, E_LONG ? et6 : et10);	// 5-5
+	if(E_LONG)				// 5-5
+		pulse(apr, &et6, 100);
+	else
+		pulse(apr, &et10, 0);
 }
 
-pulse(et4){
-	trace("ET4\n");
+defpulse_(et4)
+{
 	apr->et4_ar_pse = 0;		// 5-5
 	if(IOT_BLK)
 		apr->ex_ill_op = 0;	// 5-13
@@ -2472,24 +2533,23 @@ pulse(et4){
 		swap(&apr->mb, &apr->ar);	// 6-3
 
 	if(IOT_BLK)
-		nextpulse(apr, iot_t0);		// 8-1
+		pulse(apr, &iot_t0, 0);		// 8-1
 	else if(apr->ir_iot)
 		apr->iot_go = 1;		// 8-1
 	if(IR_FSB)
-		nextpulse(apr, fat0);		// 6-22
+		pulse(apr, &fat0, 0);		// 6-22
 	if(!ET5_INH)
-		nextpulse(apr, et5);		// 5-5
+		pulse(apr, &et5, 100);		// 5-5
 }
 
-pulse(et3){
-	trace("ET3\n");
-
+defpulse(et3)
+{
 	if(apr->ex_ir_uuo){
 		// MBLT <- IR(1) (UUO T0) on 6-3
 		apr->mb |= ((word)apr->ir&0777740) << 18;	// 6-1
 		apr->ma |= F30;				// 7-3
 		apr->uuo_f1 = 1;			// 5-10
-		nextpulse(apr, mc_wr_rq_pulse);		// 7-8
+		pulse(apr, &mc_wr_rq_pulse, 0);		// 7-8
 	}
 
 	if(apr->inst == POPJ || apr->inst == BLT)
@@ -2497,39 +2557,38 @@ pulse(et3){
 
 	// AR SBR, 6-9
 	if(FWT_NEGATE || IR_FSB)
-		nextpulse(apr, ar_negate_t0);
+		pulse(apr, &ar_negate_t0, 0);
 	if(AR_SUB)
-		nextpulse(apr, ar_ast0);
+		pulse(apr, &ar_ast0, 0);
 	if(AR_ADD)
-		nextpulse(apr, ar_ast1);
+		pulse(apr, &ar_ast1, 0);
 	if(AR_M1)
-		nextpulse(apr, ar_pm1_t0);
+		pulse(apr, &ar_pm1_t0, 0);
 	if(AR_P1)
-		nextpulse(apr, ar_pm1_t1);
+		pulse(apr, &ar_pm1_t1, 0);
 
 	if(IR_FPCH && !(apr->ir & H3) &&
 	   (apr->inst == 0130 || apr->inst == 0131 || !(apr->ir & H4) || !(apr->ir & H5)))
-		nextpulse(apr, st7);		// 5-6
+		pulse(apr, &st7, 0);		// 5-6
 	if(apr->inst == BLT)
-		nextpulse(apr, blt_t0);		// 6-18
+		pulse(apr, &blt_t0, 0);		// 6-18
 	if(apr->shift_op)
-		nextpulse(apr, sht1);		// 6-20
+		pulse(apr, &sht1, 100);		// 6-20
 	if(apr->inst == FSC){
 		if(apr->ar & F0)
-			nextpulse(apr, fst1);	// 6-19
-		nextpulse(apr, fst0);		// 6-19
+			pulse(apr, &fst1, 0);	// 6-19
+		pulse(apr, &fst0, 0);		// 6-19
 	}
 	if(apr->inst == XCT)
-		nextpulse(apr, xct_t0);		// 5-10
+		pulse(apr, &xct_t0, 0);		// 5-10
 	if(AR_SBR)
 		apr->et4_ar_pse = 1;		// 5-5
 	if(!ET4_INH)
-		nextpulse(apr, et4);		// 5-5
+		pulse(apr, &et4, 0);		// 5-5
 };
 
-pulse(et1){
-	trace("ET1\n");
-
+defpulse(et1)
+{
 	if(apr->ex_ir_uuo){
 		apr->ex_ill_op = 1;		// 5-13
 		apr->mb &= RT;			// 6-3
@@ -2537,7 +2596,7 @@ pulse(et1){
 	if(apr->ir_jrst && apr->ir & H12)
 		apr->ex_mode_sync = 1;		// 5-13
 	if(apr->ir_jrst && apr->ir & H11)
-		ar_flag_set(apr);		// 6-10
+		ar_flag_set_p(apr);		// 6-10
 	if(PI_RST)
 		clear_pih(apr);			// 8-4
 
@@ -2571,54 +2630,55 @@ pulse(et1){
 	if(apr->inst == POPJ || apr->ex_ir_uuo || apr->inst == BLT)
 		apr->ma = 0;			// 7-3
 	if(apr->shift_op && apr->mb & F18)
-		nextpulse(apr, sht0);		// 6-20
+		pulse(apr, &sht0, 0);		// 6-20
 	if(apr->inst == FSC && !(apr->ar & F0))
 		SC_COM;				// 6-15
-	nextpulse(apr, et3);
+	pulse(apr, &et3, 100);
 }
 
-pulse(et0){
-	trace("ET0\n");
-
+defpulse(et0)
+{
 	if(!PC_P1_INH)
 		apr->pc = apr->pc+1 & RT;	// 5-12
 	apr->ar_cry0 = 0;	// 6-10
 	apr->ar_cry1 = 0;	// 6-10
 	ar_cry(apr);
 	if(apr->ir_jrst && apr->ir & H11)
-		ar_flag_clr(apr);		// 6-10
+		ar_flag_clr_p(apr);		// 6-10
 	if(CH_INC_OP)
-		nextpulse(apr, cht1);		// 6-19
+		pulse(apr, &cht1, 0);		// 6-19
 	if(CH_N_INC_OP)
-		nextpulse(apr, cht6);		// 6-19
+		pulse(apr, &cht6, 0);		// 6-19
 	if(CH_LOAD)
-		nextpulse(apr, lct0);		// 6-20
+		pulse(apr, &lct0, 0);		// 6-20
 	if(CH_DEP)
-		nextpulse(apr, dct0);		// 6-20
+		pulse(apr, &dct0, 0);		// 6-20
 	if(IR_MUL)
-		nextpulse(apr, mpt0);		// 6-12
+		pulse(apr, &mpt0, 0);		// 6-21
 	if(IR_FAD)
-		nextpulse(apr, fat0);		// 6-22
+		pulse(apr, &fat0, 0);		// 6-22
 	if(IR_FMP)
-		nextpulse(apr, fmt0);		// 6-22
+		pulse(apr, &fmt0, 0);		// 6-22
 	if(IR_FDV)
-		nextpulse(apr, fdt0);		// 6-22
+		pulse(apr, &fdt0, 0);		// 6-22
 	if(IR_DIV){
-		nextpulse(apr, ds_div_t0);	// 6-25
+		pulse(apr, &ds_div_t0, 0);	// 6-25
 		if(apr->ir & H6)	// DIV
-			nextpulse(apr, apr->ar & F0 ? dst3 : dst10);	// 6-25
+			pulse(apr, apr->ar & F0 ? &dst3 : &dst10, 0);	// 6-25
 		else			// IDIV
-			nextpulse(apr, apr->ar & F0 ? dst0 : dst1);	// 6-25
+			pulse(apr, apr->ar & F0 ? &dst0 : &dst1, 0);	// 6-25
 	}
 }
 
-pulse(et0a){
-	trace("ET0A\n");
+defpulse(et0a)
+{
 	debug("%o: ", apr->pc);
 	if((apr->inst & 0700) != 0700)
 		debug("%s\n", mnemonics[apr->inst]);
 	else
 		debug("%s\n", iomnemonics[apr->io_inst>>5 & 7]);
+if(apr->inst == 0)
+exit(0);
 
 	if(PI_HOLD)
 		set_pih(apr, apr->pi_req);	// 8-3, 8-4
@@ -2646,7 +2706,7 @@ pulse(et0a){
 		apr->ar = apr->mb;		// 6-8
 	if(apr->fwt_01 || apr->fwt_10 || IOT_STATUS)
 		apr->mb = apr->ar;		// 6-3
-	if(apr->hwt_10 || apr->inst == JSP || apr->inst == EXCH || 
+	if(apr->hwt_10 || apr->inst == JSP || apr->inst == EXCH ||
 	   apr->inst == BLT || IR_FSB)
 		swap(&apr->mb, &apr->ar);	// 6-3
 	if(apr->inst == POP || apr->inst == POPJ || apr->inst == JRA)
@@ -2683,61 +2743,61 @@ pulse(et0a){
                   IOT_BLK || apr->inst == EXCH || CH_DEP || CH_INC_OP || \
                   MEMAC_MEM || apr->boole_as_10 || apr->boole_as_11)
 
-pulse(ft7){
-	trace("FT7\n");
+defpulse(ft7)
+{
 	apr->f6a = 1;			// 5-4
-	nextpulse(apr, apr->mc_split_cyc_sync ? mc_split_rd_rq :	// 7-8
-	                                        mc_rdwr_rq_pulse);	// 7-8
+	pulse(apr, apr->mc_split_cyc_sync ? &mc_split_rd_rq :	// 7-8
+	                                    &mc_rdwr_rq_pulse, 0);	// 7-8
 }
 
-pulse(ft6a){
-	trace("FT6A\n");
+defpulse(ft6a)
+{
 	apr->f6a = 0;			// 5-4
-	nextpulse(apr, et0a);		// 5-5
-	nextpulse(apr, et0);		// 5-5
-	nextpulse(apr, et1);		// 5-5
+	pulse(apr, &et0a, 0);		// 5-5
+	pulse(apr, &et0, 0);		// 5-5
+	pulse(apr, &et1, 100);		// 5-5
 }
 
-pulse(ft6){
-	trace("FT6\n");
+defpulse(ft6)
+{
 	apr->f6a = 1;			// 5-4
-	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
+	pulse(apr, &mc_rd_rq_pulse, 0);	// 7-8
 }
 
-pulse(ft5){
-	trace("FT5\n");
+defpulse(ft5)
+{
 	// cache this because we need it again in ET10
 	apr->fc_e_pse = FC_E_PSE;
 	apr->ma = apr->mb & RT;		// 7-3
-	nextpulse(apr, FC_E          ? ft6 :	// 5-4
-                       apr->fc_e_pse ? ft7 :	// 5-4
-                                       ft6a);	// 5-4
+	pulse(apr, FC_E          ? &ft6 :	// 5-4
+                   apr->fc_e_pse ? &ft7 :	// 5-4
+                                   &ft6a, 0);	// 5-4
 }
 
-pulse(ft4a){
-	trace("FT4A\n");
+defpulse(ft4a)
+{
 	apr->f4a = 0;			// 5-4
 	apr->ma = 0;			// 7-3
 	swap(&apr->mb, &apr->mq);	// 6-3, 6-13
-	nextpulse(apr, ft5);		// 5-4
+	pulse(apr, &ft5, 100);		// 5-4
 }
 
-pulse(ft4){
-	trace("FT4\n");
+defpulse(ft4)
+{
 	apr->mq = apr->mb;		// 6-13
 	apr->f4a = 1;			// 5-4
-	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
+	pulse(apr, &mc_rd_rq_pulse, 0);	// 7-8
 }
 
-pulse(ft3){
-	trace("FT3\n");
+defpulse(ft3)
+{
 	apr->ma = apr->mb & RT;		// 7-3
 	swap(&apr->mb, &apr->ar);	// 6-3
-	nextpulse(apr, ft4);		// 5-4
+	pulse(apr, &ft4, 100);		// 5-4
 }
 
-pulse(ft1a){
-	trace("FT1A\n");
+defpulse_(ft1a)
+{
 	bool acltrt = FC_C_ACLT || FC_C_ACRT;
 	bool fac2 = FAC2;
 	apr->f1a = 0;				// 5-4
@@ -2749,101 +2809,101 @@ pulse(ft1a){
 		swap(&apr->mb, &apr->ar);	// 6-3
 	if(FC_C_ACLT)
 		SWAPLTRT(apr->mb);		// 6-3
-	nextpulse(apr, fac2   ? ft4 :	// 5-4
-                       acltrt ? ft3 :	// 5-4
-                              ft5);	// 5-4
+	pulse(apr, fac2   ? &ft4 :	// 5-4
+                   acltrt ? &ft3 :	// 5-4
+                            &ft5, 100);	// 5-4
 }
 
-pulse(ft1){
-	trace("FT1\n");
+defpulse(ft1)
+{
 	apr->ma |= apr->ir>>5 & 017;	// 7-3
 	apr->f1a = 1;			// 5-4
-	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
+	pulse(apr, &mc_rd_rq_pulse, 0);	// 7-8
 }
 
-pulse(ft0){
-	trace("FT0\n");
-	nextpulse(apr, FAC_INH ? ft5 : ft1);	// 5-4
+defpulse_(ft0)
+{
+	pulse(apr, FAC_INH ? &ft5 : &ft1, 0);	// 5-4
 }
 
 /*
  * Address
  */
 
-pulse(at5){
-	trace("AT5\n");
+defpulse(at5)
+{
 	apr->a_long = 1;		// ?? nowhere to be found
 	apr->af0 = 1;			// 5-3
 	apr->ma |= apr->mb & RT;	// 7-3
 	apr->ir &= ~037;		// 5-7
-	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
+	pulse(apr, &mc_rd_rq_pulse, 0);	// 7-8
 }
 
-pulse(at4){
-	trace("AT4\n");
+defpulse(at4)
+{
 	apr->ar &= ~LT;			// 6-8
 	// TODO: what is MC DR SPLIT? what happens here anyway?
 	if(apr->sw_addr_stop || apr->key_mem_stop)
 		apr->mc_split_cyc_sync = 1;	// 7-9
-	nextpulse(apr, apr->ir & 020 ? at5 : ft0);	// 5-3, 5-4
+	pulse(apr, apr->ir & 020 ? &at5 : &ft0, 0);	// 5-3, 5-4
 }
 
-pulse(at3a){
-	trace("AT3A\n");
+defpulse_(at3a)
+{
 	apr->af3a = 0;			// 5-3
 	apr->mb = apr->ar;		// 6-3
-	nextpulse(apr, at4);		// 5-3
+	pulse(apr, &at4, 100);		// 5-3
 }
 
-pulse(at3){
-	trace("AT3\n");
+defpulse(at3)
+{
 	apr->af3 = 0;			// 5-3
 	apr->ma = 0;			// 7-3
 	apr->af3a = 1;			// 5-3
-	nextpulse(apr, ar_ast1);	// 6-9
+	pulse(apr, &ar_ast1, 0);	// 6-9
 }
 
-pulse(at2){
-	trace("AT2\n");
+defpulse(at2)
+{
 	apr->a_long = 1;		// ?? nowhere to be found
 	apr->ma |= apr->ir & 017;	// 7-3
 	apr->af3 = 1;			// 5-3
-	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
+	pulse(apr, &mc_rd_rq_pulse, 0);	// 7-8
 }
 
-pulse(at1){
-	trace("AT1\n");
+defpulse_(at1)
+{
 	apr->ex_uuo_sync = 1;		// 5-13
 	// decode here because of EX UUO SYNC
 	decodeir(apr);
-	nextpulse(apr, (apr->ir & 017) == 0 ? at4 : at2);	// 5-3
+	pulse(apr, (apr->ir & 017) == 0 ? &at4 : &at2, 0);	// 5-3
 }
 
-pulse(at0){
-	trace("AT0\n");
+defpulse_(at0)
+{
 	apr->ar &= ~RT;			// 6-8
 	apr->ar |= apr->mb & RT;	// 6-8
 	apr->ir |= apr->mb>>18 & 037;	// 5-7
 	apr->ma = 0;			// 7-3
 	apr->af0 = 0;			// 5-3
-	nextpulse(apr, pi_sync);	// 8-4
+	pulse(apr, &pi_sync, 0);	// 8-4
 }
 
 /*
  * Instruction
  */
 
-pulse(it1a){
-	trace("IT1A\n");
+defpulse_(it1a)
+{
 	apr->if1a = 0;				// 5-3
 	apr->ir |= apr->mb>>18 & 0777740;	// 5-7
 	if(apr->ma & 0777760)
 		set_key_rim_sbr(apr, 0);	// 5-2
-	nextpulse(apr, at0);			// 5-3
+	pulse(apr, &at0, 0);			// 5-3
 }
 
-pulse(it1){
-	trace("IT1\n");
+defpulse_(it1)
+{
 	if(apr->pi_cyc){
 		// 7-3, 8-4
 		apr->ma |= 040;
@@ -2855,259 +2915,265 @@ pulse(it1){
 	if(apr->pi_ov)
 		apr->ma = (apr->ma+1)&RT;	// 7-3
 	apr->if1a = 1;				// 5-3
-	nextpulse(apr, mc_rd_rq_pulse);		// 7-8
+	pulse(apr, &mc_rd_rq_pulse, 0);		// 7-8
 }
 
-pulse(iat0){
-	trace("IAT0\n");
+defpulse_(iat0)
+{
 	// have to call directly because PI CYC sets EX PI SYNC
-	mr_clr(apr);			// 5-2
+	mr_clr_p(apr);			// 5-2
 	set_pi_cyc(apr, 1);		// 8-4
-	nextpulse(apr, it1);		// 5-3
+	pulse(apr, &it1, 200);		// 5-3
 }
 
-pulse(it0){
-	trace("IT0\n");
+defpulse_(it0)
+{
 	apr->ma = 0;			// 7-3
 	// have to call directly because IF1A is set with a delay
-	mr_clr(apr);			// 5-2
+	mr_clr_p(apr);			// 5-2
 	apr->if1a = 1;			// 5-3
-	nextpulse(apr, pi_sync);	// 8-4
+	pulse(apr, &pi_sync, 0);	// 8-4
 }
 
 /*
  * Memory Control
  */
 
-pulse(mai_addr_ack){
-	trace("MAI ADDR ACK\n");
-	curpulse(apr, mc_addr_ack);	// 7-8
+defpulse(mai_addr_ack)
+{
+	pulse(apr, &mc_addr_ack, 0);	// 7-8
 }
 
-pulse(mai_rd_rs){
-	trace("MAI RD RS\n");
+defpulse(mai_rd_rs)
+{
 	if(apr->ma == apr->mas)
 		apr->mi = apr->mb;		// 7-7
 	if(!apr->mc_stop)
-		nextpulse(apr, mc_rs_t0);	// 7-8
+		pulse(apr, &mc_rs_t0, 0);	// 7-8
 }
 
-pulse(mc_rs_t1){
-	trace("MC RS T1\n");
+defpulse(mc_rs_t1)
+{
 	set_mc_rd(apr, 0);			// 7-9
 	if(apr->key_ex_nxt || apr->key_dep_nxt)
 		apr->mi = apr->mb;		// 7-7
 
-	if(apr->key_rd_wr) nextpulse(apr, key_rd_wr_ret);	// 5-2
-	if(apr->sf7) nextpulse(apr, st7);			// 5-6
-	if(apr->sf5a) nextpulse(apr, st5a);			// 5-6
-	if(apr->sf3) nextpulse(apr, st3);			// 5-6
-	if(apr->f6a) nextpulse(apr, ft6a);			// 5-4
-	if(apr->f4a) nextpulse(apr, ft4a);			// 5-4
-	if(apr->f1a) nextpulse(apr, ft1a);			// 5-4
-	if(apr->af0) nextpulse(apr, at0);			// 5-3
-	if(apr->af3) nextpulse(apr, at3);			// 5-3
-	if(apr->if1a) nextpulse(apr, it1a);			// 5-3
-	if(apr->iot_f0a) nextpulse(apr, iot_t0a);		// 8-1
-	if(apr->blt_f0a) nextpulse(apr, blt_t0a);		// 6-18
-	if(apr->blt_f3a) nextpulse(apr, blt_t3a);		// 6-18
-	if(apr->blt_f5a) nextpulse(apr, blt_t5a);		// 6-18
-	if(apr->uuo_f1) nextpulse(apr, uuo_t1);			// 5-10
-	if(apr->chf6) nextpulse(apr, cht8b);			// 6-19
+	if(apr->key_rd_wr) pulse(apr, &key_rd_wr_ret, 0);	// 5-2
+	if(apr->sf7) pulse(apr, &st7, 0);			// 5-6
+	if(apr->sf5a) pulse(apr, &st5a, 0);			// 5-6
+	if(apr->sf3) pulse(apr, &st3, 0);			// 5-6
+	if(apr->f6a) pulse(apr, &ft6a, 0);			// 5-4
+	if(apr->f4a) pulse(apr, &ft4a, 0);			// 5-4
+	if(apr->f1a) pulse(apr, &ft1a, 0);			// 5-4
+	if(apr->af0) pulse(apr, &at0, 0);			// 5-3
+	if(apr->af3) pulse(apr, &at3, 0);			// 5-3
+	if(apr->if1a) pulse(apr, &it1a, 0);			// 5-3
+	if(apr->iot_f0a) pulse(apr, &iot_t0a, 0);		// 8-1
+	if(apr->blt_f0a) pulse(apr, &blt_t0a, 0);		// 6-18
+	if(apr->blt_f3a) pulse(apr, &blt_t3a, 0);		// 6-18
+	if(apr->blt_f5a) pulse(apr, &blt_t5a, 0);		// 6-18
+	if(apr->uuo_f1) pulse(apr, &uuo_t1, 0);			// 5-10
+	if(apr->chf6) pulse(apr, &cht8b, 0);			// 6-19
 }
 
-pulse(mc_rs_t0){
-	trace("MC RS T0\n");
+defpulse_(mc_rs_t0)
+{
 //	apr->mc_stop = 0;		// ?? not found on 7-9
-	nextpulse(apr, mc_rs_t1);	// 7-8
+	pulse(apr, &mc_rs_t1, 50);	// 7-8
 }
 
-pulse(mc_wr_rs){
-	trace("MC WR RS\n");
+defpulse_(mc_wr_rs)
+{
 	if(apr->ma == apr->mas)
 		apr->mi = apr->mb;	// 7-7
 	apr->membus.c34 |= apr->mb;		// 7-8
 	apr->membus.c12 |= MEMBUS_WR_RS;	// 7-8
 	if(!apr->mc_stop)
-		nextpulse(apr, mc_rs_t0);	// 7-8
+		pulse(apr, &mc_rs_t0, 0);	// 7-8
 }
 
-pulse(mc_addr_ack){
-	trace("MC ADDR ACK\n");
+defpulse_(mc_addr_ack)
+{
 	set_mc_rq(apr, 0);			// 7-9
 	if(!apr->mc_rd && apr->mc_wr)
-		nextpulse(apr, mc_wr_rs);	// 7-8
+		pulse(apr, &mc_wr_rs, 0);	// 7-8
 }
 
-pulse(mc_non_exist_rd){
-	trace("MC NON EXIST RD\n");
+defpulse(mc_non_exist_rd)
+{
 	if(!apr->mc_stop)
-		nextpulse(apr, mc_rs_t0);		// 7-8
+		pulse(apr, &mc_rs_t0, 0);		// 7-8
 }
 
-pulse(mc_non_exist_mem_rst){
-	trace("MC NON EXIST MEM RST\n");
-	nextpulse(apr, mc_addr_ack);			// 7-8
+defpulse(mc_non_exist_mem_rst)
+{
+	pulse(apr, &mc_addr_ack, 0);			// 7-8
 	if(apr->mc_rd)
-		nextpulse(apr, mc_non_exist_rd);	// 7-9
+		pulse(apr, &mc_non_exist_rd, 0);	// 7-9
 }
 
-pulse(mc_non_exist_mem){
-	trace("MC NON EXIST MEM\n");
+defpulse(mc_non_exist_mem)
+{
 	apr->cpa_non_exist_mem = 1;			// 8-5
 	recalc_cpa_req(apr);
 	if(!apr->sw_mem_disable)
-		nextpulse(apr, mc_non_exist_mem_rst);	// 7-9
+		pulse(apr, &mc_non_exist_mem_rst, 0);	// 7-9
 }
 
-pulse(mc_illeg_address){
-	trace("MC ILLEG ADDRESS\n");
+defpulse(mc_illeg_address)
+{
 	apr->cpa_illeg_op = 1;				// 8-5
 	recalc_cpa_req(apr);
-	nextpulse(apr, st7);				// 5-6
+	pulse(apr, &st7, 100);				// 5-6
 }
 
-pulse(mc_stop_1){
-	trace("MC STOP <- (1)\n");
+defpulse(mc_rq_1)
+{
+	set_mc_rq(apr, 1);	// 7-9
+}
+
+defpulse(mc_stop_1)
+{
 	apr->mc_stop = 1;		// 7-9
 	if(apr->key_mem_cont)
-		nextpulse(apr, kt4);	// 5-2
+		pulse(apr, &kt4, 0);	// 5-2
 }
 
-pulse(mc_rq_pulse){
+defpulse(mc_rq_pulse)
+{
 	bool ma_ok;
-	trace("MC RQ PULSE\n");
+
 	/* have to call this to set flags, do relocation and set address */
 	ma_ok = relocate(apr);
 	apr->mc_stop = 0;		// 7-9
 	/* hack to catch non-existent memory */
 	apr->extpulse |= EXT_NONEXIT_MEM;
 	if(ma_ok || apr->ex_inh_rel)
-		set_mc_rq(apr, 1);	// 7-9
+		pulse(apr, &mc_rq_1, 50);
 	else
-		nextpulse(apr, mc_illeg_address);	// 7-9
+		pulse(apr, &mc_illeg_address, 150);	// 7-9
 	if(apr->key_mem_stop || apr->ma == apr->mas && apr->sw_addr_stop)
-		nextpulse(apr, mc_stop_1);	// 7-9
+		pulse(apr, &mc_stop_1, 200);	// 7-9
 }
 
-pulse(mc_rdwr_rq_pulse){
-	trace("MC RD/RW RQ PULSE\n");
+defpulse_(mc_rdwr_rq_pulse)
+{
 	set_mc_rd(apr, 1);		// 7-9
 	set_mc_wr(apr, 1);		// 7-9
 	apr->mb = 0;			// 7-8
 	apr->mc_stop_sync = 1;		// 7-9
-	nextpulse(apr, mc_rq_pulse);	// 7-8
+	pulse(apr, &mc_rq_pulse, 0);	// 7-8
 }
 
-pulse(mc_rd_rq_pulse){
-	trace("MC RD RQ PULSE\n");
+defpulse_(mc_rd_rq_pulse)
+{
 	set_mc_rd(apr, 1);		// 7-9
 	set_mc_wr(apr, 0);		// 7-9
 	apr->mb = 0;			// 7-8
-	nextpulse(apr, mc_rq_pulse);	// 7-8
+	pulse(apr, &mc_rq_pulse, 0);	// 7-8
 }
 
-pulse(mc_split_rd_rq){
-	trace("MC SPLIT RD RQ\n");
-	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
+defpulse_(mc_split_rd_rq)
+{
+	pulse(apr, &mc_rd_rq_pulse, 0);	// 7-8
 }
 
-pulse(mc_wr_rq_pulse){
-	trace("MC WR RQ PULSE\n");
+defpulse_(mc_wr_rq_pulse)
+{
 	set_mc_rd(apr, 0);		// 7-9
 	set_mc_wr(apr, 1);		// 7-9
-	nextpulse(apr, mc_rq_pulse);	// 7-8
+	pulse(apr, &mc_rq_pulse, 0);	// 7-8
 }
 
-pulse(mc_split_wr_rq){
-	trace("MC SPLIT WR RQ\n");
-	nextpulse(apr, mc_wr_rq_pulse);	// 7-8
+defpulse(mc_split_wr_rq)
+{
+	pulse(apr, &mc_wr_rq_pulse, 0);	// 7-8
 }
 
-pulse(mc_rd_wr_rs_pulse){
-	trace("MC RD/WR RS PULSE\n");
-	nextpulse(apr, apr->mc_split_cyc_sync ? mc_split_wr_rq : mc_wr_rs);	// 7-8
+defpulse_(mc_rd_wr_rs_pulse)
+{
+	pulse(apr, apr->mc_split_cyc_sync ? &mc_split_wr_rq : &mc_wr_rs, 0);	// 7-8
 }
 
 /*
  * Keys
  */
 
-pulse(key_rd_wr_ret){
-	trace("KEY RD WR RET\n");
+defpulse_(key_rd_wr_ret)
+{
 	apr->key_rd_wr = 0;	// 5-2
 //	apr->ex_ill_op = 0;	// ?? not found on 5-13
-	nextpulse(apr, kt4);	// 5-2
+	pulse(apr, &kt4, 0);	// 5-2
 }
 
-pulse(key_rd){
-	trace("KEY RD\n");
+defpulse(key_rd)
+{
 	apr->key_rd_wr = 1;		// 5-2
-	nextpulse(apr, mc_rd_rq_pulse);	// 7-8
+	pulse(apr, &mc_rd_rq_pulse, 0);	// 7-8
 }
 
-pulse(key_wr){
-	trace("KEY WR\n");
+defpulse(key_wr)
+{
 	apr->key_rd_wr = 1;		// 5-2
 	apr->mb = apr->ar;		// 6-3
-	nextpulse(apr, mc_wr_rq_pulse);	// 7-8
+	pulse(apr, &mc_wr_rq_pulse, 0);	// 7-8
 }
 
-pulse(key_go){
-	trace("KEY GO\n");
+defpulse(key_go)
+{
 	apr->run = 1;		// 5-1
 	apr->key_ex_st = 0;	// 5-1
 	apr->key_dep_st = 0;	// 5-1
 	apr->key_ex_sync = 0;	// 5-1
 	apr->key_dep_sync = 0;	// 5-1
-	nextpulse(apr, it0);	// 5-3
+	pulse(apr, &it0, 0);	// 5-3
 }
 
-pulse(kt4){
-	trace("KT4\n");
+defpulse_(kt4)
+{
 	if(apr->run && (apr->key_ex_st || apr->key_dep_st))
-		nextpulse(apr, key_go); 	// 5-2
+		pulse(apr, &key_go, 0); 	// 5-2
 	// TODO check repeat switch
 }
 
-pulse(kt3){
-	trace("KT3\n");
+defpulse(kt3)
+{
 	if(apr->key_readin || apr->key_start)
 		apr->pc |= apr->ma;		// 5-12
 	if(KEY_EXECUTE){
 		apr->mb = apr->ar;		// 6-3
-		nextpulse(apr, it1a);		// 5-3
-		nextpulse(apr, kt4);		// 5-2
+		pulse(apr, &it1a, 100);		// 5-3
+		pulse(apr, &kt4, 0);		// 5-2
 	}
 	if(KEY_EX_EX_NXT)
-		nextpulse(apr, key_rd);		// 5-2
+		pulse(apr, &key_rd, 0);		// 5-2
 	if(KEY_DP_DP_NXT)
-		nextpulse(apr, key_wr);		// 5-2
+		pulse(apr, &key_wr, 0);		// 5-2
 	if(apr->key_start || apr->key_readin || apr->key_inst_cont)
-		nextpulse(apr, key_go);		// 5-2
+		pulse(apr, &key_go, 0);		// 5-2
 }
 
-pulse(kt2){
-	trace("KT2\n");
+defpulse(kt2)
+{
 	if(KEY_MA_MAS)
 		apr->ma |= apr->mas;		// 7-1
 	if(KEY_EXECUTE_DP_DPNXT)
 		apr->ar |= apr->data;		// 5-2
-	nextpulse(apr, kt3);	// 5-2
+	pulse(apr, &kt3, 200);	// 5-2
 }
 
-pulse(kt1){
-	trace("KT1\n");
+defpulse_(kt1)
+{
 	if(apr->key_io_reset)
-		nextpulse(apr, mr_start);	// 5-2
+		pulse(apr, &mr_start, 0);	// 5-2
 	if(KEY_MANUAL && !apr->key_mem_cont)
-		nextpulse(apr, mr_clr);		// 5-2
+		pulse(apr, &mr_clr, 0);		// 5-2
 	if(KEY_CLR_RIM)
 		set_key_rim_sbr(apr, 0);	// 5-2
 	if(apr->key_mem_cont && apr->mc_stop)
-		nextpulse(apr, mc_rs_t0);	// 7-8
+		pulse(apr, &mc_rs_t0, 0);	// 7-8
 	if(KEY_MANUAL && apr->mc_stop && apr->mc_stop_sync && !apr->key_mem_cont)
-		nextpulse(apr, mc_wr_rs);	// 7-8
+		pulse(apr, &mc_wr_rs, 0);	// 7-8
 
 	if(apr->key_readin)
 		set_key_rim_sbr(apr, 1);	// 5-2
@@ -3120,27 +3186,29 @@ pulse(kt1){
 	if(KEY_EXECUTE_DP_DPNXT)
 		apr->ar = 0;			// 5-2
 
-	nextpulse(apr, kt2);	// 5-2
+	pulse(apr, &kt2, 200);	// 5-2
 }
 
-pulse(kt0a){
-	trace("KT0A\n");
+defpulse(kt0a)
+{
 	apr->key_ex_st = 0;	// 5-1
 	apr->key_dep_st = 0;	// 5-1
 	apr->key_ex_sync = apr->key_ex;		// 5-1
 	apr->key_dep_sync = apr->key_dep;	// 5-1
 	if(!apr->run || apr->key_mem_cont)
-		nextpulse(apr, kt1);	// 5-2
+		// TODO: actually 0 or 100, but couldn't this
+		// cause kt1 to be executed multiple times?
+		pulse(apr, &kt1, 100);	// 5-2
 }
 
-pulse(kt0){
-	trace("KT0\n");
-	nextpulse(apr, kt0a);		// 5-2
+defpulse(kt0)
+{
+	pulse(apr, &kt0a, 0);		// 5-2
 }
 
-pulse(key_manual){
-	trace("KEY MANUAL\n");
-	nextpulse(apr, kt0);		// 5-2
+defpulse(key_manual)
+{
+	pulse(apr, &kt0, 0);		// 5-2
 }
 
 
@@ -3159,11 +3227,13 @@ updatebus(void *bus)
 void
 aprstart(Apr *apr)
 {
+	int i;
 	printf("[aprstart]\n");
-	apr->clist = apr->pulses1;
-	apr->nlist = apr->pulses2;
-	apr->ncurpulses = 0;
-	apr->nnextpulses = 0;
+
+	apr->pfree = nil;
+	apr->pulse = nil;
+	for(i = 0; i < MAXPULSE; i++)
+		pfree(apr, &apr->pulses[i]);
 	apr->ia_inh = 0;
 
 	// must clear lest EX USER be set by MR CLR after MR START
@@ -3174,7 +3244,7 @@ aprstart(Apr *apr)
 	apr->iobus.c12 = 0;
 	apr->iobus.c34 = 0;
 
-	nextpulse(apr, mr_pwr_clr);
+	pulse(apr, &mr_pwr_clr, 100);	// random value
 	apr->lasttick = getms();
 	apr->powered = 1;
 }
@@ -3184,20 +3254,15 @@ aprcycle(void *p)
 {
 	Apr *apr;
 	Busdev *dev;
-	Pulse **tmp;
 	int i, devcode;
+	bool iot_go_pulse;
 
 	apr = p;
-
 	if(!apr->sw_power){
 		apr->powered = 0;
 		return;
 	}else if(!apr->powered)
 		aprstart(apr);
-
-	apr->ncurpulses = apr->nnextpulses;
-	apr->nnextpulses = 0;
-	tmp = apr->clist; apr->clist = apr->nlist; apr->nlist = tmp;
 
 	if(apr->pulsestepping){
 		int c;
@@ -3218,23 +3283,28 @@ aprcycle(void *p)
 	apr->membus.c12_prev = apr->membus.c12;
 	apr->membus.c34_prev = apr->membus.c34;
 
-	for(i = 0; i < apr->ncurpulses; i++)
-		apr->clist[i](apr);
+	i = stepone(apr);
+
+	iot_go_pulse = apr->iot_go && !apr->iot_reset;
+	if(iot_go_pulse && !apr->iot_go_pulse){
+		apr->iot_init_setup = 1;
+		/* These are asserted during INIT SETUP, IOT T2 and FINAL SETUP.
+		 * We clear them in IOT T3A which happens after FINAL SETUP */
+		if(IOT_OUTGOING)	apr->iobus.c12 |= apr->ar;
+		if(IOT_STATUS)	apr->iobus.c34 |= IOBUS_IOB_STATUS;
+		if(IOT_DATAI)	apr->iobus.c34 |= IOBUS_IOB_DATAI;
+		pulse(apr, &iot_t2, 1000);
+	}
+	apr->iot_go_pulse = iot_go_pulse;
 
 	updatebus(&apr->iobus);
 	updatebus(&apr->membus);
-
-	/* This is simplified, we have no IOT RESET,
-	 * IOT INIT SET UP or IOT FINAL SETUP really.
-	 * normally we'd have to wait for IOT RESET to clear here */
-	if(apr->iot_go)
-		nextpulse(apr, iot_t2);
 
 
 	/* Key pulses */
 	if(apr->extpulse & EXT_KEY_MANUAL){
 		apr->extpulse &= ~EXT_KEY_MANUAL;
-		nextpulse(apr, key_manual);
+		pulse(apr, &key_manual, 1);
 	}
 	if(apr->extpulse & EXT_KEY_INST_STOP){
 		apr->extpulse &= ~EXT_KEY_INST_STOP;
@@ -3244,7 +3314,8 @@ aprcycle(void *p)
 	}
 
 
-	/* Pulses and signals through IO bus */
+	/* Pulses and signals through IO bus.
+	 * NB: we interpret level signals as pulses here too. */
 	apr->iobus.devcode = -1;
 	if(apr->iobus.c34_pulse & (IOBUS_PULSES | IOBUS_IOB_STATUS | IOBUS_IOB_DATAI)){
 		devcode = 0;
@@ -3280,11 +3351,11 @@ aprcycle(void *p)
 	if(apr->membus.c12 & MEMBUS_MAI_ADDR_ACK){
 		apr->membus.c12 &= ~MEMBUS_MAI_ADDR_ACK;
 		apr->extpulse &= ~EXT_NONEXIT_MEM;
-		nextpulse(apr, mai_addr_ack);
+		pulse(apr, &mai_addr_ack, 1);
 	}
 	if(apr->membus.c12 & MEMBUS_MAI_RD_RS){
 		apr->membus.c12 &= ~MEMBUS_MAI_RD_RS;
-		nextpulse(apr, mai_rd_rs);
+		pulse(apr, &mai_rd_rs, 1);
 	}
 	if(apr->mc_rd && apr->membus.c34){
 		/* 7-6, 7-9 */
@@ -3297,7 +3368,7 @@ aprcycle(void *p)
 	if(apr->extpulse & EXT_NONEXIT_MEM){
 		apr->extpulse &= ~EXT_NONEXIT_MEM;
 		if(apr->mc_rq && !apr->mc_stop)
-			nextpulse(apr, mc_non_exist_mem);	// 7-9
+			pulse(apr, &mc_non_exist_mem, 1);	// 7-9
 	}
 
 	if(i)
