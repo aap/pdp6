@@ -484,7 +484,9 @@ void updatepanel(Apr *apr);
 
 enum
 {
-	FmtUnk, FmtSav
+	FmtUnk,
+	FmtSav,
+	FmtSblk
 };
 
 static void
@@ -502,10 +504,57 @@ loadsav(FILE *fp)
 			iowd += 01000001;
 			w = readwbak(fp);
 			if(w == ~0)
-				return;
+				goto format;
 			dep(right(iowd), 0, w);
 		}
 	}
+format:
+	printf("SAV format botch\n");
+}
+
+static void
+loadsblk(FILE *fp)
+{
+	word iowd, w, chk;
+	int d;
+
+	/* Skip RIM loader */
+	while(w = readwits(fp), w != ~0)
+		if(w == 0254000000001)
+			goto sblk;
+	goto format;
+sblk:
+	/* Read a simple block */
+	while(w = readwits(fp), w != ~0){
+		/* We expect an AOBJN word here */
+		if((w & F0) == 0)
+			goto end;
+		iowd = w;
+		chk = iowd;
+		d = right(iowd) != 0;	/* 0 is symbol table */
+		while(left(iowd) != 0){
+			w = readwits(fp);
+			if(w == ~0)
+				goto format;
+
+			chk = (chk<<1 | chk>>35) + w & FW;
+
+			dep(right(iowd), 0, w);
+			iowd += 01000001;
+		}
+		if(readwits(fp) != chk)
+			goto format;
+	}
+	goto format;
+end:
+	w = readwits(fp);
+	if(left(w) != 0324000)
+		goto format;
+	apr->pc = right(w);
+	return;
+
+format:
+	printf("SBLK format botch\n");
 }
 
 static void
@@ -520,6 +569,9 @@ c_load(int argc, char *argv[])
 	case 's':
 		fmt = FmtSav;
 		break;
+	case 'b':
+		fmt = FmtSblk;
+		break;
 	}ARGEND;
 	if(argc < 1)
 		return;
@@ -529,8 +581,10 @@ c_load(int argc, char *argv[])
 		printf("couldn't open file: %s\n", argv[0]);
 		return;
 	}
-	if(fmt == FmtSav)
-		loadsav(fp);
+	switch(fmt){
+	case FmtSav: loadsav(fp); break;
+	case FmtSblk: loadsblk(fp); break;
+	}
 	fclose(fp);
 }
 

@@ -71,6 +71,7 @@ err(char *fmt, ...)
 	vfprintf(stderr, fmt, ap);
 	fprintf(stderr, "\n");
 	va_end(ap);
+printf("ERRRRR\n");
 	exit(1);
 }
 

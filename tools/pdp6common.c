@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <ctype.h>
@@ -61,6 +62,92 @@ readwbak(FILE *fp)
 	       (word)buf[3] << 8 |
 	       ((word)buf[4]&0177) << 1 |
 	       ((word)buf[4]&0200) >> 7;
+}
+
+
+/* read word in ITS evacuate format. */
+static int leftover = -1;
+word
+readwits(FILE *fp)
+{
+#define PUSH(x) w = (w<<7) | ((x) & 0177); bits += 7
+	int o;
+	word w;
+	int bits;
+
+	if(feof(fp))
+		return ~0;
+
+	w = 0;
+	bits = 0;
+
+	if(leftover >= 0){
+		w = leftover;
+		bits = 7;
+		leftover = -1;
+	}
+
+	while(bits < 36){
+		o = getc(fp);
+		if(o == EOF)
+			if(bits == 0)
+				return ~0;
+
+		if(o == 012){
+			PUSH(015);
+			PUSH(012);
+		}else if(o == 015){
+			PUSH(012);
+		}else if(o <= 0176){
+			PUSH(o);
+		}else if(o == 0177){
+			PUSH(0177);
+			PUSH(7);
+		}else if(o == 0207){
+			PUSH(0177);
+			PUSH(0177);
+		}else if(o == 0212){
+			PUSH(0177);
+			PUSH(015);
+		}else if(o == 0215){
+			PUSH(0177);
+			PUSH(012);
+		}else if(o <= 0355){
+			PUSH(0177);
+			PUSH(o - 0200);
+		}else if(o == 0356){
+			PUSH(015);
+		}else if(o == 0357){
+			PUSH(0177);
+		}else{
+			if(bits != 0){
+				fprintf(stderr, "[error in 36-bit file format]\n");
+				exit(1);
+			}
+			w = o & 017;
+			w = (w << 8) | getc(fp);
+			w = (w << 8) | getc(fp);
+			w = (w << 8) | getc(fp);
+			w = (w << 8) | getc(fp);
+			bits = 36;
+		}
+
+		if(bits == 35){
+			w <<= 1;
+			bits++;
+		}else if(bits == 42){
+			leftover = w & 0177;
+			w >>= 7;
+			w <<= 1;
+		}
+	}
+
+	if(w > 0777777777777){
+		fprintf(stderr, "[error in 36-bit file format (word too large)]\n");
+		exit(1);
+	}
+
+	return w;
 }
 
 /* decompose a double into sign, exponent and mantissa */

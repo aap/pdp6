@@ -685,13 +685,13 @@ defpulse(ar_flag_clr)
 
 defpulse(ar_flag_set)
 {
-	apr->ar_ov_flag     = !!(apr->mb & F0); // 6-10
-	apr->ar_cry0_flag   = !!(apr->mb & F1); // 6-10
-	apr->ar_cry1_flag   = !!(apr->mb & F2); // 6-10
-	apr->ar_pc_chg_flag = !!(apr->mb & F3); // 6-10
-	apr->chf7           = !!(apr->mb & F4); // 6-19
-	if(apr->mb & F5)
-		apr->ex_mode_sync = 1;	// 5-13
+	// 6-10
+	if(apr->mb & F0) apr->ar_ov_flag = 1;
+	if(apr->mb & F1) apr->ar_cry0_flag = 1;
+	if(apr->mb & F2) apr->ar_cry1_flag = 1;
+	if(apr->mb & F3) apr->ar_pc_chg_flag = 1;
+	if(apr->mb & F4) apr->chf7 = 1;			// 6-19
+	if(apr->mb & F5) apr->ex_mode_sync = 1;		// 5-13
 	recalc_cpa_req(apr);
 }
 
@@ -2411,10 +2411,9 @@ defpulse_(et10)
 		swap(&apr->mb, &apr->ar);		// 6-3
 	if(MEMAC || apr->ir_as){
 		// 6-10
-		apr->ar_cry0_flag = apr->ar_cry0;
-		apr->ar_cry1_flag = apr->ar_cry1;
+		if(apr->ar_cry0) apr->ar_cry0_flag = 1;
+		if(apr->ar_cry1) apr->ar_cry1_flag = 1;
 	}
-
 	if(apr->ir_fwt && !apr->ar_cry0 && apr->ar_cry1 ||
 	   (MEMAC || apr->ir_as) && AR_OV_SET){
 		apr->ar_ov_flag = 1;			// 6-10
@@ -2677,8 +2676,6 @@ defpulse(et0a)
 		debug("%s\n", mnemonics[apr->inst]);
 	else
 		debug("%s\n", iomnemonics[apr->io_inst>>5 & 7]);
-if(apr->inst == 0)
-exit(0);
 
 	if(PI_HOLD)
 		set_pih(apr, apr->pi_req);	// 8-3, 8-4
@@ -3034,6 +3031,7 @@ defpulse(mc_rq_1)
 
 defpulse(mc_stop_1)
 {
+	// TODO: it's important this pulse come *before* MC RS T0
 	apr->mc_stop = 1;		// 7-9
 	if(apr->key_mem_cont)
 		pulse(apr, &kt4, 0);	// 5-2
@@ -3351,11 +3349,11 @@ aprcycle(void *p)
 	if(apr->membus.c12 & MEMBUS_MAI_ADDR_ACK){
 		apr->membus.c12 &= ~MEMBUS_MAI_ADDR_ACK;
 		apr->extpulse &= ~EXT_NONEXIT_MEM;
-		pulse(apr, &mai_addr_ack, 1);
+		pulse(apr, &mai_addr_ack, 200);
 	}
 	if(apr->membus.c12 & MEMBUS_MAI_RD_RS){
 		apr->membus.c12 &= ~MEMBUS_MAI_RD_RS;
-		pulse(apr, &mai_rd_rs, 1);
+		pulse(apr, &mai_rd_rs, 200);
 	}
 	if(apr->mc_rd && apr->membus.c34){
 		/* 7-6, 7-9 */
