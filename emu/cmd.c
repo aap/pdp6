@@ -539,7 +539,8 @@ sblk:
 
 			chk = (chk<<1 | chk>>35) + w & FW;
 
-			dep(right(iowd), 0, w);
+			if(d)
+				dep(right(iowd), 0, w);
 			iowd += 01000001;
 		}
 		if(readwits(fp) != chk)

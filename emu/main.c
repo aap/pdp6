@@ -230,9 +230,9 @@ updateapr(Apr *apr, Ptr *ptr)
 		}
 	}
 
-	setelements(apr->mb, mb_l, 36);
-	setelements(apr->ar, ar_l, 36);
-	setelements(apr->mq, mq_l, 36);
+	setelements(apr->c.mb, mb_l, 36);
+	setelements(apr->c.ar, ar_l, 36);
+	setelements(apr->c.mq, mq_l, 36);
 
 	ff_l[0].state = apr->key_ex_st;
 	ff_l[1].state = apr->key_ex_sync;
@@ -272,7 +272,7 @@ updateapr(Apr *apr, Ptr *ptr)
 
 	ff_l[32].state = apr->fdf1;
 	ff_l[33].state = apr->fdf2;
-	ff_l[34].state = apr->ir & H6 && apr->mq & F1 && !apr->nrf3;
+	ff_l[34].state = apr->ir & H6 && apr->c.mq & F1 && !apr->nrf3;
 	ff_l[35].state = apr->nrf1;
 	ff_l[36].state = apr->nrf2;
 	ff_l[37].state = apr->nrf3;

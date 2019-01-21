@@ -307,6 +307,13 @@ enum Extpulse {
 	EXT_NONEXIT_MEM      = 4
 };
 
+/* everything that is read AND written at the same time */
+struct AprState
+{
+	word ar;
+	word mb;
+	word mq;
+};
 
 struct Apr
 {
@@ -315,15 +322,13 @@ struct Apr
 	Membus membus;
 	int powered;
 
+	struct AprState c, n;
 	hword ir;
 	word mi;
 	word data;
 	hword pc;
 	hword ma;
 	hword mas;
-	word mb;
-	word ar;
-	word mq;
 	bool mq36;
 	u16 sc, fe;
 	u8 pr, rlr, rla;
