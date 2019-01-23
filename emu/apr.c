@@ -99,6 +99,30 @@ pfree(Apr *apr, TPulse *p)
 	apr->pfree = p;
 }
 
+static void
+tracechange(Apr *apr)
+{
+	static char buf[256], *p;
+
+	p = buf;
+	if(apr->c.ar != apr->n.ar)
+		p += sprintf(p, " AR/%012lo", apr->n.ar);
+	if(apr->c.mb != apr->n.mb)
+		p += sprintf(p, " MB/%012lo", apr->n.mb);
+	if(apr->c.mq != apr->n.mq)
+		p += sprintf(p, " MQ/%012lo", apr->n.mq);
+	if(p != buf)
+		trace("%s\n", buf);
+}
+
+static void
+tracestate(Apr *apr)
+{
+	trace("AR/%012lo MQ/%012lo.%d MB/%012lo MA/%06o SC/%03o FE/%03o\n",
+		apr->c.ar, apr->c.mq, apr->mq36, apr->c.mb,
+		apr->ma, apr->sc, apr->fe);
+}
+
 static int
 stepone(Apr *apr)
 {
@@ -121,7 +145,9 @@ stepone(Apr *apr)
 		pfree(apr, p);
 		i++;
 	}
+//	tracechange(apr);
 	apr->c = apr->n;
+	tracestate(apr);
 	return i;
 }
 
@@ -428,10 +454,10 @@ void
 ar_cry_in(Apr *apr, word c)
 {
 	word a;
-	a = (apr->c.ar & ~F0) + c;
+	a = (apr->n.ar & ~F0) + c;
 	apr->n.ar += c;
-	apr->ar_cry0 = !!(apr->n.ar & FCRY);
-	apr->ar_cry1 = !!(a         &  F0);
+	if(apr->n.ar & FCRY) apr->ar_cry0 = 1;
+	if(a         &   F0) apr->ar_cry1 = 1;
 	apr->n.ar &= FW;
 	ar_cry(apr);
 }
@@ -1298,9 +1324,9 @@ defpulse(dct1)
 defpulse_(dct0a)
 {
 	apr->dcf1 = 0;			// 6-20
-	apr->n.mq |= apr->c.mb;		// 6-17 dct0b
+	apr->n.mq |= apr->c.mb;		// 6-13 dct0b
 	apr->n.mb = apr->c.mq;		// 6-17
-	apr->c.ar = ~apr->n.ar & FW;	// 6-17
+	apr->n.ar = ~apr->c.ar & FW;	// 6-17
 	pulse(apr, &dct1, 150);		// 6-20
 }
 
@@ -1383,6 +1409,8 @@ defpulse(cht6)
 		apr->sc = 0;		// 6-15
 	apr->chf2 = 1;			// 6-19
 	pulse(apr, &cht7, 150);		// 6-19
+//if(apr->pc > 0470)
+//apr->pulsestepping = 1;
 }
 
 defpulse(cht5)
@@ -1587,12 +1615,17 @@ defpulse(dst15)
 	pulse(apr, &cfac_ar_add, 0);	// 6-17
 }
 
-defpulse(dst14b)
+defpulse(dst14b_dly)
 {
 	if(apr->sc == 0777)
-		pulse(apr, &dst16, 100);	// 6-26
+		pulse(apr, &dst16, 0);	// 6-26
 	else
-		pulse(apr, MQ35_XOR_MB0 ? &dst14 : &dst15, 100);	// 6-26
+		pulse(apr, MQ35_XOR_MB0 ? &dst14 : &dst15, 0);	// 6-26
+}
+
+defpulse(dst14b)
+{
+	pulse(apr, &dst14b_dly, 100);	// 6-26
 }
 
 defpulse(dst14a)
@@ -2186,9 +2219,10 @@ defpulse(ar_cry_comp)
 
 defpulse_(ar_pm1_t1)
 {
-	ar_cry_in(apr, 1);			// 6-6
 	if(apr->inst == BLT || AR_PM1_LTRT)
-		ar_cry_in(apr, 01000000);	// 6-9
+		ar_cry_in(apr, 01000001);	// 6-9
+	else
+		ar_cry_in(apr, 1);		// 6-6
 	// There must be some delay after the carry is done
 	// but I don't quite know how this works,
 	// so we just use 50ns a an imaginary value
@@ -2392,6 +2426,7 @@ defpulse(st1)
 
 defpulse_(et10)
 {
+//trace("AR/%012lo MB/%012lo\n", apr->c.ar, apr->c.mb);
 	bool sc_e = SC_E;
 
 	if(PI_HOLD){
@@ -2503,6 +2538,7 @@ defpulse_(et5)
 
 defpulse_(et4)
 {
+//trace("AR/%012lo MB/%012lo\n", apr->c.ar, apr->c.mb);
 	apr->et4_ar_pse = 0;		// 5-5
 	if(IOT_BLK)
 		apr->ex_ill_op = 0;	// 5-13
@@ -2540,6 +2576,7 @@ defpulse_(et4)
 
 defpulse(et3)
 {
+//trace("AR/%012lo MB/%012lo\n", apr->c.ar, apr->c.mb);
 	if(apr->ex_ir_uuo){
 		// MBLT <- IR(1) (UUO T0) on 6-3
 		apr->n.mb |= ((word)apr->ir&0777740) << 18;	// 6-1
@@ -2585,6 +2622,7 @@ defpulse(et3)
 
 defpulse(et1)
 {
+//trace("AR/%012lo MB/%012lo\n", apr->c.ar, apr->c.mb);
 	if(apr->ex_ir_uuo){
 		apr->ex_ill_op = 1;		// 5-13
 		apr->n.mb &= RT;		// 6-3
@@ -2674,6 +2712,9 @@ defpulse(et0a)
 	else
 		debug("%s\n", iomnemonics[apr->io_inst>>5 & 7]);
 
+//trace("AR/%012lo MB/%012lo\n", apr->c.ar, apr->c.mb);
+//trace("AR/%012lo MB/%012lo\n", apr->n.ar, apr->n.mb);
+
 	if(PI_HOLD)
 		set_pih(apr, apr->pi_req);	// 8-3, 8-4
 	if(apr->key_ex_sync)
@@ -2747,8 +2788,12 @@ defpulse(ft7)
 defpulse(ft6a)
 {
 	apr->f6a = 0;			// 5-4
-	pulse(apr, &et0a, 0);		// 5-5
-	pulse(apr, &et0, 0);		// 5-5
+	// HACK: if we fetch nothing at all we get to ET0(A)
+	// from AT4, where we clear ARLT, without simulated delay.
+	// In the real machines the values must have settled by then,
+	// so introduce a fake delay to update our state.
+	pulse(apr, &et0a, 1);		// 5-5
+	pulse(apr, &et0, 1);		// 5-5
 	pulse(apr, &et1, 100);		// 5-5
 }
 
@@ -3262,12 +3307,14 @@ aprcycle(void *p)
 	}else if(!apr->powered)
 		aprstart(apr);
 
+/*
 	if(apr->pulsestepping){
 		int c;
 		while(c = getchar(), c != EOF && c != '\n')
 			if(c == 'x')
 				apr->pulsestepping = 0;
 	}
+*/
 
 	apr->tick = getms();
 	if(apr->tick-apr->lasttick >= TIMESTEP){
