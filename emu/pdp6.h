@@ -304,7 +304,6 @@ struct TPulse
 enum Extpulse {
 	EXT_KEY_MANUAL       = 1,
 	EXT_KEY_INST_STOP    = 2,
-	EXT_NONEXIT_MEM      = 4
 };
 
 /* everything that is read AND written at the same time */

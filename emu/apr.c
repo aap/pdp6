@@ -59,6 +59,19 @@ static void wake_pi(void *dev);
 
 char *apr_ident = APR_IDENT;
 
+/*
+ * Pulse system
+ */
+
+static void
+pfree(Apr *apr, TPulse *p)
+{
+	p->next = apr->pfree;
+	apr->pfree = p;
+}
+
+/* Add a pulse to the list.
+ * NB: does *not* check if pulse is already queued. */
 static void
 pulse(Apr *apr, Pulse *p, int t)
 {
@@ -80,6 +93,21 @@ pulse(Apr *apr, Pulse *p, int t)
 	*pp = tp;
 }
 
+/* Remove pulse from list. Only first. */
+static void
+rempulse(Apr *apr, Pulse *p)
+{
+	TPulse *tp, **pp;
+
+	for(pp = &apr->pulse; *pp; pp = &(*pp)->next)
+		if((*pp)->p == p){
+			tp = *pp;
+			*pp = tp->next;
+			pfree(apr, tp);
+			break;
+		}
+}
+
 static void
 pprint(Apr *apr)
 {
@@ -91,12 +119,6 @@ pprint(Apr *apr)
 		t += p->t;
 		trace("%s %d %d\n", p->p->n, p->t, t);
 	}
-}
-static void
-pfree(Apr *apr, TPulse *p)
-{
-	p->next = apr->pfree;
-	apr->pfree = p;
 }
 
 static void
@@ -141,8 +163,8 @@ stepone(Apr *apr)
 		p = apr->pulse;
 		apr->pulse = p->next;
 		trace("pulse %s\n", p->p->n);
-		p->p->f(apr);
 		pfree(apr, p);
+		p->p->f(apr);
 		i++;
 	}
 //	tracechange(apr);
@@ -674,6 +696,7 @@ declpulse(dst14);
 declpulse(dct0a);
 declpulse(mst2);
 declpulse(mpt0a);
+declpulse(nrt2);
 declpulse(fst0a);
 declpulse(fmt0a);
 declpulse(fmt0b);
@@ -1625,6 +1648,7 @@ defpulse(dst14b_dly)
 
 defpulse(dst14b)
 {
+	// TODO: remove this perhaps?
 	pulse(apr, &dst14b_dly, 100);	// 6-26
 }
 
@@ -1822,16 +1846,26 @@ defpulse(nrt4)
 	pulse(apr, &nrt6, 0);		// 6-27
 }
 
+defpulse(nrt31_dly)
+{
+	pulse(apr, NR_ROUND ? &nrt5 : &nrt4, 0);	// 6-27
+}
+
 defpulse(nrt3)
 {
 	if(!(apr->sc & 0400))
 		SET_OVERFLOW;		// 6-17
 	if(!(apr->c.ar & F0) || NR_ROUND)
 		SC_COM;			// 6-15
-	pulse(apr, NR_ROUND ? &nrt5 : &nrt4, 100);	// 6-27
+	pulse(apr, &nrt31_dly, 100);	// 6-27
 }
 
-defpulse(nrt2)
+defpulse(nrt1_dly)
+{
+	pulse(apr, AR_EQ_FP_HALF || !AR9_EQ_AR0 ? &nrt3 : &nrt2, 0);	// 6-27
+}
+
+defpulse_(nrt2)
 {
 	word ar0_shl_inp, ar35_shl_inp;
 	word mq0_shl_inp, mq35_shl_inp;
@@ -1844,13 +1878,18 @@ defpulse(nrt2)
 	mq35_shl_inp = 0;
 	AR_SH_LT;	// 6-17
 	MQ_SH_LT;	// 6-17
-	pulse(apr, AR_EQ_FP_HALF || !AR9_EQ_AR0 ? &nrt3 : &nrt2, 150);	// 6-27
+	pulse(apr, &nrt1_dly, 150);	// 6-17
 }
 
 defpulse(nrt1)
 {
 	SC_COM;			// 6-15
-	pulse(apr, AR_EQ_FP_HALF || !AR9_EQ_AR0 ? &nrt3 : &nrt2, 100);	// 6-27
+	pulse(apr, &nrt1_dly, 100);	// 6-17
+}
+
+defpulse(nrt01_dly)
+{
+	pulse(apr, AR_0_AND_MQ1_0 ? &nrt6 : &nrt1, 0);	// 6-27
 }
 
 defpulse(nrt0)
@@ -1865,7 +1904,7 @@ defpulse(nrt0)
 	mq1_shr_inp = (apr->c.ar & F35) << 34;
 	AR_SH_RT;	// 6-17
 	MQ_SH_RT;	// 6-17
-	pulse(apr, AR_0_AND_MQ1_0 ? &nrt6 : &nrt1, 200);	// 6-27
+	pulse(apr, &nrt01_dly, 200);	// 6-27
 }
 
 defpulse_(nrt0_5)
@@ -1973,7 +2012,7 @@ defpulse_(fmt0b)
 	apr->fmf2 = 0;		// 6-22
 	apr->sc |= apr->fe;	// 6-15
 	apr->nrf2 = 1;		// 6-27
-	pulse(apr, AR_0_AND_MQ1_0 ? &nrt6 : &nrt1, 200);	// 6-27
+	pulse(apr, &nrt01_dly, 100);	// 6-27
 }
 
 defpulse_(fmt0a)
@@ -3059,6 +3098,12 @@ defpulse(mc_non_exist_mem)
 		pulse(apr, &mc_non_exist_mem_rst, 0);	// 7-9
 }
 
+defpulse(mc_error_dly)
+{
+	if(apr->mc_rq && !apr->mc_stop)
+		pulse(apr, &mc_non_exist_mem, 0);	// 7-9
+}
+
 defpulse(mc_illeg_address)
 {
 	apr->cpa_illeg_op = 1;				// 8-5
@@ -3073,7 +3118,7 @@ defpulse(mc_rq_1)
 
 defpulse(mc_stop_1)
 {
-	// TODO: it's important this pulse come *before* MC RS T0
+	// NOTE: it's important this pulse come *before* MC RS T0
 	apr->mc_stop = 1;		// 7-9
 	if(apr->key_mem_cont)
 		pulse(apr, &kt4, 0);	// 5-2
@@ -3086,8 +3131,11 @@ defpulse(mc_rq_pulse)
 	/* have to call this to set flags, do relocation and set address */
 	ma_ok = relocate(apr);
 	apr->mc_stop = 0;		// 7-9
-	/* hack to catch non-existent memory */
-	apr->extpulse |= EXT_NONEXIT_MEM;
+
+	/* this pulse is likely to be still queued. so remove first it. */
+	rempulse(apr, &mc_error_dly);
+	pulse(apr, &mc_error_dly, 100000);	// 7-9
+
 	if(ma_ok || apr->ex_inh_rel)
 		pulse(apr, &mc_rq_1, 50);
 	else
@@ -3395,7 +3443,6 @@ aprcycle(void *p)
 	/* Pulses from memory  */
 	if(apr->membus.c12 & MEMBUS_MAI_ADDR_ACK){
 		apr->membus.c12 &= ~MEMBUS_MAI_ADDR_ACK;
-		apr->extpulse &= ~EXT_NONEXIT_MEM;
 		// TODO: figure out a better delay
 		// NB: must be at least 200 because
 		//     otherwise MC STOP won't be set in time
@@ -3410,14 +3457,6 @@ aprcycle(void *p)
 		/* 7-6, 7-9 */
 		apr->n.mb |= apr->membus.c34;
 		apr->membus.c34 = 0;
-	}
-
-	/* TODO: do this differently because the
-	 * memory might have been busy. */
-	if(apr->extpulse & EXT_NONEXIT_MEM){
-		apr->extpulse &= ~EXT_NONEXIT_MEM;
-		if(apr->mc_rq && !apr->mc_stop)
-			pulse(apr, &mc_non_exist_mem, 1);	// 7-9
 	}
 
 	if(i)
