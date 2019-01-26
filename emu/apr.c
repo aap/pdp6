@@ -1,6 +1,9 @@
 #include "pdp6.h"
 #include <unistd.h>
 
+// Schematics don't have USER IOT implemented fully
+#define FIX_USER_IOT
+
 enum Opcode {
 	FSC    = 0132,
 	IBP    = 0133,
@@ -454,6 +457,19 @@ decodeir(Apr *apr)
 
 void recalc_cpa_req(Apr *apr);
 
+/*
+ * AR control signals
+ */
+
+#define ARLT_CLEAR apr->n.ar &= RT
+#define ARRT_CLEAR apr->n.ar &= LT
+#define AR_CLEAR apr->n.ar = 0
+#define ARLT_COM apr->n.ar ^= LT
+#define ARRT_COM apr->n.ar ^= RT
+#define AR_COM apr->n.ar ^= FW
+#define ARLT_FM_MB_J apr->n.ar = CONS(apr->c.mb, apr->n.ar)
+#define ARRT_FM_MB_J apr->n.ar = CONS(apr->n.ar, apr->c.mb)
+
 void
 ar_jfcl_clr(Apr *apr)
 {
@@ -484,6 +500,17 @@ ar_cry_in(Apr *apr, word c)
 	ar_cry(apr);
 }
 
+/*
+ * MB
+ */
+
+#define MBLT_CLEAR apr->n.mb &= RT
+#define MB_CLEAR apr->n.mb = 0
+
+/*
+ * PI control signals and helpers
+ */
+
 void
 set_pi_cyc(Apr *apr, bool value)
 {
@@ -507,9 +534,11 @@ get_pi_req(Apr *apr)
 	return 0;
 }
 
+#define PIH_CLEAR apr->pih = 0
+
 /* clear highest held break */
 void
-clear_pih(Apr *apr)
+pih0_fm_pi_ok1(Apr *apr)
 {
 	// 8-3
 	int chan;
@@ -523,22 +552,30 @@ clear_pih(Apr *apr)
 }
 
 void
-set_pir(Apr *apr, int pir)
+pih_fm_pi_ch_rq(Apr *apr)
 {
 	// 8-3
-	/* held breaks aren't retriggered */
-	apr->pir = pir & ~apr->pih;
-	apr->pi_req = get_pi_req(apr);
-}
-
-void
-set_pih(Apr *apr, int pih)
-{
-	// 8-3
-	apr->pih = pih;
+	apr->pih |= apr->pi_req;
 	apr->pir &= ~apr->pih;
 	apr->pi_req = get_pi_req(apr);
 }
+
+#define PIR_CLEAR apr->pir = 0
+#define PIR_FM_IOB1 set_pir(apr, apr->iobus.c12 & 0177)
+#define PIR_STB set_pir(apr, apr->iobus.c34 & apr->pio)
+
+void
+set_pir(Apr *apr, int pir)
+{
+	// 8-3
+	apr->pir |= pir;
+	/* held breaks aren't retriggered */
+	apr->pir &= ~apr->pih;
+	apr->pi_req = get_pi_req(apr);
+}
+
+#define PIO_FM_IOB1 apr->pio |= apr->iobus.c12&0177
+#define PIO0_FM_IOB1 apr->pio &= ~(apr->iobus.c12&0177)
 
 /* Recalculate the PI requests on the IO bus from each device */
 void
@@ -682,7 +719,6 @@ declpulse(et5);
 declpulse(et9);
 declpulse(et10);
 declpulse(st7);
-declpulse(pir_stb);
 declpulse(ar_negate_t0);
 declpulse(ar_pm1_t1);
 declpulse(ar_ast0);
@@ -714,8 +750,8 @@ declpulse(fat10);
 defpulse(pi_reset)
 {
 	apr->pi_active = 0;	// 8-4
-	apr->pih = 0;		// 8-4
-	apr->pir = 0;		// 8-4
+	PIH_CLEAR;		// 8-4
+	PIR_CLEAR;		// 8-4
 	apr->pi_req = get_pi_req(apr);
 	apr->pio = 0;		// 8-3
 }
@@ -739,6 +775,9 @@ defpulse(ar_flag_set)
 	if(apr->c.mb & F3) apr->ar_pc_chg_flag = 1;
 	if(apr->c.mb & F4) apr->chf7 = 1;		// 6-19
 	if(apr->c.mb & F5) apr->ex_mode_sync = 1;	// 5-13
+#ifdef FIX_USER_IOT
+	if(!apr->ex_user) apr->cpa_iot_user = !!(apr->c.mb & F6);
+#endif
 	recalc_cpa_req(apr);
 }
 
@@ -927,6 +966,16 @@ wake_cpa(void *dev)
 	if(IOB_CONO_SET){
 		if(bus->c12 & F18) apr->cpa_pdl_ov = 0;
 		if(bus->c12 & F19) bus->c34 |= IOBUS_IOB_RESET;	// 8-1
+#ifdef FIX_USER_IOT
+		// IO reset seems to reset this too?
+		if(bus->c12 & F19) apr->cpa_iot_user = 0;
+		// these bits seem to be flipped in the schematics
+		if(bus->c12 & F20) apr->cpa_iot_user = 0;
+		if(bus->c12 & F21) apr->cpa_iot_user = 1;
+#else
+		if(bus->c12 & F20) apr->cpa_iot_user = 1;
+		if(bus->c12 & F21) apr->cpa_iot_user = 0;
+#endif
 		if(bus->c12 & F22) apr->cpa_illeg_op = 0;
 		if(bus->c12 & F23) apr->cpa_non_exist_mem = 0;
 		if(bus->c12 & F24) apr->cpa_clock_enable = 0;
@@ -978,16 +1027,11 @@ wake_pi(void *dev)
 	}
 	if(IOB_CONO_SET){
 		trace("PI CONO SET %llo\n", bus->c12);
-		if(bus->c12 & F24)
-			set_pir(apr, apr->pir | bus->c12&0177);
-		if(bus->c12 & F25)
-			apr->pio |= bus->c12&0177;
-		if(bus->c12 & F26)
-			apr->pio &= ~(bus->c12&0177);
-		if(bus->c12 & F27)
-			apr->pi_active = 0;
-		if(bus->c12 & F28)
-			apr->pi_active = 1;
+		if(bus->c12 & F24) PIR_FM_IOB1;
+		if(bus->c12 & F25) PIO_FM_IOB1;
+		if(bus->c12 & F26) PIO0_FM_IOB1;
+		if(bus->c12 & F27) apr->pi_active = 0;
+		if(bus->c12 & F28) apr->pi_active = 1;
 	}
 }
 
@@ -1058,6 +1102,7 @@ defpulse(iot_t0)
 
 defpulse(uuo_t2)
 {
+	apr->inst_ma = apr->ma;		// remember where we got the instruction from
 	apr->if1a = 1;			// 5-3
 	pulse(apr, &mc_rd_rq_pulse, 0);	// 7-8
 }
@@ -1098,7 +1143,7 @@ defpulse(blt_t5)
 defpulse(blt_t4)
 {
 	SWAP(mb, ar);			// 6-3
-	pulse(apr, &pir_stb, 0);	// 8-4
+	PIR_STB;			// 8-4
 	pulse(apr, &blt_t5, 100);	// 6-18
 }
 
@@ -1117,7 +1162,7 @@ defpulse(blt_t3)
 
 defpulse(blt_t2)
 {
-	apr->n.ar &= RT;		// 6-8
+	ARLT_CLEAR;			// 6-8
 	pulse(apr, &blt_t3, 100);	// 6-18
 }
 
@@ -1333,7 +1378,7 @@ defpulse(dct3)
 
 defpulse(dct2)
 {
-	apr->n.ar = ~apr->c.ar & FW;	// 6-17
+	AR_COM;				// 6-17
 	pulse(apr, &dct3, 100);		// 6-20
 }
 
@@ -1349,7 +1394,7 @@ defpulse_(dct0a)
 	apr->dcf1 = 0;			// 6-20
 	apr->n.mq |= apr->c.mb;		// 6-13 dct0b
 	apr->n.mb = apr->c.mq;		// 6-17
-	apr->n.ar = ~apr->c.ar & FW;	// 6-17
+	AR_COM;				// 6-17
 	pulse(apr, &dct1, 150);		// 6-20
 }
 
@@ -1426,14 +1471,12 @@ defpulse(cht7)
 
 defpulse(cht6)
 {
-	apr->n.ar = apr->c.ar & 0007777777777 |
+	apr->n.ar = apr->n.ar & 0007777777777 |
 		(((word)apr->sc & 077) << 30);	// 6-9, 6-4
 	if(CH_INC_OP)
 		apr->sc = 0;		// 6-15
 	apr->chf2 = 1;			// 6-19
 	pulse(apr, &cht7, 150);		// 6-19
-//if(apr->pc > 0470)
-//apr->pulsestepping = 1;
 }
 
 defpulse(cht5)
@@ -1545,7 +1588,7 @@ defpulse(mst1)
 {
 	apr->n.mq = apr->c.mb;		// 6-13
 	apr->n.mb = apr->c.ar;		// 6-3
-	apr->n.ar = 0;			// 6-8
+	AR_CLEAR;			// 6-8
 	if(MQ35_EQ_MQ36 && apr->sc != 0777)
 		pulse(apr, &mst2, 200);	// 6-24
 	if(!(apr->c.mq&F35) && apr->mq36)
@@ -1744,7 +1787,7 @@ defpulse(dst8)
 defpulse(dst7)
 {
 	SWAP(mb, mq);			// 6-17
-	apr->n.ar = ~apr->c.ar & FW;	// 6-17
+	AR_COM;				// 6-17
 	pulse(apr, &dst10, 0);		// 6-25
 }
 
@@ -1782,7 +1825,7 @@ defpulse(dst3)
 defpulse(dst2)
 {
 	SWAP(mb, mq);			// 6-17
-	apr->n.ar = 0;			// 6-8
+	AR_CLEAR;			// 6-8
 	pulse(apr, &dst10, 0);		// 6-25
 }
 
@@ -1842,7 +1885,7 @@ defpulse(nrt5)
 
 defpulse(nrt4)
 {
-	apr->n.ar |= apr->c.ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4, 6-9
+	apr->n.ar |= apr->n.ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4, 6-9
 	pulse(apr, &nrt6, 0);		// 6-27
 }
 
@@ -1925,7 +1968,7 @@ defpulse_(fst0a)
 	apr->fsf1 = 0;	// 6-19
 	if(!AR0_EQ_SC0)
 		SET_OVERFLOW;	// 6-17
-	apr->n.ar |= apr->c.ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4, 6-9
+	apr->n.ar |= apr->n.ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4, 6-9
 	pulse(apr, &et10, 0);	// 5-5
 }
 
@@ -2105,7 +2148,7 @@ defpulse(fat7)
 
 defpulse(fat6)
 {
-	apr->n.ar = 0;		// 6-8
+	AR_CLEAR;		// 6-8
 	pulse(apr, &fat5a, 0);	// 6-22
 }
 
@@ -2194,7 +2237,7 @@ defpulse_(mpt0a)
 {
 	apr->mpf1 = 0;				// 6-21
 	if(!(apr->ir & H6) && apr->c.ar & F0)
-		apr->n.ar = ~apr->c.ar & FW;	// 6-17
+		AR_COM;				// 6-17
 	if(apr->c.ar & F0 && apr->mpf2)
 		SET_OVERFLOW;			// 6-17
 	if(apr->ir & H6)
@@ -2251,7 +2294,7 @@ defpulse(art3)
 defpulse(ar_cry_comp)
 {
 	if(apr->ar_com_cont){
-		apr->n.ar = ~apr->c.ar & FW;	// 6-8
+		AR_COM;				// 6-8
 		pulse(apr, &art3, 100);		// 6-9
 	}
 }
@@ -2272,14 +2315,14 @@ defpulse_(ar_pm1_t1)
 
 defpulse(ar_pm1_t0)
 {
-	apr->n.ar = ~apr->c.ar & FW;	// 6-8
+	AR_COM;				// 6-8
 	apr->ar_com_cont = 1;		// 6-9
 	pulse(apr, &ar_pm1_t1, 100);	// 6-9
 }
 
 defpulse_(ar_negate_t0)
 {
-	apr->n.ar = ~apr->c.ar & FW;	// 6-8
+	AR_COM;				// 6-8
 	pulse(apr, &ar_pm1_t1, 100);	// 6-9
 }
 
@@ -2300,7 +2343,7 @@ defpulse_(ar_ast1)
 
 defpulse_(ar_ast0)
 {
-	apr->n.ar = ~apr->c.ar & FW;	// 6-8
+	AR_COM;				// 6-8
 	apr->ar_com_cont = 1;		// 6-9
 	pulse(apr, &ar_ast1, 100);	// 6-9
 }
@@ -2323,16 +2366,10 @@ defpulse(xct_t0)
 #define PI_RST (apr->ir_jrst && apr->ir & H9 || PI_BLK_RST && apr->pi_cyc)
 #define PI_HOLD ((!apr->ir_iot || PI_BLK_RST) && apr->pi_cyc)
 
-defpulse_(pir_stb)
-{
-	set_pir(apr, apr->pir | apr->pio & apr->iobus.c34);	// 8-3
-}
-
 defpulse(pi_sync)
 {
-	/* Call directly, we need the result in this pulse */
 	if(!apr->pi_cyc)
-		pir_stb_p(apr);			// 8-4
+		PIR_STB;			// 8-4
 	if(apr->pi_req && !apr->pi_cyc)
 		pulse(apr, &iat0, 200);		// 5-3
 	if(IA_NOT_INT)
@@ -2465,7 +2502,6 @@ defpulse(st1)
 
 defpulse_(et10)
 {
-//trace("AR/%012lo MB/%012lo\n", apr->c.ar, apr->c.mb);
 	bool sc_e = SC_E;
 
 	if(PI_HOLD){
@@ -2538,7 +2574,7 @@ defpulse(et7)
 	if(apr->inst == JSR && (apr->ex_pi_sync || apr->ex_ill_op))
 		apr->ex_user = 0;	// 5-13
 	if(apr->ir_acbm)
-		apr->n.ar = ~apr->c.ar & FW;	// 6-8
+		AR_COM;				// 6-8
 	pulse(apr, &et8, 100);			// 5-5
 }
 
@@ -2556,6 +2592,9 @@ defpulse(et6)
 		if(apr->ar_pc_chg_flag) apr->n.mb |= F3;
 		if(apr->chf7)           apr->n.mb |= F4;
 		if(apr->ex_user)        apr->n.mb |= F5;
+#ifdef FIX_USER_IOT
+		if(apr->cpa_iot_user)   apr->n.mb |= F6;
+#endif
 	}
 	if(IOT_CONSZ || IOT_CONSO)
 		apr->n.ar &= apr->c.mb;	// 6-8
@@ -2565,9 +2604,9 @@ defpulse(et6)
 defpulse_(et5)
 {
 	if(MB_PC_STO)
-		apr->n.mb = 0;			// 6-3
+		MB_CLEAR;			// 6-3
 	if(apr->ir_acbm)
-		apr->n.ar = ~apr->c.ar & FW;	// 6-8
+		AR_COM;				// 6-8
 	apr->pc_set = PC_SET;
 	if(E_LONG)				// 5-5
 		pulse(apr, &et6, 100);
@@ -2577,7 +2616,6 @@ defpulse_(et5)
 
 defpulse_(et4)
 {
-//trace("AR/%012lo MB/%012lo\n", apr->c.ar, apr->c.mb);
 	apr->et4_ar_pse = 0;		// 5-5
 	if(IOT_BLK)
 		apr->ex_ill_op = 0;	// 5-13
@@ -2590,15 +2628,15 @@ defpulse_(et4)
 	                     apr->ir_boole_op == 015 ||
 	                     apr->ir_boole_op == 016 ||
 	                     apr->ir_boole_op == 017))
-		apr->n.ar = ~apr->c.ar & FW;
+		AR_COM;
 	if(HWT_LT || IOT_CONO)
-		apr->n.ar = CONS(apr->c.mb, apr->n.ar);
+		ARLT_FM_MB_J;
 	if(HWT_RT)
-		apr->n.ar = CONS(apr->n.ar, apr->c.mb);
+		ARRT_FM_MB_J;
 	if(HWT_LT_SET)
-		apr->n.ar ^= 0777777000000;
+		ARLT_COM;
 	if(HWT_RT_SET)
-		apr->n.ar ^= 0000000777777;
+		ARRT_COM;
 
 	if(FWT_SWAP || IOT_BLK || apr->ir_acbm)
 		SWAP(mb, ar);			// 6-3
@@ -2615,7 +2653,6 @@ defpulse_(et4)
 
 defpulse(et3)
 {
-//trace("AR/%012lo MB/%012lo\n", apr->c.ar, apr->c.mb);
 	if(apr->ex_ir_uuo){
 		// MBLT <- IR(1) (UUO T0) on 6-3
 		apr->n.mb |= ((word)apr->ir&0777740) << 18;	// 6-1
@@ -2661,17 +2698,16 @@ defpulse(et3)
 
 defpulse(et1)
 {
-//trace("AR/%012lo MB/%012lo\n", apr->c.ar, apr->c.mb);
 	if(apr->ex_ir_uuo){
 		apr->ex_ill_op = 1;		// 5-13
-		apr->n.mb &= RT;		// 6-3
+		MBLT_CLEAR;		// 6-3
 	}
 	if(apr->ir_jrst && apr->ir & H12)
 		apr->ex_mode_sync = 1;		// 5-13
 	if(apr->ir_jrst && apr->ir & H11)
 		ar_flag_set_p(apr);		// 6-10
 	if(PI_RST)
-		clear_pih(apr);			// 8-4
+		pih0_fm_pi_ok1(apr);			// 8-4
 
 	// 6-3
 	if(apr->ir_acbm)
@@ -2695,7 +2731,7 @@ defpulse(et1)
 	   ACBM_SET)
 		apr->n.ar |= apr->c.mb;
 	if(HWT_AR_0 || IOT_STATUS || IOT_DATAI)
-		apr->n.ar = 0;
+		AR_CLEAR;
 
 	if(HWT_SWAP || FWT_SWAP || apr->inst == BLT)
 		apr->n.mb = SWAPLTRT(apr->c.mb);
@@ -2745,17 +2781,14 @@ defpulse(et0)
 
 defpulse(et0a)
 {
-	debug("%o: ", apr->pc);
+	debug("%06o: ", apr->inst_ma);
 	if((apr->inst & 0700) != 0700)
 		debug("%s\n", mnemonics[apr->inst]);
 	else
 		debug("%s\n", iomnemonics[apr->io_inst>>5 & 7]);
 
-//trace("AR/%012lo MB/%012lo\n", apr->c.ar, apr->c.mb);
-//trace("AR/%012lo MB/%012lo\n", apr->n.ar, apr->n.mb);
-
 	if(PI_HOLD)
-		set_pih(apr, apr->pi_req);	// 8-3, 8-4
+		pih_fm_pi_ch_rq(apr);	// 8-3, 8-4
 	if(apr->key_ex_sync)
 		apr->key_ex_st = 1;		// 5-1
 	if(apr->key_dep_sync)
@@ -2768,13 +2801,13 @@ defpulse(et0a)
 	                     apr->ir_boole_op == 03 ||
 	                     apr->ir_boole_op == 014 ||
 	                     apr->ir_boole_op == 017))
-		apr->n.ar = 0;			// 6-8
+		AR_CLEAR;			// 6-8
 	if(apr->ir_boole && (apr->ir_boole_op == 02 ||
 	                     apr->ir_boole_op == 04 ||
 	                     apr->ir_boole_op == 012 ||
 	                     apr->ir_boole_op == 013 ||
 	                     apr->ir_boole_op == 015))
-		apr->n.ar = ~apr->c.ar & FW;	// 6-8
+		AR_COM;				// 6-8
 	if(apr->fwt_00 || apr->fwt_11 || apr->hwt_11 || MEMAC_MEM ||
 	   IOT_BLK || IOT_DATAO)
 		apr->n.ar = apr->c.mb;		// 6-8
@@ -2919,7 +2952,7 @@ defpulse(at5)
 
 defpulse(at4)
 {
-	apr->n.ar &= ~LT;		// 6-8
+	ARLT_CLEAR;		// 6-8
 	// TODO: what is MC DR SPLIT? what happens here anyway?
 	if(apr->sw_addr_stop || apr->key_mem_stop)
 		apr->mc_split_cyc_sync = 1;	// 7-9
@@ -2959,8 +2992,7 @@ defpulse_(at1)
 
 defpulse_(at0)
 {
-	apr->n.ar &= ~RT;			// 6-8
-	apr->n.ar |= apr->c.mb & RT;	// 6-8
+	ARRT_FM_MB_J;			// 6-8
 	apr->ir |= apr->c.mb>>18 & 037;	// 5-7
 	apr->ma = 0;			// 7-3
 	apr->af0 = 0;			// 5-3
@@ -2992,6 +3024,7 @@ defpulse_(it1)
 		apr->ma |= apr->pc;		// 7-3
 	if(apr->pi_ov)
 		apr->ma = (apr->ma+1)&RT;	// 7-3
+	apr->inst_ma = apr->ma;			// remember where we got the instruction from
 	apr->if1a = 1;				// 5-3
 	pulse(apr, &mc_rd_rq_pulse, 0);		// 7-8
 }
@@ -3148,7 +3181,7 @@ defpulse_(mc_rdwr_rq_pulse)
 {
 	set_mc_rd(apr, 1);		// 7-9
 	set_mc_wr(apr, 1);		// 7-9
-	apr->n.mb = 0;			// 7-8
+	MB_CLEAR;			// 7-8
 	apr->mc_stop_sync = 1;		// 7-9
 	pulse(apr, &mc_rq_pulse, 0);	// 7-8
 }
@@ -3157,7 +3190,7 @@ defpulse_(mc_rd_rq_pulse)
 {
 	set_mc_rd(apr, 1);		// 7-9
 	set_mc_wr(apr, 0);		// 7-9
-	apr->n.mb = 0;			// 7-8
+	MB_CLEAR;			// 7-8
 	pulse(apr, &mc_rq_pulse, 0);	// 7-8
 }
 
@@ -3275,7 +3308,7 @@ defpulse_(kt1)
 	if(apr->key_ex_nxt  || apr->key_dep_nxt)
 		apr->ma = (apr->ma+1)&RT;	// 5-2
 	if(KEY_EXECUTE_DP_DPNXT)
-		apr->n.ar = 0;			// 5-2
+		AR_CLEAR;			// 5-2
 
 	pulse(apr, &kt2, 200);	// 5-2
 }

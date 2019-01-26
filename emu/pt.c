@@ -251,7 +251,7 @@ makeptp(int argc, char *argv[])
 	ptp->dev.ioconnect = ptpioconnect;
 	ptp->fd = -1;
 
-	th = (Thread){ nil, ptpcycle, ptp, 1, 0 };
+	th = (Thread){ nil, ptpcycle, ptp, 1000, 0 };
 	addthread(th);
 	return &ptp->dev;
 }
@@ -271,7 +271,7 @@ makeptr(int argc, char *argv[])
 	ptr->dev.ioconnect = ptrioconnect;
 	ptr->fd = -1;
 
-	th = (Thread){ nil, ptrcycle, ptr, 1, 0 };
+	th = (Thread){ nil, ptrcycle, ptr, 1000, 0 };
 	addthread(th);
 	return &ptr->dev;
 }

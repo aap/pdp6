@@ -401,6 +401,7 @@ struct Apr
 	bool ex_inh_rel;
 
 	/* decoded instructions */
+	hword inst_ma;		/* for debug, memory address of instruction */
 	int inst, io_inst;
 	bool ir_fp;
 	bool ir_fwt;
