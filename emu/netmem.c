@@ -25,11 +25,12 @@ netmemcycle(void *dev)
 	if(!hasinput(nm->fd))
 		return;
 
-	if(readn(nm->fd, &len, 1)){
+	if(readn(nm->fd, buf, 2)){
 		fprintf(stderr, "netmem fd closed\n");
 		nm->fd = -1;
 		return;
 	}
+	len = buf[0]<<8 | buf[1];
 	if(len > 9){
 		fprintf(stderr, "netmem botch, closing\n");
 		close(nm->fd);
@@ -50,23 +51,25 @@ netmemcycle(void *dev)
 		if(p == nil) goto err;
 		*p = d;
 		printf("write %06lo %012lo\n", a, d);
-		buf[0] = 1;
-		buf[1] = ACK;
-		writen(nm->fd, buf, buf[0]+1);
+		buf[0] = 0;
+		buf[1] = 1;
+		buf[2] = ACK;
+		writen(nm->fd, buf, buf[1]+2);
 		break;
 	case RDRQ:
 		p = getmemref(&nm->apr->membus, a, 0);
 		if(p == nil) goto err;
 		d = *p;
 		printf("read %06lo %012lo\n", a, d);
-		buf[0] = 6;
-		buf[1] = ACK;
-		buf[2] = d;
-		buf[3] = d>>8;
-		buf[4] = d>>16;
-		buf[5] = d>>24;
-		buf[6] = d>>32;
-		writen(nm->fd, buf, buf[0]+1);
+		buf[0] = 0;
+		buf[1] = 6;
+		buf[2] = ACK;
+		buf[3] = d;
+		buf[4] = d>>8;
+		buf[5] = d>>16;
+		buf[6] = d>>24;
+		buf[7] = d>>32;
+		writen(nm->fd, buf, buf[1]+2);
 		break;
 	default:
 		fprintf(stderr, "unknown netmem message %d\n", buf[0]);
