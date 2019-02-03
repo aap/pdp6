@@ -3,6 +3,8 @@
 
 // Schematics don't have USER IOT implemented fully
 #define FIX_USER_IOT
+// Schematics have a bug in the divide subroutine
+#define FIX_DS
 
 enum Opcode {
 	FSC    = 0132,
@@ -1800,7 +1802,14 @@ defpulse(dst6)
 defpulse(dst5a)
 {
 	apr->dsf2 = 0;				// 6-25
+#ifdef FIX_DS
+	/* we have to ignore the lower sign bit
+	 * for carry propagation */
+	pulse(apr, apr->c.ar & 0377777777777 ?
+		&dst6 : &dst8, 100);	// 6-25
+#else
 	pulse(apr, apr->c.ar ? &dst6 : &dst8, 100);	// 6-25
+#endif
 }
 
 defpulse(dst5)
