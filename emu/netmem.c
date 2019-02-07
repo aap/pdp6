@@ -120,6 +120,7 @@ makenetmem(int argc, char *argv[])
 	nm->fd = dial(host, port);
 	if(nm->fd < 0)
 		printf("couldn't connect\n");
+	printf("netmem fd: %d\n", nm->fd);
 
 	th = (Thread){ nil, netmemcycle, nm, 50, 0 };
 	addthread(th);
