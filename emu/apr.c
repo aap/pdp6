@@ -3059,6 +3059,19 @@ defpulse_(it0)
  * Memory Control
  */
 
+defpulse(mi_fm_mb)
+{
+	// 7-7
+	apr->mi |= apr->c.mb;
+}
+
+defpulse(mi_clr)
+{
+	// 7-7
+	apr->mi = 0;
+	pulse(apr, &mi_fm_mb, 100);
+}
+
 defpulse(mai_addr_ack)
 {
 	pulse(apr, &mc_addr_ack, 0);	// 7-8
@@ -3067,7 +3080,7 @@ defpulse(mai_addr_ack)
 defpulse(mai_rd_rs)
 {
 	if(apr->ma == apr->mas)
-		apr->mi = apr->c.mb;		// 7-7
+		pulse(apr, &mi_clr, 0);		// 7-7
 	if(!apr->mc_stop)
 		pulse(apr, &mc_rs_t0, 0);	// 7-8
 }
@@ -3076,7 +3089,7 @@ defpulse(mc_rs_t1)
 {
 	set_mc_rd(apr, 0);			// 7-9
 	if(apr->key_ex_nxt || apr->key_dep_nxt)
-		apr->mi = apr->c.mb;		// 7-7
+		pulse(apr, &mi_clr, 0);		// 7-7
 
 	if(apr->key_rd_wr) pulse(apr, &key_rd_wr_ret, 0);	// 5-2
 	if(apr->sf7) pulse(apr, &st7, 0);			// 5-6
@@ -3105,7 +3118,7 @@ defpulse_(mc_rs_t0)
 defpulse_(mc_wr_rs)
 {
 	if(apr->ma == apr->mas)
-		apr->mi = apr->c.mb;	// 7-7
+		pulse(apr, &mi_clr, 0);		// 7-7
 	apr->membus.c34 |= apr->c.mb;		// 7-8
 	apr->membus.c12 |= MEMBUS_WR_RS;	// 7-8
 	if(!apr->mc_stop)
