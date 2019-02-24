@@ -244,7 +244,6 @@ makedc(int argc, char *argv[])
 
 	dc->dev.type = dc_ident;
 	dc->dev.name = "";
-	dc->dev.attach = nil;
 	dc->dev.ioconnect = dcioconnect;
 
 	return &dc->dev;

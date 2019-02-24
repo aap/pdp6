@@ -33,6 +33,36 @@ readmem(const char *file, word *mem, word size)
 	fclose(f);
 }
 
+void
+writemem(const char *file, word *mem, word size)
+{
+	FILE *f;
+	hword i, a;
+
+	if(f = fopen(file, "w"), f == nil)
+		return;
+
+	a = 0;
+	for(i = 0; i < size; i++)
+		if(mem[i] != 0){
+			if(a != i){
+				a = i;
+				fprintf(f, "%06o:\n", a);
+			}
+			fprintf(f, "%012lo\n", mem[a++]);
+		}
+
+	fclose(f);
+}
+
+static void
+synccore(Mem *mem)
+{
+	CMem *core;
+	core = mem->module;
+	writemem(core->filename, core->core, 040000);
+}
+
 /* Both functions below are very confusing. I'm sorry.
  * The schematics cannot be converted to C in a straightfoward way
  * but I tried my best. */
@@ -245,11 +275,9 @@ makecoremem(const char *file)
 	memset(core, 0, sizeof(CMem));
 	core->filename = strdup(file);
 	mem = malloc(sizeof(Mem));
+	memset(mem, 0, sizeof(Mem));
 	mem->dev.type = cmem_ident;
 	mem->dev.name = "";
-	mem->dev.attach = nil;
-	mem->dev.ioconnect = nil;
-	mem->dev.next = nil;
 
 	mem->module = core;
 	mem->bus[0] = &memterm;
@@ -258,6 +286,7 @@ makecoremem(const char *file)
 	mem->bus[3] = &memterm;
 	mem->wake = wakecore;
 	mem->poweron = powercore;
+	mem->sync = synccore;
 
 	return mem;
 }
@@ -274,11 +303,9 @@ makefastmem(int p)
 	ff->fmc_p_sel = p;
 
 	mem = malloc(sizeof(Mem));
+	memset(mem, 0, sizeof(Mem));
 	mem->dev.type = fmem_ident;
 	mem->dev.name = "";
-	mem->dev.attach = nil;
-	mem->dev.ioconnect = nil;
-	mem->dev.next = nil;
 
 	mem->module = ff;
 	mem->bus[0] = &memterm;

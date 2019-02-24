@@ -230,11 +230,8 @@ makeapr(int argc, char *argv[])
 
 	apr->dev.type = apr_ident;
 	apr->dev.name = "";
-	apr->dev.attach = nil;
-	apr->dev.ioconnect = nil;
 	apr->dev.examine = ex_apr;
 	apr->dev.deposit = dep_apr;
-	apr->dev.next = nil;
 
 	apr->iobus.dev[CPA] = (Busdev){ apr, wake_cpa, 0 };
 	apr->iobus.dev[PI] = (Busdev){ apr, wake_pi, 0 };

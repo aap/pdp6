@@ -103,8 +103,10 @@ struct Device
 	char *name;
 	/* attach file to device */
 	void (*attach)(Device *dev, const char *path);
+	void (*detach)(Device *dev);
 	/* connect device to iobus */
 	void (*ioconnect)(Device *dev, IOBus *bus);
+	/* manipulate device registers */
 	word (*examine)(Device *dev, const char *reg);
 	int  (*deposit)(Device *dev, const char *reg, word data);
 };
@@ -146,10 +148,11 @@ enum {
 struct Mem
 {
 	Device dev;
-	void *module;
+	void *module;			/* CMem, FMem */
 	Membus *bus[4];
 	int (*wake)(Mem *mem, Membus *bus);
 	void (*poweron)(Mem *mem);
+	void (*sync)(Mem *mem);		/* sync file to disk */
 };
 
 struct Membus
@@ -554,6 +557,7 @@ struct Dx555
 	uchar *start;
 	uchar *cur;
 	uchar *end;
+	uint size;
 };
 #define DX_IDENT "dx555"
 extern char *dx_ident;
@@ -598,17 +602,21 @@ struct Dt551
 	int ut_info_error;
 	int ut_incomp_block;
 
-	int tmk;	/* 9 bits */
-	int rwb;	/* 6 bits */
-	int lb;		/* 6 bits */
-	int tbm;	/* 4 bits */
-	int tdata;	/* 8 bits */
-	int tct;	/* 1 bit  */
+	int tmk;	/* mark track window, 9b */
+	int rwb;	/* read write buffer, 6b */
+	int lb;		/* longitudinal buffer, computes check sum, 6b */
+	int tbm;	/* block mark timing, 4b */
+	int tdata;	/* data timing, 8b */
+	int tct;	/* selects half of 6 bit rwb, 1b */
+	/* error check */
 	int utek;	/* 6 bits */
 	int uteck;
 
 	int rw_state;	/* null, rq, active */
 
+	int delay;
+	int sense;
+	int wb;
 
 //	int req;
 };
@@ -616,11 +624,6 @@ struct Dt551
 extern char *dt_ident;
 Device *makedt(int argc, char *argv[]);
 void dtconn(Dc136 *dc, Dt551 *dt);
-/*
-void dtcono(Dt551 *dt, word iob);
-void dtcycle(Dt551 *dt);
-*/
-
 
 typedef struct Netmem Netmem;
 struct Netmem

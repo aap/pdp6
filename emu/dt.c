@@ -10,11 +10,14 @@ char *dx_ident = DX_IDENT;
 
 enum
 {
-	DTSIZE = 922512
+//	DTSIZE = 922512
+	// 01102 blocks, 2700 word for start/end each + safe zone
+	DTSIZE = 987288 + 1000
 };
 
 /* Transport */
 
+#if 0
 static uchar
 dxread(Dx555 *dx)
 {
@@ -29,6 +32,25 @@ dxwrite(Dx555 *dx, uchar d)
 {
 	if(dx->dt->ut_rev)
 		*dx->cur = d ^ 010;
+	else
+		*dx->cur = d;
+}
+#endif
+
+static uchar
+dxread_(Dx555 *dx)
+{
+	if(dx->dt->ut_rev)
+		return *dx->cur ^ 017;
+	else
+		return *dx->cur;
+}
+
+static void
+dxwrite_(Dx555 *dx, uchar d)
+{
+	if(dx->dt->ut_rev)
+		*dx->cur = d ^ 017;
 	else
 		*dx->cur = d;
 }
@@ -49,18 +71,30 @@ dxmove(Dx555 *dx)
 }
 
 static void
+dxdetach(Device *dev)
+{
+	Dx555 *dx;
+
+	dx = (Dx555*)dev;
+	if(dx->fd < 0)
+		return;
+
+	lseek(dx->fd, 0, SEEK_SET);
+	write(dx->fd, dx->start, dx->size);
+	close(dx->fd);
+	dx->fd = -1;
+	memset(dx->start, 0, dx->size);
+}
+
+static void
 dxattach(Device *dev, const char *path)
 {
 	Dx555 *dx;
-	int fd;
 
 	dx = (Dx555*)dev;
-	fd = dx->fd;
-	if(fd >= 0){
-		dx->fd = -1;
-		close(dx->fd);
-	}
-	memset(dx->start, 0, DTSIZE);
+	dxdetach(dev);
+	memset(dx->start, 0, dx->size);
+	// TODO: resize
 	dx->fd = open(path, O_RDWR | O_CREAT, 0666);
 	if(dx->fd < 0)
 		fprintf(stderr, "couldn't open file %s\n", path);
@@ -88,12 +122,14 @@ makedx(int argc, char *argv[])
 	dx->dev.type = dx_ident;
 	dx->dev.name = "";
 	dx->dev.attach = dxattach;
-	dx->dev.ioconnect = nil;
+	dx->dev.detach = dxdetach;
 
-	dx->start = malloc(DTSIZE);
+	dx->fd = -1;
+	dx->size = DTSIZE;
+	dx->start = malloc(dx->size);
 	dx->cur = dx->start;
-	dx->end = dx->start + DTSIZE;
-	memset(dx->start, 0, DTSIZE);
+	dx->end = dx->start + dx->size;
+	memset(dx->start, 0, dx->size);
 
 	return &dx->dev;
 }
@@ -105,8 +141,10 @@ enum
 	TapeEndF  = 022,
 	TapeEndR  = 055,
 
+	/* block mark high half */
 	BlockSpace = 025,
 
+	/* block mark low half */
 	BlockEndF = 026,
 	BlockEndR = 045,
 
@@ -126,18 +164,16 @@ enum
 
 #define DATA_SYNC (dt->tmk == (0600|DataSync))
 #define END_ZONE (dt->tmk == (0600|TapeEndF))
-#define BM_SPACE (dt->tmk == (0400|BlockSpace) ||\
-		dt->tmk == (0500|BlockSpace) ||\
-		dt->tmk == (0600|BlockSpace) ||\
-		dt->tmk == (0700|BlockSpace))
+#define BM_SPACE ((dt->tmk&0477) == (0400|BlockSpace))
 #define BM_END (dt->tmk == (0500|BlockEndF))
-#define DATA_SYNC (dt->tmk == (0600|DataSync))
 #define BM_SYNC (dt->tmk == (0700|BlockSync))
+#define REV_BM (dt->tmk == (0500|BlockEndR))
 #define FWD_DATA_END (dt->tmk == (0400|DataEndF) ||\
 		dt->tmk == (0700|DataEndF))
 #define REV_DATA_END (dt->tmk == (0400|DataEndR) ||\
 		dt->tmk == (0600|DataEndR))
 #define DATA (dt->tmk == (0400|Data))
+
 
 #define STOP (dt->tdata == 0 || dt->tdata == 1)
 #define SYNC (dt->tdata == 0200)
@@ -145,6 +181,7 @@ enum
 #define BLOCK (dt->tdata == 040 || dt->tdata == 020 || dt->tdata == 010)
 #define PRE_FINAL (dt->tdata == 004)
 #define FWD_CKS (dt->tdata == 002)
+
 
 #define UT_WRITE ((dt->ut_fcn & 04) == 04)
 #define UT_READ ((dt->ut_fcn & 04) == 0)
@@ -154,26 +191,33 @@ enum
 #define UT_DN (dt->ut_fcn == 0)
 #define UT_WRTM (dt->ut_fcn == 04)
 
+
 #define DC_SELECT1 (dt->dc->devp[dt->dc->device] == dt)
-#define UTE_DC_DISCONNECT (!(DC_SELECT1 && !dt->dc->da_rq))
-#define UT_WRITE_PREVENT (dt->seldx->wrlock)
+#define UT_WRITE_PREVENT (UT_WRITE && dt->seldx->wrlock)
 #define UT_WREN_DATA (UT_WRITE && dt->ut_wren && !UT_WRITE_PREVENT)
-#define RW_ODD (!dt->tct && dt->rw_state == RW_ACTIVE)
+#define UT_WREN_BTM (UT_WREN_DATA && dt->ut_btm_switch && UT_WRTM)	// 3-14
+#define RW_ODD (!dt->tct && dt->rw_state == RW_ACTIVE)	// 3-6
+#define RW_EVEN (dt->tct && dt->rw_state == RW_ACTIVE)
 #define RW_BM_DONE (UT_BM && BM_END)
-#define RW_DATA_CONT (DC_SELECT1 && !dt->dc->da_rq && UT_DATA && dt->rw_state == RW_ACTIVE)
-#define RW_DATA_STOP (UTE_DC_DISCONNECT && UT_DATA && dt->rw_state == RW_ACTIVE)
+#define RW_DATA_CONT (DC_SELECT1 && !dt->dc->da_rq && UT_DATA && prev.rw_state == RW_ACTIVE)
+// TODO: what is RW_DATA_WR_CONT?
+// TODO: this is really RW_DATA_WR_STOP
+#define RW_DATA_STOP (UTE_DC_DISCONNECT && UT_DATA && prev.rw_state == RW_ACTIVE)
 
 #define TBM0 (dt->tbm == 10)
 #define TBM3 (dt->tbm == 1)
 
-// all but block space
+#define UTE_UNIT_OK (nunits == 1)
+#define UTE_DC_DISCONNECT (!(DC_SELECT1 && !dt->dc->da_rq))
+// all but block space and rev block mark
 #define UTE_MK (DATA_SYNC || END_ZONE || BM_END ||\
-	DATA_SYNC || BM_SYNC || FWD_DATA_END || REV_DATA_END || DATA)
-#define UTE_ERROR (dt->uteck && (dt->utek == 040) != UTE_MK)
-// not sure if BM SYNC || DATA SYNC is correct
-#define UTE_ACTIVE_ERROR (!UT_ALL && dt->rw_state == RW_ACTIVE && (BM_SYNC || DATA_SYNC))
+	BM_SYNC || FWD_DATA_END || REV_DATA_END || DATA)
+#define UTE_ERROR (dt->uteck && (prev.utek == 040) != UTE_MK)
+// TODO: not sure if BM SYNC || DATA SYNC is correct
+#define UTE_ACTIVE_ERROR (!UT_ALL && prev.rw_state == RW_ACTIVE && (BM_SYNC || DATA_SYNC))
 
-
+//#define debug(...) printf(__VA_ARGS__)
+#define debug(...) 0
 
 #define PRINT1 \
 	printf("%c%02o(%o,%02o,%d)", dt->rw_state == RW_ACTIVE ? '+' : dt->rw_state == RW_RQ ? '-' : ' ', \
@@ -194,21 +238,23 @@ enum
 
 #define PRINT2 \
 	if(END_ZONE) \
-		printf("TapeEndF "); \
+		debug("%c%d %02o TapeEndF ", state, dt->tct, dt->lb); \
 	else if(BM_SPACE) \
-		printf("BlockSpace %o ", dt->tbm); \
+		debug("%c%d %02o BlockSpace %o ", state, dt->tct, dt->lb, dt->tbm); \
 	else if(BM_END) \
-		printf("BlockEndF "); \
+		debug("%c%d %02o BlockEndF %o ", state, dt->tct, dt->lb, dt->tbm); \
+	else if(REV_BM) \
+		debug("%c%d %02o BlockEndR %o ", state, dt->tct, dt->lb, dt->tbm); \
 	else if(DATA_SYNC) \
-		printf("DataSync "); \
+		debug("%c%d %02o DataSync %o ", state, dt->tct, dt->lb, dt->tdata); \
 	else if(BM_SYNC) \
-		printf("BlockSync "); \
+		debug("%c%d %02o BlockSync %o ", state, dt->tct, dt->lb, dt->tbm); \
 	else if(FWD_DATA_END) \
-		printf("DataEndF "); \
+		debug("%c%d %02o DataEndF %o ", state, dt->tct, dt->lb, dt->tdata); \
 	else if(REV_DATA_END) \
-		printf("DataEndR "); \
+		debug("%c%d %02o DataEndR %o ", state, dt->tct, dt->lb, dt->tdata); \
 	else if(DATA) \
-		printf("Data ");
+		debug("%c%d %02o Data %o ", state, dt->tct, dt->lb, dt->tdata);
 
 static void
 recalc_dt_req(Dt551 *dt)
@@ -225,14 +271,278 @@ recalc_dt_req(Dt551 *dt)
 	setreq(dt->bus, UTC, req);
 }
 
+#define LDB(p, s, w) ((w)>>(p) & (1<<(s))-1)
+#define XLDB(ppss, w) LDB((ppss)>>6 & 077, (ppss)&077, w)
+#define MASK(p, s) ((1<<(s))-1 << (p))
+#define DPB(b, p, s, w) ((w)&~MASK(p,s) | (b)<<(p) & MASK(p,s))
+#define XDPB(b, ppss, w) DPB(b, (ppss)>>6 & 077, (ppss)&077, w)
+
+word dtbuf;
+char state = 'n';
+
+#define REV (dt->ut_rev && !UT_BM)
+
+static void
+dt_tp0(Dt551 *dt)
+{
+	dt->sense = dxread_(dt->seldx);
+
+	// 3-7
+	if(UT_WRITE && dt->rw_state == RW_ACTIVE)
+		dt->ut_wren = 1;
+
+	// 3-7
+	if(UT_WRITE){	// TODO
+		int c;
+		c = REV ? 7 : 0;
+		if(dt->tct)
+			dt->wb = dt->rwb&7 ^ c;
+		else
+			dt->wb = dt->rwb>>3&7 ^ c;
+		/* copy to mark track; 3-13/14 */
+		if(UT_WREN_BTM)
+			dt->wb |= dt->wb<<1 & 010;
+		else
+			dt->wb = dt->wb&7 | dt->sense&010;
+		if(UT_WRITE_PREVENT)
+			dt->ut_illegal_op = 1;		// 3-16
+		if(UT_WREN_DATA){
+			dxwrite_(dt->seldx, dt->wb);
+debug("writing %02o\n", dt->wb);
+		}
+	}
+}
+
+static void
+dt_tp1(Dt551 *dt)
+{
+	/* complement WB here, totally useless */
+	//dt->wb = ~dt->wb & 07;
+
+	/* advance mark track window */
+	if(!UT_WRTM)
+		dt->tmk = ((dt->tmk << 1) | LDB(3, 1, dt->sense)) & 0777 |
+			dt->tmk&0400;
+
+	/* Strobe sensors into RWB */
+	// 3-12
+	if(dt->rw_state == RW_ACTIVE && UT_READ){
+		int c = REV ? 7 : 0;
+		if(dt->tct)
+			dt->rwb |= (dt->sense^c)&07;
+		else
+			dt->rwb |= ((dt->sense^c)&07) << 3;
+	}
+}
+
+static void
+dt_tp2(Dt551 *dt)
+{
+	Dt551 prev;
+	int tbedge, tdedge;
+
+	prev = *dt;
+
+	if(END_ZONE){
+		dt->ut_go = 0;
+		dt->ut_tape_end_flag = 1;
+		/* TODO: is this right? */
+		dt->rw_state = RW_NULL;
+	}
+
+	/* Block mark timing.
+	 * Shift down starting at block sync,
+	 * shifts to 10 before rev block number,
+	 * shifts to 01 before fwd block number. */
+	// 3-5
+	if(BM_SYNC)
+		dt->tbm |= 020;
+	if(BM_SYNC || BM_SPACE)
+		dt->tbm >>= 1;
+	tbedge = ~prev.tbm & dt->tbm;
+
+	/* Data timing.
+	 * Shift down starting at data sync.
+	 * shifts to 100 before reverse check sum,
+	 * shifts to 001 after forward check sum */
+	// 3-8, 3-9
+	if(DATA_SYNC)
+		dt->tdata = 0400;
+	if(FWD_DATA_END || REV_DATA_END || DATA_SYNC)
+		dt->tdata >>= 1;
+	tdedge = ~prev.tdata & dt->tdata;
+
+
+	/* Send 6 bit byte to DC every two steps when reading */
+	if(UT_READ && RW_EVEN)
+		/* except checksums */
+		if((prev.tdata & 0102) == 0){
+			int rwb = dt->rwb;
+			if(REV)
+				rwb = rwb>>3 & 07 | rwb<<3 & 070;
+			dcgv(dt->dc, DEVNO, rwb, REV);
+			if(UTE_DC_DISCONNECT)
+				dt->ut_incomp_block = 1;	// 3-17
+		}
+
+	/* Clear LB before reading the reverse checksum */
+	if(tdedge & 0100)
+		dt->lb = 0;	// 3-9
+
+	/* Keep track of checksum */
+	if(dt->tct)
+		// Manual says XOR, but also talks of parity of zeros
+//		dt->lb ^= dt->rwb;
+		dt->lb ^= ~dt->rwb & 077;
+
+	if(prev.rw_state != RW_ACTIVE)
+		dt->tct = 0;
+	else
+		dt->tct ^= 1;
+
+	/* Ring count UTEK */
+	if(!BM_SPACE){
+		if(dt->utek == 1)
+			dt->utek = 0100;
+		dt->utek >>= 1;
+	}
+
+	/* Go into active state */
+	if(prev.rw_state == RW_RQ)
+		if(UT_BM && tbedge & 1 ||	// 3-6
+		   UT_DATA && tdedge & 0100 ||	// 3-9
+		   UT_ALL && tbedge & 010)	// 3-11
+			dt->rw_state = RW_ACTIVE;
+
+	/* What to do after block */
+	if(tdedge & 1){
+		if(RW_DATA_CONT)		// 3-10
+			dt->rw_state = RW_RQ;
+		if(RW_DATA_STOP)		// 3-11
+			dt->ut_jb_done_flag = 1;
+		/* test checksum. NB: manual says should be 0
+		 * TODO: not sure about ACTIVE */
+		if(prev.rw_state == RW_ACTIVE && dt->lb != 077)
+debug("CHECKSUM ERR\n"),
+			dt->ut_info_error = 1;	// 3-13
+	}
+
+	/* Job done after block mark */
+	if(prev.rw_state == RW_ACTIVE && RW_BM_DONE)	// 3-8
+		dt->ut_jb_done_flag = 1;
+
+	/* Catch wrongly set active state; 3-16 */
+	if(UTE_ACTIVE_ERROR){
+		dt->ut_info_error = 1;
+		dt->rw_state = RW_NULL;
+	}
+	/* Catch invalid mark code */
+	if(UTE_ERROR)
+debug("TRACK ERROR\n"),
+		dt->ut_info_error = 1;		// 3-15
+
+	/* Stop activity once job gets done */
+	if(!prev.ut_jb_done_flag && dt->ut_jb_done_flag)	// 3-8
+		dt->rw_state = RW_NULL;
+}
+
+static void
+dt_tp3(Dt551 *dt)
+{
+	// 3-6
+	if(RW_ODD)
+		dt->rwb = 0;
+
+	// 3-15
+	/* before fwd block mark */
+	if(dt->tbm & 1){
+		if(BM_SPACE)
+			dt->utek = 040;		// UTE PRESET 100000
+		else
+			dt->uteck = 1;
+	}
+	if(BM_SYNC)
+		dt->uteck = 0;
+}
+
+static void
+dt_tp4(Dt551 *dt)
+{
+	/* stop writing WB here */
+	if(dt->rw_state != RW_ACTIVE)
+		dt->ut_wren = 0;
+
+	/* get 6 bit byte from DC every two steps when writing */
+	if(UT_WRITE && RW_ODD){
+		/* except checksums */
+		if((dt->tdata & 0102) == 0){
+			dt->rwb |= dctk(dt->dc, DEVNO, REV);
+			if(UTE_DC_DISCONNECT)
+				dt->ut_incomp_block = 1;	// 3-17
+		}else
+debug("Getting LB\n"),
+			dt->rwb |= dt->lb;
+		// 3-6
+		if(REV)
+			dt->rwb = dt->rwb>>3 & 07 | dt->rwb<<3 & 070;
+	}
+}
+
+/* count dialled transports and select last */
+static int
+selectdx(Dt551 *dt)
+{
+	int i, n, nunits;
+	n = dt->ut_units == 0 ? 8 : dt->ut_units;
+	nunits = 0;
+	dt->seldx = nil;
+	if(dt->ut_units_select)
+		for(i = 0; i < 8; i++)
+			if(dt->dx[i] && dt->dx[i]->unit == n){
+				dt->seldx = dt->dx[i];
+				nunits++;
+			}
+	return nunits;
+}
+
+/* Read one line of bits and move the tape.
+ * This should occur once every 33.33μs */
 static void
 dtcycle(void *p)
 {
 	Dt551 *dt;
 	dt = (Dt551*)p;
-	uchar l, wb;
-	int data1edge, data7edge;
-	int bm0edge, bm3edge;
+
+	if(dt->delay){
+		if(--dt->delay == 0){
+			// UT_START goes to 0 here
+
+			int nunits;
+
+			dt->time_flag = 1;
+
+			/* check for legal selection */
+			nunits = selectdx(dt);
+
+			// UTE_SW_ERROR; 3-16
+			if(!UTE_UNIT_OK ||
+			   dt->ut_btm_switch != UT_WRTM)
+debug("ILL op %d %d %d\n", nunits, dt->ut_btm_switch, UT_WRTM),
+				dt->ut_illegal_op = 1;
+			if(!UTE_UNIT_OK){
+				dt->ut_go = 0;		// 3-3
+				return;
+			}
+
+			if(UT_WRTM)		// 3-14
+				dt->rw_state = RW_ACTIVE;
+			else if(!UT_DN)		// TODO: is this right?
+				dt->rw_state = RW_RQ;
+		}else
+			/* Don't move during delay.
+			 * TODO: is this right? */
+			return;
+	}
 
 	// TODO: maybe do something else here?
 	if(dt->seldx == nil)
@@ -241,166 +551,33 @@ dtcycle(void *p)
 	if(!dt->ut_go)
 		return;
 
+	// sense; start writing
+	dt_tp0(dt);
 
-	if(dt->rw_state != RW_ACTIVE)
-		dt->tct = 0;
-	l = dxread(dt->seldx);
+dtbuf = dtbuf<<3 & FW;
+dtbuf |= dt->sense & 07;
 
-/* TP0 */
+	// read strobe
+	dt_tp1(dt);
 
-	if(dt->rw_state == RW_ACTIVE)
-		dt->ut_wren = 1;
+	// interpret mark code
+	dt_tp2(dt);
 
-	if(UT_WRITE){
-		if(UT_WRITE_PREVENT)
-			dt->ut_illegal_op = 1;
-		if(dt->tct)
-			wb = l&010 | dt->rwb&07;
-		else
-			wb = l&010 | dt->rwb>>3 & 07;
-	}
-	if(UT_WREN_DATA)
-		dxwrite(dt->seldx, wb);
+	// clear rwb; mark track error sync
+	dt_tp3(dt);
 
-/* TP1 */
+	// get next rwb from DC to write
+	dt_tp4(dt);
 
-//**/				PRINT1
-//**/				PRINT2
-
-	dt->tmk = ((dt->tmk << 1) | !!(l&010)) & 0377 |
-		dt->tmk&0400 | (dt->tmk<<1)&0400;
-	if(UT_READ){
-		if(dt->tct != dt->ut_rev)
-			dt->rwb |= l&07;
-		else
-			dt->rwb |= (l&07) << 3;
-	}
-
-/* TP2 */
-///**/				printf("%2o%c%c%c  ", dt->utek, UTE_MK ? 'M' : ' ', UTE_ERROR ? 'E' : ' ', dt->uteck ?  'C' : ' ');
-
-	if(UTE_ERROR || UTE_ACTIVE_ERROR)
-printf("UT INFO ERROR\n"),
-		dt->ut_info_error = 1;
-
-	if(!BM_SPACE){
-		if(dt->utek == 1)
-			dt->utek = 040;
-		else
-			dt->utek >>= 1;
-	}
-
-	if(dt->tct)
-		dt->lb ^= ~dt->rwb & 077;
-
-//**/			if(dt->rw_state == RW_ACTIVE && dt->tct)
-//**/				printf("(%02o, %02o) ", dt->rwb, dt->lb);
-
-	if(UT_READ && dt->rw_state == RW_ACTIVE && dt->tct){
-		// before tct complement
-		if(!(UT_DATA && dt->tdata & 0102)){
-			dcgv(dt->dc, DEVNO, dt->rwb, dt->ut_rev);
-			if(UTE_DC_DISCONNECT)
-				dt->ut_incomp_block = 1;
-		}
-	}
-
-
-	if(END_ZONE){
-		dt->ut_tape_end_flag = 1;
-		dt->ut_go = 0;
-	}
-
-	bm0edge = 0;
-	bm3edge = 0;
-	if(BM_SYNC)
-		dt->tbm |= 020;	// shifted to 010 (TBM0) now
-	if(BM_SPACE || BM_SYNC){
-		dt->tbm >>= 1;
-		if(TBM0)
-			bm0edge = 1;
-		else if(TBM3)
-			bm3edge = 1;
-	}
-
-	data1edge = 0;	// goes up before rev checksum is expected
-	data7edge = 0;	// goes up when checksum is seen
-	if(DATA_SYNC)
-		dt->tdata |= 0400;	// shifted to 0200 now
-	if(FWD_DATA_END || REV_DATA_END || DATA_SYNC){
-		dt->tdata >>= 1;
-		if(dt->tdata == 0100)
-			data1edge = 1;
-		else if(dt->tdata == 1)
-			data7edge = 1;
-	}
-
-	if(data1edge)
-		dt->lb = 0;
-
-	// TODO: not sure about rw_active
-	if(data7edge && dt->rw_state == RW_ACTIVE)
-		if(dt->lb != 077)
-printf("UT INFO ERROR\n"),
-			dt->ut_info_error = 1;
-
-	// before active is set below
-	if(dt->rw_state == RW_ACTIVE)
-		dt->tct = !dt->tct;
-
-	// manual mentions tdata6(0) going to 0???
-	if(dt->rw_state == RW_ACTIVE){
-		if(data7edge && RW_DATA_STOP ||
-		   RW_BM_DONE){
-printf("FINISHING JOB\n");
-			dt->ut_jb_done_flag = 1;
-			dt->rw_state = RW_NULL;
-		}
-		if(UTE_ACTIVE_ERROR)
-			dt->rw_state = RW_NULL;
-		if(data7edge && RW_DATA_CONT)
-			dt->rw_state = RW_RQ;
-	}else if(dt->rw_state == RW_RQ){
-		if(UT_BM && bm3edge ||
-		   UT_DATA && data1edge ||
-		   UT_ALL && bm0edge)
-			dt->rw_state = RW_ACTIVE;
-	}
-
-/* TP3 */
-
-	if(RW_ODD)
-		dt->rwb = 0;
-
-	if(TBM3 && BM_SPACE)
-		dt->utek = 040;
-	if(BM_SYNC)
-		dt->uteck = 0;
-	if(TBM3 && !BM_SPACE)
-		dt->uteck = 1;
-
-/* TP4 */
-
-	if(UT_WRITE && RW_ODD){
-		/* Take checksum data from LB */
-		if(UT_DATA && dt->tdata & 0102)
-			dt->rwb = dt->lb;
-		else{
-			dt->rwb |= dctk(dt->dc, DEVNO, dt->ut_rev);
-			if(UTE_DC_DISCONNECT)
-				dt->ut_incomp_block = 1;
-		}
-		if(dt->ut_rev)
-			dt->rwb = dt->rwb>>3 & 07 | dt->rwb<<3 & 070;
-	}
-	if(dt->rw_state == RW_ACTIVE)
-		dt->ut_wren = 0;
-
-//**/				printf("\n");
+	state = dt->rw_state == RW_NULL ? 'n' :
+	        dt->rw_state == RW_RQ ? 'r' :
+	        dt->rw_state == RW_ACTIVE ? 'a' : 'x';
+	PRINT2
+	else
+		debug("%c%d -- ", state, dt->tct);
+	debug(" %012lo %02o %d.%02o\n", dtbuf, dt->rwb, dt->uteck, dt->utek);
 
 	dxmove(dt->seldx);
-
-	recalc_dt_req(dt);
 }
 
 static void
@@ -444,7 +621,7 @@ wake_dt(void *dev)
 	if(bus->devcode == UTS){
 		if(IOB_STATUS){
 //printf("UTS STATUS\n");
-			// we have no delays (yet?) F25
+			if(dt->delay) bus->c12 |= F25;
 			if(dt->rw_state == RW_RQ) bus->c12 |= F26;
 			if(dt->rw_state == RW_ACTIVE) bus->c12 |= F27;
 			if(dt->rw_state == RW_NULL) bus->c12 |= F28;
@@ -459,7 +636,7 @@ wake_dt(void *dev)
 	}
 	if(bus->devcode == UTC){
 		if(IOB_STATUS){
-//printf("UTC STATUS\n");
+printf("UTC STATUS\n");
 			if(dt->ut_units_select) bus->c12 |= F19;
 			if(dt->ut_tape_end_enable) bus->c12 |= F20;
 			if(dt->ut_jb_done_enable) bus->c12 |= F21;
@@ -481,12 +658,11 @@ wake_dt(void *dev)
 			dt->ut_tape_end_flag = 0;
 			dt->ut_jb_done_flag = 0;
 
+			// 3-5
 			dt->rw_state = RW_NULL;
 		}
 		if(IOB_CONO_SET){
 //printf("UTC CONO SET\n");
-			int i, n, nunits;
-
 			dt->ut_pia = bus->c12 & 07;
 			dt->ut_units = bus->c12>>3 & 07;
 			dt->ut_fcn = bus->c12>>6 & 07;
@@ -498,42 +674,37 @@ wake_dt(void *dev)
 			dt->ut_tape_end_enable = bus->c12>>15 & 1;
 			dt->ut_units_select = bus->c12>>16 & 1;
 
-			// UT CONO SET LONG
+			// UT CONO SET LONG, 1ms after UT CONO SET
 			//  triggers UT START level until end of delay
 
-			// find selected transport unit
-			n = dt->ut_units == 0 ? 8 : dt->ut_units;
-			dt->seldx = nil;
-			nunits = 0;
-			if(dt->ut_units_select)
-				for(i = 0; i < 8; i++)
-					if(dt->dx[i] && dt->dx[i]->unit == n){
-						dt->seldx = dt->dx[i];
-						nunits++;
-					}
+			/* update selection, also done after delay */
+			selectdx(dt);
+
+			dt->delay = 0;
 			if(dt->ut_time){
-				// wait delay
-				dt->time_flag = 1;
-				dt->uteck = 0;
-
-				if(nunits != 1){
-					dt->ut_go = 0;
-					dt->ut_illegal_op = 1;
-					goto ret;
+				switch(dt->ut_time){
+				case 1:	// 20ms
+					dt->delay = 600;
+					break;
+				case 2:	// 160ms
+					dt->delay = 4800;
+					break;
+				case 3: // 300ms
+					dt->delay = 9000;
+					break;
 				}
-				if(dt->ut_btm_switch != UT_WRTM)
-					dt->ut_illegal_op = 1;
-			}
+				// T CLEAR; 3-4
+				dt->tmk = 0;
+				dt->uteck = 0;	// 3-15
 
-			if(!UT_DN){
-				if(UT_WRTM)
-					dt->rw_state = RW_ACTIVE;
-				else
+				dt->time_flag = 0;
+				// now wait
+			}else
+				if(!UT_DN &&		// TODO: is this right?
+				   !UT_WRTM)		// 3-14
 					dt->rw_state = RW_RQ;
-			}
 		}
 	}
-ret:
 	recalc_dt_req(dt);
 }
 
@@ -555,6 +726,27 @@ dtconn(Dc136 *dc, Dt551 *dt)
 	dc->devp[DEVNO] = dt;
 }
 
+int
+dtdep(Device *dev, const char *reg, word data)
+{
+	Dt551 *dt;
+
+	dt = (Dt551*)dev;
+	if(strcmp(reg, "btm_wr") == 0) dt->ut_btm_switch = data&1;
+	else return 1;
+	return 0;
+}
+
+word
+dtex(Device *dev, const char *reg)
+{
+	Dt551 *dt;
+
+	dt = (Dt551*)dev;
+	if(strcmp(reg, "btm_wr") == 0) return dt->ut_btm_switch;
+	return ~0;
+}
+
 Device*
 makedt(int argc, char *argv[])
 {
@@ -566,11 +758,13 @@ makedt(int argc, char *argv[])
 
 	dt->dev.type = dt_ident;
 	dt->dev.name = "";
-	dt->dev.attach = nil;
 	dt->dev.ioconnect = dtioconnect;
+	dt->dev.deposit = dtdep;
+	dt->dev.examine = dtex;
 
-	// should have 30000 cycles per second
-	th = (Thread){ nil, dtcycle, dt, 1000, 0 };
+	// should have 30000 cycles per second, so one every 33μs
+	// APR at 1 has an approximate cycle time of 200-300ns
+	th = (Thread){ nil, dtcycle, dt, 150, 0 };
 	addthread(th);
 
 	return &dt->dev;

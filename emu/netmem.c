@@ -32,9 +32,10 @@ netmemcycle(void *dev)
 	}
 	len = buf[0]<<8 | buf[1];
 	if(len > 9){
-		fprintf(stderr, "netmem botch, closing\n");
+		fprintf(stderr, "netmem botch(%d), closing\n", len);
 		close(nm->fd);
 		nm->fd = -1;
+		return;
 	}
 	memset(buf, 0, sizeof(buf));
 	readn(nm->fd, buf, len);
@@ -96,9 +97,6 @@ makenetmem(int argc, char *argv[])
 	memset(nm, 0, sizeof(Netmem));
 	nm->dev.type = netmem_ident;
 	nm->dev.name = "";
-	nm->dev.attach = nil;
-	nm->dev.ioconnect = nil;
-	nm->dev.next = nil;
 
 	// TODO: don't hardcode;
 	apr = getdevice("apr");

@@ -621,7 +621,26 @@ dofile(const char *path)
 void
 quit(int code)
 {
-	//SDL_Quit();
+	int i;
+	Device *dev;
+	Membus *mbus;
+
+	/* Detach all files */
+	for(dev = devlist; dev; dev = dev->next)
+		if(dev->detach)
+			dev->detach(dev);
+
+	/* Sync memory to disk */
+	for(dev = devlist; dev; dev = dev->next){
+		if(strcmp(dev->type, apr_ident) != 0)
+			continue;
+
+		mbus = &((Apr*)dev)->membus;
+		for(i = 0; i < 16; i++)
+			if(mbus->cmem[i] && mbus->cmem[i]->sync)
+				mbus->cmem[i]->sync(mbus->cmem[i]);
+	}
+
 	putchar('\n');
 	exit(code);
 }

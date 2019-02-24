@@ -260,6 +260,27 @@ c_attach(int argc, char *argv[])
 	dev->attach(dev, argv[2]);
 }
 
+static void
+c_detach(int argc, char *argv[])
+{
+	Device *dev;
+
+	if(argc < 2){
+		printf("Not enough arguments\n");
+		return;
+	}
+	dev = getdevice(argv[1]);
+	if(dev == nil){
+		printf("No device: %s\n", argv[1]);
+		return;
+	}
+	if(dev->detach == nil){
+		printf("No detach for device type %s\n", dev->type);
+		return;
+	}
+	dev->detach(dev);
+}
+
 /* ioconnect dev busdev */
 static void
 c_ioconnect(int argc, char *argv[])
@@ -615,6 +636,8 @@ struct {
 		"make a device: mkdev name type [args]" },
 	{ "attach", c_attach,
 		"attach a file to a devie: attach name filename" },
+	{ "detach", c_detach,
+		"detach a file from a devie: attach name" },
 	{ "connectio", c_ioconnect,
 		"connect device to IO bus: connectio devname procname" },
 	{ "connectmem", c_memconnect,

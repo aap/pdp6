@@ -14,3 +14,6 @@ pdp6: $(SRC) $(H)
 
 test_dc: test_dc.c dc.c $(H)
 	$(CC) -o $@ $(CFLAGS) test_dc.c dc.c
+
+test_dt: test_dt.c dc.c dt.c $(H)
+	$(CC) -o $@ $(CFLAGS) test_dt.c dc.c dt.c

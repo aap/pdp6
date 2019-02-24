@@ -44,7 +44,7 @@ readn(int fd, void *data, int n)
 
 	while(n > 0){
 		m = read(fd, data, n);
-		if(m == -1)
+		if(m <= 0)
 			return -1;
 		data += m;
 		n -= m;
