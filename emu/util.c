@@ -1,6 +1,11 @@
-#include "pdp6.h"
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+#include <netinet/tcp.h>
 #include <unistd.h>
 #include <netdb.h>
+
 
 void
 strtolower(char *s)
@@ -84,4 +89,45 @@ dial(const char *host, int port)
 win:
 	freeaddrinfo(result);
 	return sockfd;
+}
+
+void
+serve(int port, void (*handlecon)(int, void*), void *arg)
+{
+	int sockfd, confd;
+	socklen_t len;
+	struct sockaddr_in server, client;
+	int x;
+
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if(sockfd < 0){
+		perror("error: socket");
+		return;
+	}
+
+	x = 1;
+	setsockopt (sockfd, SOL_SOCKET, SO_REUSEADDR, (void *)&x, sizeof x);
+	
+	memset(&server, 0, sizeof(server));
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = INADDR_ANY;
+	server.sin_port = htons(port);
+	if(bind(sockfd, (struct sockaddr*)&server, sizeof(server)) < 0){
+		perror("error: bind");
+		return;
+	}
+	listen(sockfd, 5);
+	len = sizeof(client);
+	while(confd = accept(sockfd, (struct sockaddr*)&client, &len),
+	      confd >= 0)
+		handlecon(confd, arg);
+	perror("error: accept");
+	return;
+}
+
+void
+nodelay(int fd)
+{
+	int flag = 1;
+	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
 }

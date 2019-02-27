@@ -5,6 +5,10 @@
 #include <pthread.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+
+#include "../emu/util.h"
 
 #define nelem(a) (sizeof(a)/sizeof(a[0]))
 #define nil NULL
@@ -118,6 +122,14 @@ setlights(uchar b, Element *l, int n)
 }
 
 void
+setlights_(uchar b, Element *l, int n)
+{
+	int i;
+	for(i = 0; i < n; i++)
+		l[i].state = !!(b & 1 << 5-i);
+}
+
+void
 set18lights(uchar *b, Element *l)
 {
 	setlights(b[0], l, 8);
@@ -145,6 +157,18 @@ getswitches(Element *sw, int n, int state)
 		b |= (uchar)(sw[i].state == state) << 7-i;
 	return b;
 }
+
+uchar
+getswitches_(Element *sw, int n, int state)
+{
+	uchar b;
+	int i;
+	b = 0;
+	for(i = 0; i < n; i++)
+		b |= (uchar)(sw[i].state == state) << 5-i;
+	return b;
+}
+
 
 uchar
 get18switches(uchar *b, Element *sw)
@@ -322,6 +346,133 @@ findlayout(int *w, int *h)
 
 	*w = oppanel.surf->w;
 	*h = oppanel.pos.y + oppanel.surf->h;
+}
+
+void
+talkserial(int fd)
+{
+	int i, n;
+	char c, buf[32];
+
+	while(1){
+		misc_l[3].state = misc_sw[0].state;
+		misc_l[4].state = misc_sw[1].state;
+		misc_l[5].state = misc_sw[2].state;
+		misc_l[6].state = misc_sw[3].state;
+
+		/* Send switches to CPU */
+		n = 0;
+		buf[n++] = getswitches_(data_sw, 6, 1);
+		buf[n++] = getswitches_(data_sw+6, 6, 1);
+		buf[n++] = getswitches_(data_sw+12, 6, 1);
+		buf[n++] = getswitches_(data_sw+18, 6, 1);
+		buf[n++] = getswitches_(data_sw+24, 6, 1);
+		buf[n++] = getswitches_(data_sw+30, 6, 1);
+		buf[n++] = getswitches_(ma_sw, 6, 1);
+		buf[n++] = getswitches_(ma_sw+6, 6, 1);
+		buf[n++] = getswitches_(ma_sw+12, 6, 1);
+		buf[n++] = getswitches_(keys, 6, 2);
+		buf[n++] = getswitches_(keys, 6, 1);
+		c = 0;
+		c |= (keys[6].state == 2)<<3;
+		c |= (keys[6].state == 1)<<2;
+		c |= (keys[7].state == 2)<<1;
+		c |= (keys[7].state == 1)<<0;
+		buf[n++] = c;
+		c = 0;
+		c |= (misc_sw[1].state == 1)<<3;
+		c |= (misc_sw[0].state == 1)<<2;
+		c |= (misc_sw[3].state == 1)<<1;
+		c |= (misc_sw[2].state == 1)<<0;
+		buf[n++] = c;
+		// TODO: speed knobs
+		buf[n++] = 0;
+		for(i = 0; i < n; i++)
+			if(buf[i] != 077)
+				buf[i] |= 0100;
+		buf[n++] = '\r';
+		write(fd, buf, n);
+
+
+		/* Read lights from CPU if we get any */
+		if(hasinput(fd)){
+			if(read(fd, &c, 1) != 1)
+				break;
+			if(c >= '0' && c <= '7'){
+				if(readn(fd, buf, 3))
+					break;
+
+				switch(c){
+				case '0':
+					setlights_(buf[0], ir_l, 6);
+					setlights_(buf[1], ir_l+6, 6);
+					setlights_(buf[2], ir_l+12, 6);
+					break;
+				case '1':
+					setlights_(buf[0], mi_l, 6);
+					setlights_(buf[1], mi_l+6, 6);
+					setlights_(buf[2], mi_l+12, 6);
+					break;
+				case '2':
+					setlights_(buf[0], mi_l+18, 6);
+					setlights_(buf[1], mi_l+24, 6);
+					setlights_(buf[2], mi_l+30, 6);
+					break;
+				case '3':
+					setlights_(buf[0], pc_l, 6);
+					setlights_(buf[1], pc_l+6, 6);
+					setlights_(buf[2], pc_l+12, 6);
+					break;
+				case '4':
+					setlights_(buf[0], ma_l, 6);
+					setlights_(buf[1], ma_l+6, 6);
+					setlights_(buf[2], ma_l+12, 6);
+					break;
+				case '5':
+					misc_l[2].state = !!(buf[0] & 040);	// run
+					setlights_(buf[0]<<2, pih_l, 4);
+					setlights_(buf[1], pih_l+4, 3);
+					break;
+				case '6':
+					misc_l[1].state = !!(buf[0] & 040);	// stop
+					setlights_(buf[0]<<2, pir_l, 4);
+					setlights_(buf[1], pir_l+4, 3);
+					break;
+				case '7':
+					misc_l[0].state = !!(buf[0] & 040);	// pi
+					setlights_(buf[0]<<2, pio_l, 4);
+					setlights_(buf[1], pio_l+4, 3);
+					break;
+				}
+			}
+		}
+	}
+}
+
+void
+handlenetwork(int fd, void *x)
+{
+	nodelay(fd);
+	talkserial(fd);
+	close(fd);
+}
+
+void*
+servethread(void *x)
+{
+	serve(2000, handlenetwork, nil);
+}
+
+void*
+openserial(void *x)
+{
+	int fd;
+
+	fd = open("/tmp/panel", O_RDWR);
+	if(fd < 0)
+		err("Couldn't open serial connection");
+	talkserial(fd);
+	close(fd);
 }
 
 void*
@@ -515,7 +666,9 @@ main(int argc, char *argv[])
 
 	extra_l = e; e += 1;
 
-	pthread_create(&comthread, nil, talki2c, nil);
+//	pthread_create(&comthread, nil, talki2c, nil);
+	pthread_create(&comthread, nil, servethread, nil);
+//	pthread_create(&comthread, nil, talkserial, nil);
 
 	for(;;){
 		while(SDL_PollEvent(&ev))

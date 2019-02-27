@@ -1,4 +1,4 @@
-SRC=panel6.c
+SRC=panel6.c ../emu/util.c
 # clang
 #CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses \
 #        -Wno-bitwise-op-parentheses
