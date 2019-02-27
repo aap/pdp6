@@ -181,6 +181,7 @@ stepone(Apr *apr)
 
 
 // TODO This is WIP
+// TODO: can't set switches with real panel connected
 
 #define EXDEPREGS \
 	X(ir)\

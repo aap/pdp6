@@ -217,7 +217,7 @@ enum
 #define UTE_ACTIVE_ERROR (!UT_ALL && prev.rw_state == RW_ACTIVE && (BM_SYNC || DATA_SYNC))
 
 //#define debug(...) printf(__VA_ARGS__)
-#define debug(...) 0
+#define debug(...)
 
 #define PRINT1 \
 	printf("%c%02o(%o,%02o,%d)", dt->rw_state == RW_ACTIVE ? '+' : dt->rw_state == RW_RQ ? '-' : ' ', \
@@ -422,9 +422,10 @@ dt_tp2(Dt551 *dt)
 			dt->ut_jb_done_flag = 1;
 		/* test checksum. NB: manual says should be 0
 		 * TODO: not sure about ACTIVE */
-		if(prev.rw_state == RW_ACTIVE && dt->lb != 077)
-debug("CHECKSUM ERR\n"),
+		if(prev.rw_state == RW_ACTIVE && dt->lb != 077){
+debug("CHECKSUM ERR\n");
 			dt->ut_info_error = 1;	// 3-13
+		}
 	}
 
 	/* Job done after block mark */
@@ -437,9 +438,10 @@ debug("CHECKSUM ERR\n"),
 		dt->rw_state = RW_NULL;
 	}
 	/* Catch invalid mark code */
-	if(UTE_ERROR)
-debug("TRACK ERROR\n"),
+	if(UTE_ERROR){
+debug("TRACK ERROR\n");
 		dt->ut_info_error = 1;		// 3-15
+	}
 
 	/* Stop activity once job gets done */
 	if(!prev.ut_jb_done_flag && dt->ut_jb_done_flag)	// 3-8
@@ -479,9 +481,10 @@ dt_tp4(Dt551 *dt)
 			dt->rwb |= dctk(dt->dc, DEVNO, REV);
 			if(UTE_DC_DISCONNECT)
 				dt->ut_incomp_block = 1;	// 3-17
-		}else
-debug("Getting LB\n"),
+		}else{
+debug("Getting LB\n");
 			dt->rwb |= dt->lb;
+		}
 		// 3-6
 		if(REV)
 			dt->rwb = dt->rwb>>3 & 07 | dt->rwb<<3 & 070;
@@ -526,9 +529,10 @@ dtcycle(void *p)
 
 			// UTE_SW_ERROR; 3-16
 			if(!UTE_UNIT_OK ||
-			   dt->ut_btm_switch != UT_WRTM)
-debug("ILL op %d %d %d\n", nunits, dt->ut_btm_switch, UT_WRTM),
+			   dt->ut_btm_switch != UT_WRTM){
+debug("ILL op %d %d %d\n", nunits, dt->ut_btm_switch, UT_WRTM);
 				dt->ut_illegal_op = 1;
+			}
 			if(!UTE_UNIT_OK){
 				dt->ut_go = 0;		// 3-3
 				return;

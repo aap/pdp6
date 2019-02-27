@@ -227,6 +227,9 @@ ismouseover(Element *e, int x, int y)
 {
 	Point p;
 
+	if(e->grid->panel == nil)
+		return 0;
+
 	p = xform(e->grid, e->pos);
 	return x >= p.x && x <= p.x + e->surf[e->state]->w &&
 	       y >= p.y && y <= p.y + e->surf[e->state]->h;
@@ -261,6 +264,9 @@ drawelement(SDL_Surface *screen, Element *elt, int power)
 	SDL_Rect r;
 	Point p;
 	int s;
+
+	if(elt->grid->panel == nil)
+		return;
 
 	p = xform(elt->grid, elt->pos);
 	r.x = p.x+0.5;
@@ -348,6 +354,28 @@ findlayout(int *w, int *h)
 	*h = oppanel.pos.y + oppanel.surf->h;
 }
 
+/* Show only operator console */
+void
+findlayout_small(int *w, int *h)
+{
+	SDL_Rect nopos = { -1, -1, -1, -1 };
+
+	indpanel1.pos = nopos;
+	indpanel2.pos = nopos;
+	iopanel.pos = nopos;
+	extrapanel.pos = nopos;
+
+	iogrid.panel = nil;
+	indgrid1.panel = nil;
+	indgrid2.panel = nil;
+	extragrid.panel = nil;
+
+	oppanel.pos = (SDL_Rect){ 0, 0, 0, 0 };
+
+	*w = oppanel.surf->w;
+	*h = oppanel.surf->h;
+}
+
 void
 talkserial(int fd)
 {
@@ -395,7 +423,7 @@ talkserial(int fd)
 
 
 		/* Read lights from CPU if we get any */
-		if(hasinput(fd)){
+		while(hasinput(fd)){
 			if(read(fd, &c, 1) != 1)
 				break;
 			if(c >= '0' && c <= '7'){
@@ -623,7 +651,8 @@ main(int argc, char *argv[])
 	extragrid = indgrid1;
 	extragrid.panel = &extrapanel;
 
-	findlayout(&w, &h);
+//	findlayout(&w, &h);
+	findlayout_small(&w, &h);
 
 	screen = SDL_SetVideoMode(w, h, 32, SDL_DOUBLEBUF);
 	if(screen == nil)
@@ -688,11 +717,16 @@ main(int argc, char *argv[])
 			}
 
 		SDL_FillRect(screen, nil, SDL_MapRGBA(screen->format, 0xe6, 0xe6, 0xe6, 0xff));
-		SDL_BlitSurface(indpanel1.surf, nil, screen, &indpanel1.pos);
-		SDL_BlitSurface(indpanel2.surf, nil, screen, &indpanel2.pos);
-		SDL_BlitSurface(extrapanel.surf, nil, screen, &extrapanel.pos);
-		SDL_BlitSurface(iopanel.surf, nil, screen, &iopanel.pos);
-		SDL_BlitSurface(oppanel.surf, nil, screen, &oppanel.pos);
+		if(indpanel1.pos.x >= 0)
+			SDL_BlitSurface(indpanel1.surf, nil, screen, &indpanel1.pos);
+		if(indpanel2.pos.x >= 0)
+			SDL_BlitSurface(indpanel2.surf, nil, screen, &indpanel2.pos);
+		if(extrapanel.pos.x >= 0)
+			SDL_BlitSurface(extrapanel.surf, nil, screen, &extrapanel.pos);
+		if(iopanel.pos.x >= 0)
+			SDL_BlitSurface(iopanel.surf, nil, screen, &iopanel.pos);
+		if(oppanel.pos.x >= 0)
+			SDL_BlitSurface(oppanel.surf, nil, screen, &oppanel.pos);
 
 		for(i = 0, e = lamps; i < nelem(lamps); i++, e++)
 			drawelement(screen, e, 1);
