@@ -756,7 +756,8 @@ defpulse(pi_reset)
 	apr->pio = 0;		// 8-3
 }
 
-defpulse(ar_flag_clr)
+static void
+ar_flag_clr(Apr *apr)
 {
 	apr->ar_ov_flag = 0;		// 6-10
 	apr->ar_cry0_flag = 0;		// 6-10
@@ -766,7 +767,8 @@ defpulse(ar_flag_clr)
 	recalc_cpa_req(apr);
 }
 
-defpulse(ar_flag_set)
+static void
+ar_flag_set(Apr *apr)
 {
 	// 6-10
 	if(apr->c.mb & F0) apr->ar_ov_flag = 1;
@@ -781,7 +783,8 @@ defpulse(ar_flag_set)
 	recalc_cpa_req(apr);
 }
 
-defpulse(mp_clr)
+static void
+mp_clr(Apr *apr)
 {
 	// 6-19
 	apr->chf1 = 0;
@@ -815,7 +818,8 @@ defpulse(mp_clr)
 	apr->nrf3 = 0;
 }
 
-defpulse(ds_clr)
+static void
+ds_clr(Apr *apr)
 {
 	// 6-25, 6-26
 	apr->dsf1 = 0;
@@ -852,8 +856,8 @@ defpulse(mr_clr)
 
 	apr->a_long = 0;	// ?? nowhere to be found
 	apr->ar_com_cont = 0;	// 6-9
-	mp_clr_p(apr);		// 6-21
-	ds_clr_p(apr);		// 6-26
+	mp_clr(apr);		// 6-21
+	ds_clr(apr);		// 6-26
 
 	apr->iot_go = 0;	// 8-1
 	apr->iot_init_setup = 0;
@@ -892,7 +896,8 @@ defpulse(ex_clr)
 	apr->rlr = 0;		// 7-5
 }
 
-defpulse(ex_set)
+static void
+ex_set(Apr *apr)
 {
 	apr->pr  = apr->iobus.c12>>28 & 0377;	// 7-4
 	apr->rlr = apr->iobus.c12>>10 & 0377;	// 7-5
@@ -919,7 +924,7 @@ defpulse(mr_start)
 	apr->pi_ov = 0;		// 8-4
 	set_pi_cyc(apr, 0);	// 8-4
 	pulse(apr, &pi_reset, 0);	// 8-4
-	ar_flag_clr_p(apr);	// 6-10
+	ar_flag_clr(apr);	// 6-10
 
 	pulse(apr, &ex_clr, 0);
 	apr->ex_user = 0;	// 5-13
@@ -998,7 +1003,7 @@ wake_cpa(void *dev)
 	if(IOB_DATAO_CLEAR)
 		ex_clr_p(apr);
 	if(IOB_DATAO_SET)
-		ex_set_p(apr);
+		ex_set(apr);
 }
 
 static void
@@ -2712,7 +2717,7 @@ defpulse(et1)
 	if(apr->ir_jrst && apr->ir & H12)
 		apr->ex_mode_sync = 1;		// 5-13
 	if(apr->ir_jrst && apr->ir & H11)
-		ar_flag_set_p(apr);		// 6-10
+		ar_flag_set(apr);		// 6-10
 	if(PI_RST)
 		pih0_fm_pi_ok1(apr);			// 8-4
 
@@ -2760,7 +2765,7 @@ defpulse(et0)
 	apr->ar_cry1 = 0;	// 6-10
 	ar_cry(apr);
 	if(apr->ir_jrst && apr->ir & H11)
-		ar_flag_clr_p(apr);		// 6-10
+		ar_flag_clr(apr);		// 6-10
 	if(CH_INC_OP)
 		pulse(apr, &cht1, 0);		// 6-19
 	if(CH_N_INC_OP)

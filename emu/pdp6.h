@@ -35,6 +35,8 @@ int dial(const char *host, int port);
 void quit(int code);
 void cli(FILE *f);
 void *cmdthread(void *);
+void *simthread(void *p);
+void dofile(const char *path);
 
 enum {
 	MAXPULSE = 20
