@@ -3,6 +3,10 @@
 #include <pthread.h>
 #include "args.h"
 
+#include <fcntl.h>
+#include <termios.h>
+
+
 // TODO: get rid of this
 void updatepanel(Apr *apr) {}
 
@@ -18,9 +22,17 @@ getms(void)
 void
 talkserial(int fd, Apr *apr, Ptr *ptr)
 {
+	struct termios ios;
 	Apr oldapr;
 	char buf[32];
 	int n;
+
+	if(tcgetattr(fd, &ios) == 0){
+		cfsetispeed(&ios, B38400);
+		cfsetospeed(&ios, B38400);
+		cfmakeraw(&ios);
+		tcsetattr(fd, TCSANOW, &ios);
+	}
 
 	while(1){
 		if(apr == nil)
@@ -126,7 +138,7 @@ talkserial(int fd, Apr *apr, Ptr *ptr)
 void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-t] [-d debugfile]\n", argv0);
+	fprintf(stderr, "usage: %s [-t] [-d debugfile] [-p paneltty]\n", argv0);
 	exit(1);
 }
 
@@ -135,18 +147,23 @@ main(int argc, char *argv[])
 {
 	pthread_t cmd_thread, sim_thread;
 	const char *outfile;
+	const char *panelfile;
 	int fd;
 
 	Apr *apr;
 	Ptr *ptr;
 
 	outfile = "/dev/null";
+	panelfile = nil;
 	ARGBEGIN{
 	case 't':
 		dotrace = 1;
 		break;
 	case 'd':
 		outfile = EARGF(usage());
+		break;
+	case 'p':
+		panelfile = EARGF(usage());
 		break;
 	default:
 		usage();
@@ -164,9 +181,17 @@ main(int argc, char *argv[])
 	pthread_create(&sim_thread, nil, simthread, apr);
 	pthread_create(&cmd_thread, nil, cmdthread, nil);
 
-	fd = dial("localhost", 2000);
-	if(fd < 0)
-		err("can't connect to panel");
+	if(panelfile){
+		fd = open(panelfile, O_RDWR);
+		if(fd < 0)
+			err("Couldn't open %s", panelfile);
+	}else{
+		/* Just testing... */
+		fd = dial("localhost", 2000);
+		if(fd < 0)
+			err("can't connect to panel");
+	}
+
 	talkserial(fd, apr, ptr);
 
 	return 0;
