@@ -10,6 +10,23 @@ static char *ops[MAXOPS];
 /* current apr */
 static Apr *apr;
 
+static Apr*
+getapr(void)
+{
+	Device *dev;
+
+	if(apr) return apr;
+
+	for(dev = devlist; dev; dev = dev->next)
+		if(dev->type == apr_ident){
+			apr = (Apr*)dev;
+			goto found;
+		}
+	err("No APR defined");
+found:
+	return apr;
+}
+
 static void
 skipwhite(void)
 {
@@ -165,7 +182,7 @@ static void
 exam(word addr, int fastmem, int format)
 {
 	word *p;
-	p = getmemref(&apr->membus, addr, fastmem);
+	p = getmemref(&getapr()->membus, addr, fastmem);
 	if(p == nil){
 		printf("Non existent memory\n");
 		return;
@@ -187,7 +204,7 @@ static void
 dep(word addr, int fastmem, word w)
 {
 	word *p;
-	p = getmemref(&apr->membus, addr, fastmem);
+	p = getmemref(&getapr()->membus, addr, fastmem);
 	if(p == nil){
 		printf("Non existent memory\n");
 		return;
@@ -445,12 +462,12 @@ getexdepdev(char *dev)
 	s = strchr(dev, '.');
 	if(s == nil){
 		if(exdepdev == nil)
-			exdepdev = &apr->dev;
+			exdepdev = &getapr()->dev;
 		return exdepdev;
 	}
 	*s++ = '\0';
 	d = getdevice(dev);
-	exdepdev = d ? d : &apr->dev;
+	exdepdev = d ? d : &getapr()->dev;
 	while(*dev++ = *s++);
 	return exdepdev;
 }
@@ -500,7 +517,7 @@ c_xdep(int argc, char *argv[])
 	}
 
 void updatepanel(Apr *apr);
-	updatepanel(apr);
+	updatepanel(getapr());
 }
 
 enum
@@ -517,7 +534,7 @@ loadsav(FILE *fp)
 	word w;
 	while(w = readwbak(fp), w != ~0){
 		if(w >> 27 == 0254){
-			apr->pc = right(w);
+			getapr()->pc = right(w);
 			return;
 		}
 		iowd = w;
@@ -572,7 +589,7 @@ end:
 	w = readwits(fp);
 	if(left(w) != 0324000)
 		goto format;
-	apr->pc = right(w);
+	getapr()->pc = right(w);
 	return;
 
 format:
@@ -616,7 +633,7 @@ c_show(int argc, char *argv[])
 	printf("Devices:\n");
 	showdevices();
 	printf("Memory:\n");
-	showmem(&apr->membus);
+	showmem(&getapr()->membus);
 }
 
 static void
@@ -635,9 +652,9 @@ struct {
 	{ "mkdev", c_mkdev,
 		"make a device: mkdev name type [args]" },
 	{ "attach", c_attach,
-		"attach a file to a devie: attach name filename" },
+		"attach a file to a device: attach name filename" },
 	{ "detach", c_detach,
-		"detach a file from a devie: attach name" },
+		"detach a file from a device: detach name" },
 	{ "connectio", c_ioconnect,
 		"connect device to IO bus: connectio devname procname" },
 	{ "connectmem", c_memconnect,
@@ -653,7 +670,7 @@ struct {
 	{ "xdeposit", c_xdep,
 		"deposit device" },
 	{ "load", c_load,
-		"load file into memory: load [-s] filename" },
+		"load file into memory: load [-sb] filename" },
 	{ "show", c_show,
 		"show configuration" },
 	{ "quit", c_quit,
@@ -712,16 +729,10 @@ commandline(char *line)
 void
 cli(FILE *in)
 {
-	Device *dev;
 	size_t len;
 	char *line;
 
 	apr = nil;
-	for(dev = devlist; dev; dev = dev->next)
-		if(dev->type == apr_ident){
-			apr = (Apr*)dev;
-			break;
-		}
 	for(;;){
 		line = nil;
 		len = 0;

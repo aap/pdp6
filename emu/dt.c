@@ -17,28 +17,8 @@ enum
 
 /* Transport */
 
-#if 0
 static uchar
 dxread(Dx555 *dx)
-{
-	if(dx->dt->ut_rev)
-		return *dx->cur ^ 010;
-	else
-		return *dx->cur;
-}
-
-static void
-dxwrite(Dx555 *dx, uchar d)
-{
-	if(dx->dt->ut_rev)
-		*dx->cur = d ^ 010;
-	else
-		*dx->cur = d;
-}
-#endif
-
-static uchar
-dxread_(Dx555 *dx)
 {
 	if(dx->dt->ut_rev)
 		return *dx->cur ^ 017;
@@ -47,7 +27,7 @@ dxread_(Dx555 *dx)
 }
 
 static void
-dxwrite_(Dx555 *dx, uchar d)
+dxwrite(Dx555 *dx, uchar d)
 {
 	if(dx->dt->ut_rev)
 		*dx->cur = d ^ 017;
@@ -285,7 +265,7 @@ char state = 'n';
 static void
 dt_tp0(Dt551 *dt)
 {
-	dt->sense = dxread_(dt->seldx);
+	dt->sense = dxread(dt->seldx);
 
 	// 3-7
 	if(UT_WRITE && dt->rw_state == RW_ACTIVE)
@@ -307,7 +287,7 @@ dt_tp0(Dt551 *dt)
 		if(UT_WRITE_PREVENT)
 			dt->ut_illegal_op = 1;		// 3-16
 		if(UT_WREN_DATA){
-			dxwrite_(dt->seldx, dt->wb);
+			dxwrite(dt->seldx, dt->wb);
 debug("writing %02o\n", dt->wb);
 		}
 	}

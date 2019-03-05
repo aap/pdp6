@@ -2,6 +2,8 @@ mkdev name type
 	creates a device and gives it a name
 attach name path
 	attaches a file to a device
+detach name
+	detach a file from a device
 connectio name busdevname
 	connects a device to the IO bus of a processor
 connectmem name procnum busdevname addr
@@ -10,10 +12,16 @@ connectdev dev1name dev2name [args]
 	connects two devices in the appropriate way if possible
 examine [-sm] address(range)
 	examines memory (s: shadow mode, m: mnemonic)
-deposit [-sm] address(range) word
-	deposits word into memory (s: shadow mode, m: mnemonic)
-load [-s] filename
-	loads file into memory (see source for which format)
+deposit [-s] address(range) word
+	deposits word into memory (s: shadow mode)
+xexamine {[dev.]reg}+
+	examine device register(s)
+xdeposit {[dev.]reg}+ value
+	deposit into device register(s)
+load [-sb] filename
+	loads file into memory
+	-s for SAV (in backup format)
+	-b for SBLK (in evacuate format)
 show
 	shows device configuration
 help
