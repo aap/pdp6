@@ -1571,6 +1571,16 @@ defpulse(mst3)
 	pulse(apr, &cfac_ar_add, 0);	// 6-17
 }
 
+defpulse(mst2_dly)
+{
+	if(MQ35_EQ_MQ36)
+		pulse(apr, apr->sc == 0777 ? &mst5 : &mst2, 0);	// 6-24
+	if(!(apr->c.mq&F35) && apr->mq36)
+		pulse(apr, &mst3, 0);	// 6-24
+	if(apr->c.mq&F35 && !apr->mq36)
+		pulse(apr, &mst4, 0);	// 6-24
+}
+
 defpulse_(mst2)
 {
 	word ar0_shr_inp, mq0_shr_inp, mq1_shr_inp;
@@ -1581,12 +1591,17 @@ defpulse_(mst2)
 	AR_SH_RT;	// 6-17
 	MQ_SH_RT;	// 6-17
 	SC_INC;		// 6-16
-	if(MQ35_EQ_MQ36)
-		pulse(apr, apr->sc == 0777 ? &mst5 : &mst2, 150);	// 6-24
+	pulse(apr, &mst2_dly, 150);
+}
+
+defpulse(mst1_dly)
+{
+	if(MQ35_EQ_MQ36 && apr->sc != 0777)
+		pulse(apr, &mst2, 0);	// 6-24
 	if(!(apr->c.mq&F35) && apr->mq36)
-		pulse(apr, &mst3, 150);	// 6-24
+		pulse(apr, &mst3, 0);	// 6-24
 	if(apr->c.mq&F35 && !apr->mq36)
-		pulse(apr, &mst4, 150);	// 6-24
+		pulse(apr, &mst4, 0);	// 6-24
 }
 
 defpulse(mst1)
@@ -1594,12 +1609,7 @@ defpulse(mst1)
 	apr->n.mq = apr->c.mb;		// 6-13
 	apr->n.mb = apr->c.ar;		// 6-3
 	AR_CLEAR;			// 6-8
-	if(MQ35_EQ_MQ36 && apr->sc != 0777)
-		pulse(apr, &mst2, 200);	// 6-24
-	if(!(apr->c.mq&F35) && apr->mq36)
-		pulse(apr, &mst3, 200);	// 6-24
-	if(apr->c.mq&F35 && !apr->mq36)
-		pulse(apr, &mst4, 200);	// 6-24
+	pulse(apr, &mst1_dly, 200);
 }
 
 /*
