@@ -57,69 +57,71 @@ The board's SRAM can also be read and written over I²C.
 The TTY is connected to UART over GPIO pins 4 (RX) and 5 (TX)
 
 ## File tree
+ 
+```
+emu	the C emulator
+emu/main_panel.c	main file for emulator with panel simulation
+emu/main_serial.c	main file for emulator with panel over serial line
+emu/emu.c	top level emulator code
+emu/cmd.c	command line interface
+emu/apr.c	Arithmetic Processor 166 emulation
+emu/mem.c	core and fast memory emulation
+emu/tty.c	Teleprinter 626 emulator
+emu/pt.c	Paper tape reader 760 and punch 761 emulation
+emu/dc.c	Data Control 136 emulation
+emu/dt.c	DECtape 551 and 555 emulation
+emu/netmem.c	network protocol for shared memory
+emu/util.c	various utility functions
+emu/util.h
+emu/test_*.c	test code, not too important anymore
+emu/pdp6.h	main header
+emu/args.h	argument parsing
+emu/elements.inc	panel definition
+emu/cmds.txt	command line interface documentation
+emu/init.ini	emulator init file
+emu/mem_*	core memory backing store
 
-* emu	the C emulator
-* emu/main_panel.c	main file for emulator with panel simulation
-* emu/main_serial.c	main file for emulator with panel over serial line
-* emu/emu.c	top level emulator code
-* emu/cmd.c	command line interface
-* emu/apr.c	Arithmetic Processor 166 emulation
-* emu/mem.c	core and fast memory emulation
-* emu/tty.c	Teleprinter 626 emulator
-* emu/pt.c	Paper tape reader 760 and punch 761 emulation
-* emu/dc.c	Data Control 136 emulation
-* emu/dt.c	DECtape 551 and 555 emulation
-* emu/netmem.c	network protocol for shared memory
-* emu/util.c	various utility functions
-* emu/util.h
-* emu/test_*.c	test code, not too important anymore
-* emu/pdp6.h	main header
-* emu/args.h	argument parsing
-* emu/elements.inc	panel definition
-* emu/cmds.txt	command line interface documentation
-* emu/init.ini	emulator init file
-* emu/mem_*	core memory backing store
+tools
+tools/dtr2dta.c	convert between raw (dtr) and simh (dta) DECtape format
+tools/mkpty.c	make a pty and connect to the controlling tty
+tools/mkpty33.c	as above but try to pretend an ASR33
+tools/as6.c	an assembler, roughly modeled on MACRO
+tools/ld6.c	a loader or relocatable files
+tools/pdp6bin.h
+tools/pdp6common.c	useful functions for PDP-6 code
+tools/pdp6common.h
+tools/rel.c	I have no recollection of this code
+tools/reltest.c	old test code to create a REL file
+tools/test.s	old test code for the assembler/linker
+tools/test2.s
+tools/ptdump.c	print a paper tape file in octal
+tools/dtdump.c	print dtr DECtape
 
-* tools
-* tools/dtr2dta.c	convert between raw (dtr) and simh (dta) DECtape format
-* tools/mkpty.c	make a pty and connect to the controlling tty
-* tools/mkpty33.c	as above but try to pretend an ASR33
-* tools/as6.c	an assembler, roughly modeled on MACRO
-* tools/ld6.c	a loader or relocatable files
-* tools/pdp6bin.h
-* tools/pdp6common.c	useful functions for PDP-6 code
-* tools/pdp6common.h
-* tools/rel.c	I have no recollection of this code
-* tools/reltest.c	old test code to create a REL file
-* tools/test.s	old test code for the assembler/linker
-* tools/test2.s
-* tools/ptdump.c	print a paper tape file in octal
-* tools/dtdump.c	print dtr DECtape
+verilog
+verilog/apr.v	Arithmetic Processor 166 simulation
+verilog/core161c.v	Core memory 161C simulation
+verilog/fast162.v	Fast memory 162 simulation
+verilog/modules.v	utility modules
+verilog/pdp6.v		top level module
+verilog/quartus		various files for my terasic board
+verilog/test_dec.v	inst decoding test
+verilog/test.v		misc tests
+verilog/test1.inc
+verilog/test2.inc
+verilog/test_fp.inc
 
-* verilog
-* verilog/apr.v	Arithmetic Processor 166 simulation
-* verilog/core161c.v	Core memory 161C simulation
-* verilog/fast162.v	Fast memory 162 simulation
-* verilog/modules.v	utility modules
-* verilog/pdp6.v		top level module
-* verilog/quartus		various files for my terasic board
-* verilog/test_dec.v	inst decoding test
-* verilog/test.v		misc tests
-* verilog/test1.inc
-* verilog/test2.inc
-* verilog/test_fp.inc
+code	random code for the PDP-6, mostly testing
+code/bootstrap.txt	a list of boot loaders
+code/dtboot.s		loads the first block from a DECtape
+code/main.s		random entry
+code/tty.s		tty character IO
 
-* code	random code for the PDP-6, mostly testing
-* code/bootstrap.txt	a list of boot loaders
-* code/dtboot.s		loads the first block from a DECtape
-* code/main.s		random entry
-* code/tty.s		tty character IO
+panel	stand alone panel with lots of duplicate code
 
-* panel	stand alone panel with lots of duplicate code
+art	image files for the panel
 
-* art	image files for the panel
-
-* misc	nothing important
+misc	nothing important
+```
 
 ## To do
 
