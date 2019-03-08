@@ -199,6 +199,7 @@ wake_dc(void *dev)
 		}
 		if(IOB_DATAI){
 			bus->c12 |= dc->db;
+//printf("Sending DB to APR: %012lo\n", dc->db);
 			dc->db_rq = 0;
 			set_dbda_move(dc);
 		}
@@ -218,6 +219,7 @@ wake_dc(void *dev)
 			DB_CLR;
 		if(IOB_DATAO_SET){
 			dc->db |= bus->c12;
+//printf("Got DB from APR: %012lo\n", dc->db);
 			set_dbda_move(dc);
 		}
 

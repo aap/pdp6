@@ -116,6 +116,8 @@ makedx(int argc, char *argv[])
 
 /* Control */
 
+int dtdbg;
+
 enum
 {
 	TapeEndF  = 022,
@@ -196,7 +198,18 @@ enum
 // TODO: not sure if BM SYNC || DATA SYNC is correct
 #define UTE_ACTIVE_ERROR (!UT_ALL && prev.rw_state == RW_ACTIVE && (BM_SYNC || DATA_SYNC))
 
-//#define debug(...) printf(__VA_ARGS__)
+static void
+dbg(char *fmt, ...)
+{
+	if(dtdbg){
+		va_list ap;
+		va_start(ap, fmt);
+		vfprintf(stdout, fmt, ap);
+		va_end(ap);
+	}
+}
+
+//#define debug(...) dbg(__VA_ARGS__)
 #define debug(...)
 
 #define PRINT1 \
@@ -261,6 +274,13 @@ word dtbuf;
 char state = 'n';
 
 #define REV (dt->ut_rev && !UT_BM)
+
+/* This is a function for debugging purposes */
+static void
+setstat(Dt551 *dt, int state)
+{
+	dt->rw_state = state;
+}
 
 static void
 dt_tp0(Dt551 *dt)
@@ -327,7 +347,7 @@ dt_tp2(Dt551 *dt)
 		dt->ut_go = 0;
 		dt->ut_tape_end_flag = 1;
 		/* TODO: is this right? */
-		dt->rw_state = RW_NULL;
+		setstat(dt, RW_NULL);
 	}
 
 	/* Block mark timing.
@@ -354,7 +374,7 @@ dt_tp2(Dt551 *dt)
 
 
 	/* Send 6 bit byte to DC every two steps when reading */
-	if(UT_READ && RW_EVEN)
+	if(UT_READ && RW_EVEN){
 		/* except checksums */
 		if((prev.tdata & 0102) == 0){
 			int rwb = dt->rwb;
@@ -364,6 +384,7 @@ dt_tp2(Dt551 *dt)
 			if(UTE_DC_DISCONNECT)
 				dt->ut_incomp_block = 1;	// 3-17
 		}
+	}
 
 	/* Clear LB before reading the reverse checksum */
 	if(tdedge & 0100)
@@ -392,12 +413,12 @@ dt_tp2(Dt551 *dt)
 		if(UT_BM && tbedge & 1 ||	// 3-6
 		   UT_DATA && tdedge & 0100 ||	// 3-9
 		   UT_ALL && tbedge & 010)	// 3-11
-			dt->rw_state = RW_ACTIVE;
+			setstat(dt, RW_ACTIVE);
 
 	/* What to do after block */
 	if(tdedge & 1){
 		if(RW_DATA_CONT)		// 3-10
-			dt->rw_state = RW_RQ;
+			setstat(dt, RW_RQ);
 		if(RW_DATA_STOP)		// 3-11
 			dt->ut_jb_done_flag = 1;
 		/* test checksum. NB: manual says should be 0
@@ -415,7 +436,7 @@ debug("CHECKSUM ERR\n");
 	/* Catch wrongly set active state; 3-16 */
 	if(UTE_ACTIVE_ERROR){
 		dt->ut_info_error = 1;
-		dt->rw_state = RW_NULL;
+		setstat(dt, RW_NULL);
 	}
 	/* Catch invalid mark code */
 	if(UTE_ERROR){
@@ -425,7 +446,7 @@ debug("TRACK ERROR\n");
 
 	/* Stop activity once job gets done */
 	if(!prev.ut_jb_done_flag && dt->ut_jb_done_flag)	// 3-8
-		dt->rw_state = RW_NULL;
+		setstat(dt, RW_NULL);
 }
 
 static void
@@ -519,9 +540,9 @@ debug("ILL op %d %d %d\n", nunits, dt->ut_btm_switch, UT_WRTM);
 			}
 
 			if(UT_WRTM)		// 3-14
-				dt->rw_state = RW_ACTIVE;
+				setstat(dt, RW_ACTIVE);
 			else if(!UT_DN)		// TODO: is this right?
-				dt->rw_state = RW_RQ;
+				setstat(dt, RW_RQ);
 		}else
 			/* Don't move during delay.
 			 * TODO: is this right? */
@@ -620,7 +641,7 @@ wake_dt(void *dev)
 	}
 	if(bus->devcode == UTC){
 		if(IOB_STATUS){
-printf("UTC STATUS\n");
+dbg("UTC STATUS\n");
 			if(dt->ut_units_select) bus->c12 |= F19;
 			if(dt->ut_tape_end_enable) bus->c12 |= F20;
 			if(dt->ut_jb_done_enable) bus->c12 |= F21;
@@ -633,7 +654,7 @@ printf("UTC STATUS\n");
 			bus->c12 |= dt->ut_pia & 07;
 		}
 		if(IOB_CONO_CLEAR){
-//printf("UTC CONO CLEAR\n");
+dbg("UTC CONO CLEAR\n");
 			dt->ut_incomp_block = 0;
 			dt->ut_wren = 0;
 			dt->time_flag = 0;
@@ -643,10 +664,9 @@ printf("UTC STATUS\n");
 			dt->ut_jb_done_flag = 0;
 
 			// 3-5
-			dt->rw_state = RW_NULL;
+			setstat(dt, RW_NULL);
 		}
 		if(IOB_CONO_SET){
-//printf("UTC CONO SET\n");
 			dt->ut_pia = bus->c12 & 07;
 			dt->ut_units = bus->c12>>3 & 07;
 			dt->ut_fcn = bus->c12>>6 & 07;
@@ -661,11 +681,30 @@ printf("UTC STATUS\n");
 			// UT CONO SET LONG, 1ms after UT CONO SET
 			//  triggers UT START level until end of delay
 
+dbg("UTC CONO SET %06lo\n", bus->c12 & 0777777);
+dbg("SEL/%o GO/%o REV/%o TIME/%o FCN/%o\n", dt->ut_units_select,
+	dt->ut_go, dt->ut_rev,
+	dt->ut_time, dt->ut_fcn);
+
 			/* update selection, also done after delay */
 			selectdx(dt);
 
 			dt->delay = 0;
 			if(dt->ut_time){
+
+				/* TODO: unsure what to do here.
+				 * The state cleared here usually
+				 * becomes invalid in cases where
+				 * a delay is needed.
+				 * Ideally we simulate those circumstances
+				 * better, but for now clear it here. */
+				dt->tmk = 0;
+				dt->rwb = 0;
+				dt->tbm = 0;
+				dt->tdata = 0;
+				dt->utek = 0;
+				dt->uteck = 0;
+
 				switch(dt->ut_time){
 				case 1:	// 20ms
 					dt->delay = 600;
@@ -683,10 +722,11 @@ printf("UTC STATUS\n");
 
 				dt->time_flag = 0;
 				// now wait
+dbg("starting delay %d\n", dt->delay);
 			}else
 				if(!UT_DN &&		// TODO: is this right?
 				   !UT_WRTM)		// 3-14
-					dt->rw_state = RW_RQ;
+					setstat(dt, RW_RQ);
 		}
 	}
 	recalc_dt_req(dt);
@@ -717,6 +757,7 @@ dtdep(Device *dev, const char *reg, word data)
 
 	dt = (Dt551*)dev;
 	if(strcmp(reg, "btm_wr") == 0) dt->ut_btm_switch = data&1;
+	else if(strcmp(reg, "dbg") == 0) dtdbg = data&1;
 	else return 1;
 	return 0;
 }
