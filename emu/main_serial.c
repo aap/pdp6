@@ -24,8 +24,8 @@ talkserial(int fd, Apr *apr, Ptr *ptr)
 {
 	struct termios ios;
 	Apr oldapr;
-	char buf[32];
-	int n;
+	char c, buf[32];
+	int n, sw;
 
 	if(tcgetattr(fd, &ios) == 0){
 		cfsetispeed(&ios, B38400);
@@ -34,6 +34,10 @@ talkserial(int fd, Apr *apr, Ptr *ptr)
 		tcsetattr(fd, TCSANOW, &ios);
 	}
 
+	/* Synch to CR */
+	while(readn(fd, &c, 1) == 0, c != 015);
+
+	sw = 0;
 	while(1){
 		if(apr == nil)
 			return;
@@ -99,38 +103,45 @@ talkserial(int fd, Apr *apr, Ptr *ptr)
 		/* Send lights */
 		// TODO: only send changes
 		n = 0;
-		buf[n++] = '0';
-		buf[n++] = apr->ir>>12 & 077 | 0100;
-		buf[n++] = apr->ir>>6 & 077 | 0100;
-		buf[n++] = apr->ir>>0 & 077 | 0100;
-		buf[n++] = '1';
-		buf[n++] = apr->mi>>30 & 077 | 0100;
-		buf[n++] = apr->mi>>24 & 077 | 0100;
-		buf[n++] = apr->mi>>18 & 077 | 0100;
-		buf[n++] = '2';
-		buf[n++] = apr->mi>>12 & 077 | 0100;
-		buf[n++] = apr->mi>>6 & 077 | 0100;
-		buf[n++] = apr->mi>>0 & 077 | 0100;
-		buf[n++] = '3';
-		buf[n++] = apr->pc>>12 & 077 | 0100;
-		buf[n++] = apr->pc>>6 & 077 | 0100;
-		buf[n++] = apr->pc>>0 & 077 | 0100;
-		buf[n++] = '4';
-		buf[n++] = apr->ma>>12 & 077 | 0100;
-		buf[n++] = apr->ma>>6 & 077 | 0100;
-		buf[n++] = apr->ma>>0 & 077 | 0100;
-		buf[n++] = '5';
-		buf[n++] = apr->run<<5 | apr->pih>>3 | 0100;
-		buf[n++] = (apr->pih&7)<<3 | 0100;
-		buf[n++] = 0100;
-		buf[n++] = '6';
-		buf[n++] = apr->mc_stop<<5 | apr->pir>>3 | 0100;
-		buf[n++] = (apr->pir&7)<<3 | 0100;
-		buf[n++] = 0100;
-		buf[n++] = '7';
-		buf[n++] = apr->pi_active<<5 | apr->pio>>3 | 0100;
-		buf[n++] = (apr->pio&7)<<3 | 0100;
-		buf[n++] = 0100;
+		switch(sw){
+		case 0:
+			buf[n++] = '0';
+			buf[n++] = apr->ir>>12 & 077 | 0100;
+			buf[n++] = apr->ir>>6 & 077 | 0100;
+			buf[n++] = apr->ir>>0 & 077 | 0100;
+			buf[n++] = '1';
+			buf[n++] = apr->mi>>30 & 077 | 0100;
+			buf[n++] = apr->mi>>24 & 077 | 0100;
+			buf[n++] = apr->mi>>18 & 077 | 0100;
+			buf[n++] = '2';
+			buf[n++] = apr->mi>>12 & 077 | 0100;
+			buf[n++] = apr->mi>>6 & 077 | 0100;
+			buf[n++] = apr->mi>>0 & 077 | 0100;
+			buf[n++] = '3';
+			buf[n++] = apr->pc>>12 & 077 | 0100;
+			buf[n++] = apr->pc>>6 & 077 | 0100;
+			buf[n++] = apr->pc>>0 & 077 | 0100;
+			break;
+		case 1:
+			buf[n++] = '4';
+			buf[n++] = apr->ma>>12 & 077 | 0100;
+			buf[n++] = apr->ma>>6 & 077 | 0100;
+			buf[n++] = apr->ma>>0 & 077 | 0100;
+			buf[n++] = '5';
+			buf[n++] = apr->run<<5 | apr->pih>>3 | 0100;
+			buf[n++] = (apr->pih&7)<<3 | 0100;
+			buf[n++] = 0100;
+			buf[n++] = '6';
+			buf[n++] = apr->mc_stop<<5 | apr->pir>>3 | 0100;
+			buf[n++] = (apr->pir&7)<<3 | 0100;
+			buf[n++] = 0100;
+			buf[n++] = '7';
+			buf[n++] = apr->pi_active<<5 | apr->pio>>3 | 0100;
+			buf[n++] = (apr->pio&7)<<3 | 0100;
+			buf[n++] = 0100;
+			break;
+		}
+		sw = !sw;
 		writen(fd, buf, n);
 	}
 }
