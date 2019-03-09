@@ -240,6 +240,9 @@ makeapr(int argc, char *argv[])
 	t = (Task){ nil, aprcycle, apr, 1, 0 };
 	addtask(t);
 
+	apr->clkchan = chancreate(sizeof(int), 1);
+	apr->rptchan = chancreate(sizeof(int), 1);
+
 	return &apr->dev;
 }
 
@@ -3290,9 +3293,25 @@ defpulse(key_go)
 
 defpulse_(kt4)
 {
+	/* low end of ranges. unsure, but not totally off */
+	static word ranges[6] = {
+		     3400,
+		    41718,	// *12.27
+		   602407,	// *14.44
+		  6024079,	// *10
+		 60240792,	// *10
+		269878748,	// *4.48
+	};
+	static RtcMsg rpt = { 1, 0, nil, 0 };
+
 	if(apr->run && (apr->key_ex_st || apr->key_dep_st))
 		pulse(apr, &key_go, 0); 	// 5-2
-	// TODO check repeat switch
+
+	rpt.c = apr->rptchan;
+	rpt.interval = ranges[apr->speed_range];
+	/* TODO: is this just a multiplier */
+	rpt.interval *= 1 + apr->speed_set/100.0f*14.0f;
+	chansend(rtcchan, &rpt);
 }
 
 defpulse(kt3)
@@ -3381,11 +3400,11 @@ updatebus(void *bus)
 	b->c34_pulse = (b->c34_prev ^ b->c34) & b->c34;
 }
 
-#define TIMESTEP (1000.0/60.0)
-
 void
 aprstart(Apr *apr)
 {
+	static RtcMsg lineclk = { 1, 1, nil, 1000000000/60 };
+
 	int i;
 	printf("[aprstart]\n");
 
@@ -3404,8 +3423,10 @@ aprstart(Apr *apr)
 	apr->iobus.c34 = 0;
 
 	pulse(apr, &mr_pwr_clr, 100);	// random value
-	apr->lasttick = getms();
 	apr->powered = 1;
+
+	lineclk.c = apr->clkchan;
+	chansend(rtcchan, &lineclk);
 }
 
 static void
@@ -3423,20 +3444,16 @@ aprcycle(void *p)
 	}else if(!apr->powered)
 		aprstart(apr);
 
-/*
-	if(apr->pulsestepping){
-		int c;
-		while(c = getchar(), c != EOF && c != '\n')
-			if(c == 'x')
-				apr->pulsestepping = 0;
-	}
-*/
-
-	apr->tick = getms();
-	if(apr->tick-apr->lasttick >= TIMESTEP){
-		apr->lasttick = apr->lasttick+TIMESTEP;
+	int foo;
+	if(channbrecv(apr->clkchan, &foo) == 1){
+//		printf("tick\n");
 		apr->cpa_clock_flag = 1;
 		recalc_cpa_req(apr);
+	}
+	if(channbrecv(apr->rptchan, &foo) == 1){
+//		printf("rpt\n");
+		if(KEY_MANUAL)
+			pulse(apr, &kt0a, 1);
 	}
 
 	apr->iobus.c12_prev = apr->iobus.c12;

@@ -9,13 +9,6 @@
 // TODO: get rid of this
 void updatepanel(Apr *apr) {}
 
-u32
-getms(void)
-{
-	// TODO
-	return 0;
-}
-
 #define KEYPULSE(k) (apr->k && !oldapr.k)
 
 void
@@ -179,11 +172,11 @@ threadmain(int argc, char *argv[])
 	default:
 		usage();
 	}ARGEND;
+
 	if(debugfp = fopen(outfile, "w"), debugfp == nil){
 		fprintf(stderr, "Can't open %s\n", outfile);
 		exit(1);
 	}
-
 
 	dofile("init.ini");
 	apr = (Apr*)getdevice("apr");

@@ -1,4 +1,4 @@
-SRC=emu.c util.c threading.c cmd.c apr.c mem.c tty.c pt.c dc.c dt.c netmem.c ../tools/pdp6common.c
+SRC=emu.c apr.c mem.c tty.c pt.c dc.c dt.c netmem.c cmd.c util.c threading.c rtc.c ../tools/pdp6common.c
 H=pdp6.h ../tools/pdp6common.h threading.h
 # clang
 #CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses \

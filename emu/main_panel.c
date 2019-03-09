@@ -35,12 +35,6 @@ struct Element
 	int active;
 };
 
-u32
-getms(void)
-{
-	return SDL_GetTicks();
-}
-
 SDL_Surface*
 mustloadimg(const char *path)
 {
@@ -544,11 +538,11 @@ threadmain(int argc, char *argv[])
 	default:
 		usage();
 	}ARGEND;
+
 	if(debugfp = fopen(outfile, "w"), debugfp == nil){
 		fprintf(stderr, "Can't open %s\n", outfile);
 		exit(1);
 	}
-
 
 	if(SDL_Init(SDL_INIT_VIDEO) < 0)
 		err("%s", SDL_GetError());
@@ -638,6 +632,8 @@ threadmain(int argc, char *argv[])
 
 	extra_l = e; e += 1;
 
+	rtcchan = chancreate(sizeof(RtcMsg), 20);
+
 	dofile("init.ini");
 	apr = (Apr*)getdevice("apr");
 	tty = (Tty*)getdevice("tty");
@@ -650,6 +646,7 @@ threadmain(int argc, char *argv[])
 	addtask(t);
 	threadcreate(simthread, nil);
 	threadcreate(cmdthread, cmdchans);
+	threadcreate(rtcthread, nil);
 
 	for(;;){
 		while(SDL_PollEvent(&ev))

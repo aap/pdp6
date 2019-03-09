@@ -37,7 +37,8 @@ Otherwise you need SDL and pthread.
 
 The cpu (apr), console tty, paper tape and punch,
 the data control and DECtape are implemented.
-The only things missing from the cpu is the repeat key mechanism.
+The panel is missing the repeat delay knobs,
+but the functionality is implemented.
 
 ## Verilog Simulation
 
@@ -125,7 +126,7 @@ misc	nothing important
 
 ## To do
 
-- repeat and maint. switches
+- repeat and maint. switches on panel
 - improve timing
 - implement 340 display
 - do more tests

@@ -25,7 +25,6 @@ extern int dotrace;
 void trace(char *fmt, ...);
 void debug(char *fmt, ...);
 void err(char *fmt, ...);
-u32 getms(void);
 
 void strtolower(char *s);
 int hasinput(int fd);
@@ -39,6 +38,7 @@ void cli(FILE *f, Channel **c);
 void readcmdchan(void *p);
 void *cmdthread(void *);
 void *simthread(void *p);
+void *rtcthread(void *p);
 void dofile(const char *path);
 
 enum {
@@ -99,6 +99,16 @@ struct Task
 
 extern Task *tasks;
 void addtask(Task t);
+
+typedef struct RtcMsg RtcMsg;
+struct RtcMsg
+{
+	int msg;	// 1 - start; 0 - stop
+	int repeat;
+	Channel *c;
+	word interval;
+};
+extern Channel *rtcchan;
 
 typedef struct Device Device;
 struct Device
@@ -352,6 +362,9 @@ struct Apr
 	bool key_ex, key_ex_nxt;
 	bool key_rd_off, key_rd_on;
 	bool key_pt_rd, key_pt_wr;
+	/* knobs */
+	int speed_range;	// 0-5
+	int speed_set;		// 1-100
 
 	/* PI */
 	u8 pio, pir, pih, pi_req;
@@ -426,11 +439,9 @@ struct Apr
 	bool fc_e_pse;
 	bool pc_set;
 
-	/* needed for the emulation */
-	double lasttick, tick;
+	Channel *clkchan, *rptchan;
 	int extpulse;
 	bool ia_inh;	// this is asserted for some time
-	int pulsestepping;
 
 	/* This could be abstracted away */
 	TPulse pulses[MAXPULSE];
