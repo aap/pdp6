@@ -1,6 +1,5 @@
 #include "pdp6.h"
 #include <stdarg.h>
-#include <pthread.h>
 #include "args.h"
 
 #include <fcntl.h>
@@ -154,12 +153,13 @@ usage(void)
 }
 
 int
-main(int argc, char *argv[])
+threadmain(int argc, char *argv[])
 {
-	pthread_t cmd_thread, sim_thread;
 	const char *outfile;
 	const char *panelfile;
 	int fd;
+	Channel *cmdchans[2];
+	Task t;
 
 	Apr *apr;
 	Ptr *ptr;
@@ -189,8 +189,12 @@ main(int argc, char *argv[])
 	apr = (Apr*)getdevice("apr");
 	ptr = (Ptr*)getdevice("ptr");
 
-	pthread_create(&sim_thread, nil, simthread, apr);
-	pthread_create(&cmd_thread, nil, cmdthread, nil);
+	cmdchans[0] = chancreate(sizeof(char*), 1);
+	cmdchans[1] = chancreate(sizeof(void*), 1);
+	t = (Task){ nil, readcmdchan, cmdchans, 10, 0 };
+	addtask(t);
+	threadcreate(simthread, nil);
+	threadcreate(cmdthread, cmdchans);
 
 	if(panelfile){
 		fd = open(panelfile, O_RDWR);

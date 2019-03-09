@@ -776,7 +776,7 @@ Device*
 makedt(int argc, char *argv[])
 {
 	Dt551 *dt;
-	Thread th;
+	Task t;
 
 	dt = malloc(sizeof(Dt551));
 	memset(dt, 0, sizeof(Dt551));
@@ -789,8 +789,8 @@ makedt(int argc, char *argv[])
 
 	// should have 30000 cycles per second, so one every 33μs
 	// APR at 1 has an approximate cycle time of 200-300ns
-	th = (Thread){ nil, dtcycle, dt, 150, 0 };
-	addthread(th);
+	t = (Task){ nil, dtcycle, dt, 150, 0 };
+	addtask(t);
 
 	return &dt->dev;
 }

@@ -6,7 +6,7 @@ Dx555 *dx;
 IOBus iobus;
 IOBus *bus = &iobus;
 int pireq;
-Thread dtthread;
+Task dttask;
 
 void
 setreq(IOBus *bus, int dev, u8 pia)
@@ -16,9 +16,9 @@ setreq(IOBus *bus, int dev, u8 pia)
 }
 
 void
-addthread(Thread th)
+addtask(Task t)
 {
-	dtthread = th;
+	dttask = t;
 }
 
 
@@ -203,7 +203,7 @@ fwdtest_w(void)
 	cono(bus, DC, DARQ|DBRQ|OUT|CHMOD_6|DEV1|7);
 	cono(bus, UTC, SEL|GO|FWD|DLY3|FN_WBN|DEV1|0);
 	while(dt->ut_go){
-		dtthread.f(dt);
+		dttask.f(dt);
 		if(pireq == 7){
 			if(bufsz > 0){
 				w = bufp[--bufsz];
@@ -228,7 +228,7 @@ revtest_w(void)
 	cono(bus, DC, DARQ|DBRQ|OUT|CHMOD_6|DEV1|7);
 	cono(bus, UTC, SEL|GO|REV|DLY3|FN_WD|DEV1|0);
 	while(dt->ut_go){
-		dtthread.f(dt);
+		dttask.f(dt);
 		if(pireq == 7){
 			if(bufsz > 0){
 				w = bufp[--bufsz];
@@ -251,7 +251,7 @@ fwdtest_r(void)
 	cono(bus, DC, DBDAMOVE|IN|CHMOD_6|DEV1|7);
 	cono(bus, UTC, SEL|GO|FWD|DLY3|FN_RD|DEV1|0);
 	while(dt->ut_go){
-		dtthread.f(dt);
+		dttask.f(dt);
 		if(pireq == 7){
 			w = datai(bus, DC);
 			printf("DC got: %012lo\n", w);
@@ -271,7 +271,7 @@ revtest_r(void)
 	cono(bus, DC, DBDAMOVE|IN|CHMOD_6|DEV1|7);
 	cono(bus, UTC, SEL|GO|REV|DLY3|FN_RD|DEV1|0);
 	while(dt->ut_go){
-		dtthread.f(dt);
+		dttask.f(dt);
 		if(pireq == 7){
 			w = datai(bus, DC);
 			printf("DC got: %012lo\n", w);
@@ -293,7 +293,7 @@ fmttest(void)
 	cono(bus, DC, DARQ|DBRQ|OUT|CHMOD_6|DEV1|7);
 	cono(bus, UTC, SEL|GO|FWD|DLY3|FN_WTM|DEV1|0);
 	while(dt->ut_go){
-		dtthread.f(dt);
+		dttask.f(dt);
 		if(pireq == 7){
 			if(bufsz > 0){
 				--bufsz;

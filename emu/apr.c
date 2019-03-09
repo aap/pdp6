@@ -224,7 +224,7 @@ Device*
 makeapr(int argc, char *argv[])
 {
 	Apr *apr;
-	Thread th;
+	Task t;
 
 	apr = malloc(sizeof(Apr));
 	memset(apr, 0, sizeof(Apr));
@@ -237,8 +237,8 @@ makeapr(int argc, char *argv[])
 	apr->iobus.dev[CPA] = (Busdev){ apr, wake_cpa, 0 };
 	apr->iobus.dev[PI] = (Busdev){ apr, wake_pi, 0 };
 
-	th = (Thread){ nil, aprcycle, apr, 1, 0 };
-	addthread(th);
+	t = (Task){ nil, aprcycle, apr, 1, 0 };
+	addtask(t);
 
 	return &apr->dev;
 }

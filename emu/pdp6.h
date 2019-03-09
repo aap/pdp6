@@ -6,6 +6,7 @@
 #include <ctype.h>
 #include <assert.h>
 #include "../tools/pdp6common.h"
+#include "threading.h"
 
 #define nelem(a) (sizeof(a)/sizeof(a[0]))
 #define nil NULL
@@ -33,7 +34,9 @@ int readn(int fd, void *data, int n);
 int dial(const char *host, int port);
 
 void quit(int code);
-void cli(FILE *f);
+void commandline(char *line);
+void cli(FILE *f, Channel **c);
+void readcmdchan(void *p);
 void *cmdthread(void *);
 void *simthread(void *p);
 void dofile(const char *path);
@@ -84,18 +87,18 @@ typedef struct IOBus IOBus;
 typedef struct Apr Apr;
 
 
-typedef struct Thread Thread;
-struct Thread
+typedef struct Task Task;
+struct Task
 {
-	Thread *next;	/* link to next thread */
+	Task *next;	/* link to next task */
 	void (*f)(void*);
 	void *arg;
-	int freq;	/* how often the thread is serviced */
+	int freq;	/* how often the task is serviced */
 	int cnt;
 };
 
-extern Thread *threads;
-void addthread(Thread th);
+extern Task *tasks;
+void addtask(Task t);
 
 typedef struct Device Device;
 struct Device

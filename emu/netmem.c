@@ -91,7 +91,7 @@ makenetmem(int argc, char *argv[])
 	int port;
 	Netmem *nm;
 	Device *apr;
-	Thread th;
+	Task t;
 
 	nm = malloc(sizeof(Netmem));
 	memset(nm, 0, sizeof(Netmem));
@@ -120,8 +120,8 @@ makenetmem(int argc, char *argv[])
 		printf("couldn't connect\n");
 	printf("netmem fd: %d\n", nm->fd);
 
-	th = (Thread){ nil, netmemcycle, nm, 50, 0 };
-	addthread(th);
+	t = (Task){ nil, netmemcycle, nm, 50, 0 };
+	addtask(t);
 
 	return &nm->dev;
 }

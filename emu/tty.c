@@ -136,7 +136,7 @@ Device*
 maketty(int argc, char *argv[])
 {
 	Tty *tty;
-	Thread th;
+	Task t;
 
 	tty = malloc(sizeof(Tty));
 	memset(tty, 0, sizeof(Tty));
@@ -148,8 +148,8 @@ maketty(int argc, char *argv[])
 
 	tty->fd = -1;
 
-	th = (Thread){ nil, ttycycle, tty, 1, 0 };
-	addthread(th);
+	t = (Task){ nil, ttycycle, tty, 1, 0 };
+	addtask(t);
 
 	return &tty->dev;
 }

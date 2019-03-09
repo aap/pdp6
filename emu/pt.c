@@ -240,7 +240,7 @@ Device*
 makeptp(int argc, char *argv[])
 {
 	Ptp *ptp;
-	Thread th;
+	Task t;
 
 	ptp = malloc(sizeof(Ptp));
 	memset(ptp, 0, sizeof(Ptp));
@@ -251,8 +251,8 @@ makeptp(int argc, char *argv[])
 	ptp->dev.ioconnect = ptpioconnect;
 	ptp->fd = -1;
 
-	th = (Thread){ nil, ptpcycle, ptp, 1000, 0 };
-	addthread(th);
+	t = (Task){ nil, ptpcycle, ptp, 1000, 0 };
+	addtask(t);
 	return &ptp->dev;
 }
 
@@ -260,7 +260,7 @@ Device*
 makeptr(int argc, char *argv[])
 {
 	Ptr *ptr;
-	Thread th;
+	Task t;
 
 	ptr = malloc(sizeof(Ptr));
 	memset(ptr, 0, sizeof(Ptr));
@@ -271,7 +271,7 @@ makeptr(int argc, char *argv[])
 	ptr->dev.ioconnect = ptrioconnect;
 	ptr->fd = -1;
 
-	th = (Thread){ nil, ptrcycle, ptr, 1000, 0 };
-	addthread(th);
+	t = (Task){ nil, ptrcycle, ptr, 1000, 0 };
+	addtask(t);
 	return &ptr->dev;
 }

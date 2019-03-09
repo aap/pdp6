@@ -726,8 +726,11 @@ commandline(char *line)
 	}
 }
 
+/* If there is no channel, execute immediately.
+ * Otherwise send line through channel so it can
+ * be executed synchronously in the simulation thread. */
 void
-cli(FILE *in)
+cli(FILE *in, Channel **c)
 {
 	size_t len;
 	char *line;
@@ -740,15 +743,20 @@ cli(FILE *in)
 			printf("> ");
 		if(getline(&line, &len, in) < 0)
 			return;
-		commandline(line);
-		free(line);
+		if(c){
+			chansend(c[0], &line);
+			chanrecv(c[1], &line);	// wait for completion
+		}else{
+			commandline(line);
+			free(line);
+		}
 	}
 }
 
 void*
 cmdthread(void *p)
 {
-	cli(stdin);
+	cli(stdin, p);
 	quit(0);
 	return nil;
 }

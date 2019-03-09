@@ -2,7 +2,6 @@
 #include <stdarg.h>
 #include <SDL.h>
 #include <SDL_image.h>
-#include <pthread.h>
 #include "args.h"
 
 typedef struct Point Point;
@@ -516,7 +515,7 @@ usage(void)
 }
 
 int
-main(int argc, char *argv[])
+threadmain(int argc, char *argv[])
 {
 	SDL_Surface *screen;
 	SDL_Event ev;
@@ -525,8 +524,9 @@ main(int argc, char *argv[])
 	Element *e;
 	int i;
 	int w, h;
-	pthread_t cmd_thread, sim_thread;
 	const char *outfile;
+	Channel *cmdchans[2];
+	Task t;
 
 	Apr *apr;
 	Ptr *ptr;
@@ -644,8 +644,12 @@ main(int argc, char *argv[])
 	ptr = (Ptr*)getdevice("ptr");
 	ptp = (Ptp*)getdevice("ptp");
 
-	pthread_create(&sim_thread, nil, simthread, apr);
-	pthread_create(&cmd_thread, nil, cmdthread, nil);
+	cmdchans[0] = chancreate(sizeof(char*), 1);
+	cmdchans[1] = chancreate(sizeof(void*), 1);
+	t = (Task){ nil, readcmdchan, cmdchans, 10, 0 };
+	addtask(t);
+	threadcreate(simthread, nil);
+	threadcreate(cmdthread, cmdchans);
 
 	for(;;){
 		while(SDL_PollEvent(&ev))

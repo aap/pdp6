@@ -1,4 +1,6 @@
+#ifndef USED
 #define USED(x) ((void)x)
+#endif
 #define SET(x) ((x)=0)
 
 extern char *argv0;

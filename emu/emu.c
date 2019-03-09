@@ -39,30 +39,30 @@ err(char *fmt, ...)
 }
 
 
-Thread *threads;
+Task *tasks;
 
 void
-addthread(Thread th)
+addtask(Task t)
 {
-	Thread *p;
-	p = malloc(sizeof(Thread));
-	*p = th;
-	p->next = threads;
-	threads = p;
+	Task *p;
+	p = malloc(sizeof(Task));
+	*p = t;
+	p->next = tasks;
+	tasks = p;
 }
 
 void*
 simthread(void *p)
 {
-	Thread *th;
+	Task *t;
 
 	printf("[simthread] start\n");
 	for(;;)
-		for(th = threads; th; th = th->next){
-			th->cnt++;
-			if(th->cnt == th->freq){
-				th->cnt = 0;
-				th->f(th->arg);
+		for(t = tasks; t; t = t->next){
+			t->cnt++;
+			if(t->cnt == t->freq){
+				t->cnt = 0;
+				t->f(t->arg);
 			}
 		}
 	err("can't happen");
@@ -104,8 +104,24 @@ dofile(const char *path)
 		printf("Couldn't open file %s\n", path);
 		return;
 	}
-	cli(f);
+	cli(f, nil);
 	fclose(f);
+}
+
+/* Task for simulation.
+ * Execute commands synchronously. */
+void
+readcmdchan(void *p)
+{
+	Channel **c;
+	char *line;
+
+	c = p;
+	if(channbrecv(c[0], &line) == 1){
+		commandline(line);
+		free(line);
+		chansend(c[1], &line);
+	}
 }
 
 void
