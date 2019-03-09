@@ -4,9 +4,9 @@ H=pdp6.h ../tools/pdp6common.h threading.h
 #CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses \
 #        -Wno-bitwise-op-parentheses
 CFLAGS=  -g -Wall -Wno-parentheses -fno-diagnostics-show-caret
-SDLFLAGS=`sdl-config --cflags` `pkg-config SDL_image --cflags`
+SDLFLAGS=`sdl2-config --cflags` `pkg-config SDL2_image --cflags`
 
-LIBS=`sdl-config --libs` `pkg-config SDL_image --libs` -lpthread
+LIBS=`sdl2-config --libs` `pkg-config SDL2_image --libs` -lpthread
 
 
 pdp6: main_panel.c $(SRC) $(H)

@@ -3,9 +3,9 @@ SRC=panel6.c ../emu/util.c
 #CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses \
 #        -Wno-bitwise-op-parentheses
 CFLAGS=  -g -fno-diagnostics-show-caret \
-	`sdl-config --cflags` `pkg-config SDL_image --cflags`
+	`sdl2-config --cflags` `pkg-config SDL2_image --cflags`
 
-LIBS=	`sdl-config --libs` `pkg-config SDL_image --libs` -lpthread
+LIBS=	`sdl2-config --libs` `pkg-config SDL2_image --libs` -lpthread
 
 
 panel6: $(SRC)

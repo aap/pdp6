@@ -1,7 +1,7 @@
 #include "pdp6.h"
 #include <stdarg.h>
-#include <SDL.h>
-#include <SDL_image.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 #include "args.h"
 
 typedef struct Point Point;
@@ -10,10 +10,17 @@ struct Point
 	float x, y;
 };
 
+typedef struct Image Image;
+struct Image
+{
+	SDL_Texture *tex;
+	int w, h;
+};
+
 typedef struct Panel Panel;
 struct Panel
 {
-	SDL_Surface *surf;
+	Image *surf;
 	SDL_Rect pos;
 };
 
@@ -28,26 +35,33 @@ struct Grid
 typedef struct Element Element;
 struct Element
 {
-	SDL_Surface **surf;
+	Image **surf;
 	Grid *grid;
 	Point pos;
 	int state;
 	int active;
 };
 
-SDL_Surface*
+SDL_Window *window;
+SDL_Renderer *renderer;
+
+Image*
 mustloadimg(const char *path)
 {
-	SDL_Surface *s;
-	s = IMG_Load(path);
+	Image *img;
+	SDL_Texture *s;
+	s = IMG_LoadTexture(renderer, path);
 	if(s == nil)
 		err("Couldn't load %s", path);
-	return s;
+	img = malloc(sizeof(Image));
+	img->tex = s;
+	SDL_QueryTexture(img->tex, nil, nil, &img->w, &img->h);
+	return img;
 }
 
-SDL_Surface *lampsurf[2];
-SDL_Surface *switchsurf[2];
-SDL_Surface *keysurf[3];
+Image *lampsurf[2];
+Image *switchsurf[2];
+Image *keysurf[3];
 
 Panel oppanel;
 Grid opgrid1;	/* the smaller base grid */
@@ -342,8 +356,10 @@ updatept(Ptp *ptp, Ptr *ptr)
 }
 
 void
-putpixel(SDL_Surface *screen, int x, int y, Uint32 col)
+putpixel(SDL_Texture *screen, int x, int y, Uint32 col)
 {
+	// TODO: rewrite for SDL2
+/*
 	Uint32 *p = (Uint32*)screen->pixels;
 	if(x < 0 || x >= screen->w ||
 	   y < 0 || y >= screen->h)
@@ -351,17 +367,18 @@ putpixel(SDL_Surface *screen, int x, int y, Uint32 col)
 	p += y*screen->w+x;
 	*p = SDL_MapRGBA(screen->format,
 		col&0xFF, (col>>8)&0xFF, (col>>16)&0xFF, (col>>24)&0xFF);
+*/
 }
 
 void
-drawhline(SDL_Surface *screen, int y, int x1, int x2, Uint32 col)
+drawhline(SDL_Texture *screen, int y, int x1, int x2, Uint32 col)
 {
 	for(; x1 < x2; x1++)
 		putpixel(screen, x1, y, col);
 }
 
 void
-drawvline(SDL_Surface *screen, int x, int y1, int y2, Uint32 col)
+drawvline(SDL_Texture *screen, int x, int y1, int y2, Uint32 col)
 {
 	for(; y1 < y2; y1++)
 		putpixel(screen, x, y1, col);
@@ -386,34 +403,49 @@ ismouseover(Element *e, int x, int y)
 }
 
 void
-drawgrid(Grid *g, SDL_Surface *s, Uint32 col)
+drawgrid(Grid *g, SDL_Texture *s, Uint32 col)
 {
-	SDL_Surface *ps;
+	Image *pi;
 	int x, y;
 	int xmax, ymax;
 	Point p;
 
-	ps = g->panel->surf;
-	xmax = ps->w/g->xscl;
-	ymax = ps->h/g->yscl;
+	pi = g->panel->surf;
+	xmax = pi->w/g->xscl;
+	ymax = pi->h/g->yscl;
 	for(x = 0; x < xmax; x++){
 		p = xform(g, (Point){ x, 0 });
 		drawvline(s, p.x,
-		          p.y - ps->h, p.y, col);
+		          p.y - pi->h, p.y, col);
 	}
 	for(y = 0; y < ymax; y++){
 		p = xform(g, (Point){ 0, y });
 		drawhline(s, p.y,
-		          p.x, p.x + ps->w, col);
+		          p.x, p.x + pi->w, col);
 	}
 }
 
 void
-drawelement(SDL_Surface *screen, Element *elt, int power)
+drawpanel(SDL_Renderer *renderer, Panel *p)
 {
+	if(p->pos.x < 0)
+		return;
+
+	p->pos.w = p->surf->w;
+	p->pos.h = p->surf->h;
+	SDL_RenderCopy(renderer, p->surf->tex, nil, &p->pos);
+}
+
+void
+drawelement(SDL_Renderer *renderer, Element *elt, int power)
+{
+	Image *img;
 	SDL_Rect r;
 	Point p;
 	int s;
+
+	if(elt->grid->panel == nil)
+		return;
 
 	p = xform(elt->grid, elt->pos);
 	r.x = p.x+0.5;
@@ -422,7 +454,10 @@ drawelement(SDL_Surface *screen, Element *elt, int power)
 		s = elt->state && power;
 	else
 		s = elt->state;
-	SDL_BlitSurface(elt->surf[s], nil, screen, &r);
+	img = elt->surf[s];
+	r.w = img->w;
+	r.h = img->h;
+	SDL_RenderCopy(renderer, img->tex, nil, &r);
 }
 
 void
@@ -511,7 +546,6 @@ usage(void)
 int
 threadmain(int argc, char *argv[])
 {
-	SDL_Surface *screen;
 	SDL_Event ev;
 	SDL_MouseButtonEvent *mbev;
 	SDL_MouseMotionEvent *mmev;
@@ -544,8 +578,11 @@ threadmain(int argc, char *argv[])
 		exit(1);
 	}
 
-	if(SDL_Init(SDL_INIT_VIDEO) < 0)
-		err("%s", SDL_GetError());
+	SDL_Init(SDL_INIT_EVERYTHING);
+	IMG_Init(IMG_INIT_PNG);
+
+	if(SDL_CreateWindowAndRenderer(1399, 740, 0, &window, &renderer) < 0)
+		err("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
 
 	lampsurf[0] = mustloadimg("../art/lamp_off.png");
 	lampsurf[1] = mustloadimg("../art/lamp_on.png");
@@ -591,9 +628,7 @@ threadmain(int argc, char *argv[])
 
 	findlayout(&w, &h);
 
-	screen = SDL_SetVideoMode(w, h, 32, SDL_DOUBLEBUF);
-	if(screen == nil)
-		err("%s", SDL_GetError());
+	SDL_SetWindowSize(window, w, h);
 
 	e = switches;
 	data_sw = e; e += 36;
@@ -668,19 +703,21 @@ threadmain(int argc, char *argv[])
 		updatetty(tty);
 		updatept(ptp, ptr);
 
-		SDL_FillRect(screen, nil, SDL_MapRGBA(screen->format, 0xe6, 0xe6, 0xe6, 0xff));
-		SDL_BlitSurface(indpanel1.surf, nil, screen, &indpanel1.pos);
-		SDL_BlitSurface(indpanel2.surf, nil, screen, &indpanel2.pos);
-		SDL_BlitSurface(extrapanel.surf, nil, screen, &extrapanel.pos);
-		SDL_BlitSurface(iopanel.surf, nil, screen, &iopanel.pos);
-		SDL_BlitSurface(oppanel.surf, nil, screen, &oppanel.pos);
+		SDL_SetRenderDrawColor(renderer, 0xe6, 0xe6, 0xe6, 0xff);
+		SDL_RenderClear(renderer);
+
+		drawpanel(renderer, &indpanel1);
+		drawpanel(renderer, &indpanel2);
+		drawpanel(renderer, &extrapanel);
+		drawpanel(renderer, &iopanel);
+		drawpanel(renderer, &oppanel);
 
 		for(i = 0, e = lamps; i < nelem(lamps); i++, e++)
-			drawelement(screen, e, apr->sw_power);
+			drawelement(renderer, e, apr->sw_power);
 		for(i = 0, e = keys; i < nelem(keys); i++, e++)
-			drawelement(screen, e, apr->sw_power);
+			drawelement(renderer, e, apr->sw_power);
 		for(i = 0, e = switches; i < nelem(switches); i++, e++)
-			drawelement(screen, e, apr->sw_power);
+			drawelement(renderer, e, apr->sw_power);
 
 //		SDL_LockSurface(screen);
 //		drawgrid(&opgrid1, screen, 0xFFFFFF00);
@@ -691,7 +728,7 @@ threadmain(int argc, char *argv[])
 //		drawgrid(&extragrid, screen, 0xFFFFFF00);
 //		SDL_UnlockSurface(screen);
 
-		SDL_Flip(screen);
+		SDL_RenderPresent(renderer);
 	}
 	return 0;
 }

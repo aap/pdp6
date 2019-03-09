@@ -364,7 +364,7 @@ struct Apr
 	bool key_pt_rd, key_pt_wr;
 	/* knobs */
 	int speed_range;	// 0-5
-	int speed_set;		// 1-100
+	int speed_set;		// 0-100
 
 	/* PI */
 	u8 pio, pir, pih, pi_req;
