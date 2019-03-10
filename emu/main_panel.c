@@ -42,6 +42,15 @@ struct Element
 	int active;
 };
 
+typedef struct SwDigit SwDigit;
+struct SwDigit
+{
+	Element *lp;	// lamp
+	Element *sw;	// switch
+	SwDigit *prev;
+	SwDigit *next;
+};
+
 SDL_Window *window;
 SDL_Renderer *renderer;
 
@@ -95,6 +104,11 @@ Element *iobus_l, *cr_l, *crbuf_l, *ptr_l, *ptrbuf_l,
 Element *extra_sw;
 Element *extra_l;
 
+SwDigit data_digits[12];
+SwDigit addr_digits[6];
+SwDigit *curdigit;
+SDL_Rect digitindline;
+
 #include "elements.inc"
 
 void
@@ -132,7 +146,7 @@ updatepanel(Apr *apr)
 	extra_sw[4].state = apr->sw_spltcyc_override;
 }
 
-void
+static void
 updateapr(Apr *apr, Ptr *ptr)
 {
 	Apr oldapr;
@@ -320,7 +334,7 @@ updateapr(Apr *apr, Ptr *ptr)
 	setelements(apr->iobus.c12, iobus_l, 36);
 }
 
-void
+static void
 updatetty(Tty *tty)
 {
 	if(tty){
@@ -333,7 +347,7 @@ updatetty(Tty *tty)
 	}
 }
 
-void
+static void
 updatept(Ptp *ptp, Ptr *ptr)
 {
 	if(ptp){
@@ -355,7 +369,7 @@ updatept(Ptp *ptp, Ptr *ptr)
 	}
 }
 
-void
+static void
 putpixel(SDL_Texture *screen, int x, int y, Uint32 col)
 {
 	// TODO: rewrite for SDL2
@@ -370,21 +384,21 @@ putpixel(SDL_Texture *screen, int x, int y, Uint32 col)
 */
 }
 
-void
+static void
 drawhline(SDL_Texture *screen, int y, int x1, int x2, Uint32 col)
 {
 	for(; x1 < x2; x1++)
 		putpixel(screen, x1, y, col);
 }
 
-void
+static void
 drawvline(SDL_Texture *screen, int x, int y1, int y2, Uint32 col)
 {
 	for(; y1 < y2; y1++)
 		putpixel(screen, x, y1, col);
 }
 
-Point
+static Point
 xform(Grid *g, Point p)
 {
 	p.x = g->panel->pos.x + g->xoff + p.x*g->xscl;
@@ -392,7 +406,7 @@ xform(Grid *g, Point p)
 	return p;
 }
 
-int
+static int
 ismouseover(Element *e, int x, int y)
 {
 	Point p;
@@ -402,7 +416,7 @@ ismouseover(Element *e, int x, int y)
 	       y >= p.y && y <= p.y + e->surf[e->state]->h;
 }
 
-void
+static void
 drawgrid(Grid *g, SDL_Texture *s, Uint32 col)
 {
 	Image *pi;
@@ -425,7 +439,7 @@ drawgrid(Grid *g, SDL_Texture *s, Uint32 col)
 	}
 }
 
-void
+static void
 drawpanel(SDL_Renderer *renderer, Panel *p)
 {
 	if(p->pos.x < 0)
@@ -436,7 +450,7 @@ drawpanel(SDL_Renderer *renderer, Panel *p)
 	SDL_RenderCopy(renderer, p->surf->tex, nil, &p->pos);
 }
 
-void
+static void
 drawelement(SDL_Renderer *renderer, Element *elt, int power)
 {
 	Image *img;
@@ -460,7 +474,7 @@ drawelement(SDL_Renderer *renderer, Element *elt, int power)
 	SDL_RenderCopy(renderer, img->tex, nil, &r);
 }
 
-void
+static void
 mouse(int button, int state, int x, int y)
 {
 	static int buttonstate;
@@ -510,7 +524,73 @@ mouse(int button, int state, int x, int y)
 	}
 }
 
-void
+static void
+setcurdigit(SwDigit *d)
+{
+	Point p1, p2;
+
+	curdigit = d;
+	p1 = xform(d->sw[0].grid, d->sw[0].pos);
+	p2 = xform(d->sw[2].grid, d->sw[2].pos);
+	p2.x += d->sw[2].surf[0]->w;
+	p2.y += d->sw[2].surf[0]->h;
+	digitindline.x = p1.x;
+	digitindline.y = p1.y;
+	digitindline.w = p2.x - p1.x;
+	digitindline.h = p2.y - p1.y;
+}
+
+static void
+setdigit(int n)
+{
+	curdigit->sw[0].state = !!(n & 4);
+	curdigit->sw[1].state = !!(n & 2);
+	curdigit->sw[2].state = !!(n & 1);
+	setcurdigit(curdigit->next);
+}
+
+static void
+setdigitfromlamp(void)
+{
+	curdigit->sw[0].state = curdigit->lp[0].state;
+	curdigit->sw[1].state = curdigit->lp[1].state;
+	curdigit->sw[2].state = curdigit->lp[2].state;
+	setcurdigit(curdigit->next);
+}
+
+static void
+keydown(SDL_Keysym keysym)
+{
+	int i;
+
+	switch(keysym.scancode){
+	case SDL_SCANCODE_0: setdigit(0); break;
+	case SDL_SCANCODE_1: setdigit(1); break;
+	case SDL_SCANCODE_2: setdigit(2); break;
+	case SDL_SCANCODE_3: setdigit(3); break;
+	case SDL_SCANCODE_4: setdigit(4); break;
+	case SDL_SCANCODE_5: setdigit(5); break;
+	case SDL_SCANCODE_6: setdigit(6); break;
+	case SDL_SCANCODE_7: setdigit(7); break;
+	case SDL_SCANCODE_A: setcurdigit(addr_digits); break;
+	case SDL_SCANCODE_D: setcurdigit(data_digits); break;
+	case SDL_SCANCODE_LEFT: setcurdigit(curdigit->prev); break;
+	case SDL_SCANCODE_RIGHT: setcurdigit(curdigit->next); break;
+	case SDL_SCANCODE_C:
+		/* clear */
+		for(i = 0; i < 12; i++)
+			setdigit(0);
+		break;
+	case SDL_SCANCODE_L:
+		/* load */
+		for(i = 0; i < 12; i++)
+			setdigitfromlamp();
+		break;
+	default: break;
+	}
+}
+
+static void
 findlayout(int *w, int *h)
 {
 	float gap;
@@ -667,6 +747,21 @@ threadmain(int argc, char *argv[])
 
 	extra_l = e; e += 1;
 
+	for(i = 0; i < 12; i++){
+		data_digits[i].lp = &mi_l[i*3];
+		data_digits[i].sw = &data_sw[i*3];
+		data_digits[i].prev = &data_digits[(i+11) % 12];
+		data_digits[i].next = &data_digits[(i+1) % 12];
+	}
+	for(i = 0; i < 6; i++){
+		addr_digits[i].lp = &ma_l[i*3];
+		addr_digits[i].sw = &ma_sw[i*3];
+		addr_digits[i].prev = &addr_digits[(i+5) % 6];
+		addr_digits[i].next = &addr_digits[(i+1) % 6];
+	}
+
+	setcurdigit(data_digits);
+
 	rtcchan = chancreate(sizeof(RtcMsg), 20);
 
 	dofile("init.ini");
@@ -695,6 +790,9 @@ threadmain(int argc, char *argv[])
 				mbev = (SDL_MouseButtonEvent*)&ev;
 				mouse(mbev->button, mbev->state, mbev->x, mbev->y);
 				break;
+			case SDL_KEYDOWN:
+				keydown(ev.key.keysym);
+				break;
 			case SDL_QUIT:
 				quit(0);
 			}
@@ -718,6 +816,9 @@ threadmain(int argc, char *argv[])
 			drawelement(renderer, e, apr->sw_power);
 		for(i = 0, e = switches; i < nelem(switches); i++, e++)
 			drawelement(renderer, e, apr->sw_power);
+
+		SDL_SetRenderDrawColor(renderer, 0xFF, 0, 0, 0xff);
+		SDL_RenderDrawRect(renderer, &digitindline);
 
 //		SDL_LockSurface(screen);
 //		drawgrid(&opgrid1, screen, 0xFFFFFF00);
