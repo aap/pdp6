@@ -4,6 +4,8 @@
 #include <SDL2/SDL_image.h>
 #include "args.h"
 
+#include "../art/panelart.inc"
+
 typedef struct Point Point;
 struct Point
 {
@@ -59,9 +61,29 @@ mustloadimg(const char *path)
 {
 	Image *img;
 	SDL_Texture *s;
+
 	s = IMG_LoadTexture(renderer, path);
 	if(s == nil)
 		err("Couldn't load %s", path);
+	img = malloc(sizeof(Image));
+	img->tex = s;
+	SDL_QueryTexture(img->tex, nil, nil, &img->w, &img->h);
+	return img;
+}
+
+Image*
+loadresimg(u8 *data, int sz)
+{
+	SDL_RWops *f;
+	Image *img;
+	SDL_Texture *s;
+
+	f = SDL_RWFromConstMem(data, sz);
+	if(f == nil)
+		err("Couldn't load resource");
+	s = IMG_LoadTexture_RW(renderer, f, 0);
+	if(s == nil)
+		err("Couldn't load image");
 	img = malloc(sizeof(Image));
 	img->tex = s;
 	SDL_QueryTexture(img->tex, nil, nil, &img->w, &img->h);
@@ -616,6 +638,110 @@ findlayout(int *w, int *h)
 	*h = oppanel.pos.y + oppanel.surf->h;
 }
 
+static void
+initpanel(void)
+{
+	Element *e;
+
+#ifdef LOADFILES
+	oppanel.surf = mustloadimg("../art/op_panel.png");
+	iopanel.surf = mustloadimg("../art/io_panel.png");
+	indpanel1.surf = mustloadimg("../art/ind_panel1.png");
+	indpanel2.surf = mustloadimg("../art/ind_panel2.png");
+	extrapanel.surf = mustloadimg("../art/extra_panel.png");
+
+	lampsurf[0] = mustloadimg("../art/lamp_off.png");
+	lampsurf[1] = mustloadimg("../art/lamp_on.png");
+
+	switchsurf[0] = mustloadimg("../art/switch_d.png");
+	switchsurf[1] = mustloadimg("../art/switch_u.png");
+
+	keysurf[0] = mustloadimg("../art/key_n.png");
+	keysurf[1] = mustloadimg("../art/key_d.png");
+	keysurf[2] = mustloadimg("../art/key_u.png");
+#else
+	oppanel.surf = loadresimg(op_panel_png, op_panel_png_len);
+	iopanel.surf = loadresimg(io_panel_png, io_panel_png_len);
+	indpanel1.surf = loadresimg(ind_panel1_png, ind_panel1_png_len);
+	indpanel2.surf = loadresimg(ind_panel2_png, ind_panel2_png_len);
+	extrapanel.surf = loadresimg(extra_panel_png, extra_panel_png_len);
+
+	lampsurf[0] = loadresimg(lamp_off_png, lamp_off_png_len);
+	lampsurf[1] = loadresimg(lamp_on_png, lamp_on_png_len);
+
+	switchsurf[0] = loadresimg(switch_d_png, switch_d_png_len);
+	switchsurf[1] = loadresimg(switch_u_png, switch_u_png_len);
+
+	keysurf[0] = loadresimg(key_n_png, key_n_png_len);
+	keysurf[1] = loadresimg(key_d_png, key_d_png_len);
+	keysurf[2] = loadresimg(key_u_png, key_u_png_len);
+#endif
+
+
+	opgrid1.panel = &oppanel;
+	opgrid1.xscl = opgrid1.panel->surf->w/90.0f;
+	opgrid1.yscl = opgrid1.panel->surf->h/11.0f;
+	opgrid1.yoff = opgrid1.yscl/2.0f;
+
+	opgrid2.panel = &oppanel;
+	opgrid2.xscl = opgrid1.xscl*1.76f;
+	opgrid2.yscl = opgrid2.xscl;
+	opgrid2.xoff = opgrid1.xscl*44.5f;
+	opgrid2.yoff = opgrid1.panel->surf->h*2.4f/143.0f;
+
+	iogrid.panel = &iopanel;
+	iogrid.xscl = iogrid.panel->surf->w/44.0f;
+	iogrid.yscl = iogrid.panel->surf->h/28.0f;
+
+	indgrid1.panel = &indpanel1;
+	indgrid1.xscl = indgrid1.panel->surf->w*5.0f/77.0f;
+	indgrid1.yscl = indgrid1.panel->surf->h/12.0f;
+
+	indgrid2.panel = &indpanel2;
+	indgrid2.xscl = indgrid2.panel->surf->w/44.0f;
+	indgrid2.yscl = indgrid2.panel->surf->h/11.0f;
+
+	extragrid = indgrid1;
+	extragrid.panel = &extrapanel;
+
+	e = switches;
+	data_sw = e; e += 36;
+	ma_sw = e; e += 18;
+	misc_sw = e; e += 4;
+
+	extra_sw = e; e += 5;
+
+	e = lamps;
+	mi_l = e; e += 36;
+	ir_l = e; e += 18;
+	ma_l = e; e += 18;
+	pc_l = e; e += 18;
+	pio_l = e; e += 7;
+	pir_l = e; e += 7;
+	pih_l = e; e += 7;
+	misc_l = e; e += 7;
+
+	mb_l = e; e += 36;
+	ar_l = e; e += 36;
+	mq_l = e; e += 36;
+	ff_l = e; e += 14*8;
+
+	iobus_l = e; e += 36;
+	cr_l = e; e += 9;
+	crbuf_l = e; e += 36;
+	ptr_l = e; e += 6;
+	ptrbuf_l = e; e += 36;
+	ptp_l = e; e += 6;
+	ptpbuf_l = e; e += 8;
+	tty_l = e; e += 7;
+	ttibuf_l = e; e += 8;
+	pr_l = e; e += 8;
+	rlr_l = e; e += 8;
+	rla_l = e; e += 8;
+
+	extra_l = e; e += 1;
+}
+
 void
 usage(void)
 {
@@ -664,88 +790,11 @@ threadmain(int argc, char *argv[])
 	if(SDL_CreateWindowAndRenderer(1399, 740, 0, &window, &renderer) < 0)
 		err("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
 
-	lampsurf[0] = mustloadimg("../art/lamp_off.png");
-	lampsurf[1] = mustloadimg("../art/lamp_on.png");
-
-	switchsurf[0] = mustloadimg("../art/switch_d.png");
-	switchsurf[1] = mustloadimg("../art/switch_u.png");
-
-	keysurf[0] = mustloadimg("../art/key_n.png");
-	keysurf[1] = mustloadimg("../art/key_d.png");
-	keysurf[2] = mustloadimg("../art/key_u.png");
-
-	oppanel.surf = mustloadimg("../art/op_panel.png");
-
-	opgrid1.panel = &oppanel;
-	opgrid1.xscl = opgrid1.panel->surf->w/90.0f;
-	opgrid1.yscl = opgrid1.panel->surf->h/11.0f;
-	opgrid1.yoff = opgrid1.yscl/2.0f;
-
-	opgrid2.panel = &oppanel;
-	opgrid2.xscl = opgrid1.xscl*1.76f;
-	opgrid2.yscl = opgrid2.xscl;
-	opgrid2.xoff = opgrid1.xscl*44.5f;
-	opgrid2.yoff = opgrid1.panel->surf->h*2.4f/143.0f;
-
-	iopanel.surf = mustloadimg("../art/io_panel.png");
-	iogrid.panel = &iopanel;
-	iogrid.xscl = iogrid.panel->surf->w/44.0f;
-	iogrid.yscl = iogrid.panel->surf->h/28.0f;
-
-	indpanel1.surf = mustloadimg("../art/ind_panel1.png");
-	indgrid1.panel = &indpanel1;
-	indgrid1.xscl = indgrid1.panel->surf->w*5.0f/77.0f;
-	indgrid1.yscl = indgrid1.panel->surf->h/12.0f;
-
-	indpanel2.surf = mustloadimg("../art/ind_panel2.png");
-	indgrid2.panel = &indpanel2;
-	indgrid2.xscl = indgrid2.panel->surf->w/44.0f;
-	indgrid2.yscl = indgrid2.panel->surf->h/11.0f;
-
-	extrapanel.surf = mustloadimg("../art/extra_panel.png");
-	extragrid = indgrid1;
-	extragrid.panel = &extrapanel;
+	initpanel();
 
 	findlayout(&w, &h);
 
 	SDL_SetWindowSize(window, w, h);
-
-	e = switches;
-	data_sw = e; e += 36;
-	ma_sw = e; e += 18;
-	misc_sw = e; e += 4;
-
-	extra_sw = e; e += 5;
-
-	e = lamps;
-	mi_l = e; e += 36;
-	ir_l = e; e += 18;
-	ma_l = e; e += 18;
-	pc_l = e; e += 18;
-	pio_l = e; e += 7;
-	pir_l = e; e += 7;
-	pih_l = e; e += 7;
-	misc_l = e; e += 7;
-
-	mb_l = e; e += 36;
-	ar_l = e; e += 36;
-	mq_l = e; e += 36;
-	ff_l = e; e += 14*8;
-
-	iobus_l = e; e += 36;
-	cr_l = e; e += 9;
-	crbuf_l = e; e += 36;
-	ptr_l = e; e += 6;
-	ptrbuf_l = e; e += 36;
-	ptp_l = e; e += 6;
-	ptpbuf_l = e; e += 8;
-	tty_l = e; e += 7;
-	ttibuf_l = e; e += 8;
-	pr_l = e; e += 8;
-	rlr_l = e; e += 8;
-	rla_l = e; e += 8;
-
-	extra_l = e; e += 1;
 
 	for(i = 0; i < 12; i++){
 		data_digits[i].lp = &mi_l[i*3];
@@ -764,11 +813,15 @@ threadmain(int argc, char *argv[])
 
 	rtcchan = chancreate(sizeof(RtcMsg), 20);
 
-	dofile("init.ini");
+	if(dofile("init.ini"))
+		defaultconfig();
 	apr = (Apr*)getdevice("apr");
 	tty = (Tty*)getdevice("tty");
 	ptr = (Ptr*)getdevice("ptr");
 	ptp = (Ptp*)getdevice("ptp");
+
+	if(apr == nil || tty == nil || ptr == nil || ptp == nil)
+		err("need APR, TTY, PTR and PTP");
 
 	cmdchans[0] = chancreate(sizeof(char*), 1);
 	cmdchans[1] = chancreate(sizeof(void*), 1);

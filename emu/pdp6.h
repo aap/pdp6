@@ -39,7 +39,8 @@ void readcmdchan(void *p);
 void *cmdthread(void *);
 void *simthread(void *p);
 void *rtcthread(void *p);
-void dofile(const char *path);
+int dofile(const char *path);
+void defaultconfig(void);
 
 enum {
 	MAXPULSE = 20

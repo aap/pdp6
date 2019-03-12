@@ -96,16 +96,51 @@ showdevices(void)
 		printf("%s %s\n", dev->name, dev->type);
 }
 
-void
+int
 dofile(const char *path)
 {
 	FILE *f;
 	if(f = fopen(path, "r"), f == nil){
 		printf("Couldn't open file %s\n", path);
-		return;
+		return 1;
 	}
 	cli(f, nil);
 	fclose(f);
+	return 0;
+}
+
+/* Wrapper around non-const */
+static void
+line(const char *cln)
+{
+	static char ln[160];
+	strncpy(ln, cln, 159);
+	ln[159] = 0;
+	commandline(ln);
+}
+
+void
+defaultconfig(void)
+{
+	line("mkdev apr apr166");
+	line("mkdev tty tty626");
+	line("mkdev ptr ptr760");
+	line("mkdev ptp ptp761");
+	line("mkdev dc dc136");
+	line("mkdev dt0 dt551");
+	line("mkdev dx0 dx555");
+	line("mkdev fmem fmem162 0");
+	line("mkdev mem0 moby");
+
+	line("connectdev dc dt0");
+	line("connectdev dt0 dx0 1");
+	line("connectio tty apr");
+	line("connectio ptr apr");
+	line("connectio ptp apr");
+	line("connectio dc apr");
+	line("connectio dt0 apr");
+	line("connectmem fmem 0 apr -1");
+	line("connectmem mem0 0 apr 0");
 }
 
 /* Task for simulation.

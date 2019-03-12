@@ -37,7 +37,7 @@ skipwhite(void)
 static int
 isdelim(char c)
 {
-	return c && strchr(" \t\n;'\"", c) != nil;
+	return c == '\0' || strchr(" \t\n;'\"", c) != nil;
 }
 
 /* tokenize lp into ops[numops] */
@@ -64,6 +64,7 @@ splitops(void)
 					lp++;
 				*p++ = *lp++;
 			}
+			if(*lp == '\0') lp--;
 			*p = '\0';
 		}else{
 			ops[numops++] = p = lp;
@@ -72,6 +73,7 @@ splitops(void)
 					lp++;
 				*p++ = *lp++;
 			}
+			if(*lp == '\0') lp--;
 			*p = '\0';
 		}
 	}
