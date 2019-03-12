@@ -82,6 +82,7 @@ typedef struct Mem Mem;
 typedef struct Membus Membus;
 typedef struct FMem FMem;
 typedef struct CMem CMem;
+typedef struct MobyMem MobyMem;
 typedef struct Busdev Busdev;
 typedef struct IOBus IOBus;
 typedef struct Apr Apr;
@@ -116,9 +117,9 @@ struct Device
 	Device *next;
 	char *type;
 	char *name;
-	/* attach file to device */
-	void (*attach)(Device *dev, const char *path);
-	void (*detach)(Device *dev);
+	/* mount file on device */
+	void (*mount)(Device *dev, const char *path);
+	void (*unmount)(Device *dev);
 	/* connect device to iobus */
 	void (*ioconnect)(Device *dev, IOBus *bus);
 	/* manipulate device registers */
@@ -165,7 +166,7 @@ struct Mem
 	Device dev;
 	void *module;			/* CMem, FMem */
 	Membus *bus[4];
-	int (*wake)(Mem *mem, Membus *bus);
+	int (*wake)(Mem *mem, int sel, Membus *bus);
 	void (*poweron)(Mem *mem);
 	void (*sync)(Mem *mem);		/* sync file to disk */
 };
@@ -197,12 +198,15 @@ extern char *fmem_ident;
 Mem *makefastmem(int p);
 Device *makefmem(int argc, char *argv[]);
 
-/* Core memory 161C, 16k words */
+/* Core memory 161C, normally 16k words.
+ * Can be used for other sizes too. */
 struct CMem
 {
-	const char *filename;
+	char *filename;
+	int size;
+	int mask;
 
-	word core[040000];
+	word *core;
 	word cmb;
 	hword cma;
 	bool cma_rd_rq, cma_wr_rq;
@@ -212,9 +216,12 @@ struct CMem
 	bool cmc_pse_sync;
 };
 #define CMEM_IDENT "cmem161C"
+#define MMEM_IDENT "moby"
 extern char *cmem_ident;
-Mem *makecoremem(const char *file);
-Device *makecmem(int argc, char *argv[]);
+extern char *mmem_ident;
+Mem *makecoremem(const char *file, int size);
+Device *make16kmem(int argc, char *argv[]);
+Device *make256kmem(int argc, char *argv[]);
 
 void attachmem(Mem *mem, int p, Membus *bus, int n);
 void readmem(const char *file, word *mem, word size);

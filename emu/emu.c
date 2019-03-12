@@ -133,8 +133,8 @@ quit(int code)
 
 	/* Detach all files */
 	for(dev = devlist; dev; dev = dev->next)
-		if(dev->detach)
-			dev->detach(dev);
+		if(dev->unmount)
+			dev->unmount(dev);
 
 	/* Sync memory to disk */
 	for(dev = devlist; dev; dev = dev->next){

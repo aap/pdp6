@@ -97,29 +97,27 @@ static void
 ttyattach(Device *dev, const char *path)
 {
 	Tty *tty;
-	int fd;
 	struct termios tio;
 
 	tty = (Tty*)dev;
-	fd = tty->fd;
-	if(fd >= 0){
+	if(tty->fd >= 0){
+		close(tty->fd);
 		tty->fd = -1;
-		close(fd);
 	}
-	fd = open(path, O_RDWR);
-	if(fd < 0)
+	tty->fd = open(path, O_RDWR);
+	if(tty->fd < 0)
 		goto fail;
-	if(tcgetattr(fd, &tio) < 0)
+	if(tcgetattr(tty->fd, &tio) < 0)
 		goto fail;
 	cfmakeraw(&tio);
 //	cfsetspeed(&tio, B300);
-	if(tcsetattr(fd, TCSAFLUSH, &tio) < 0)
+	if(tcsetattr(tty->fd, TCSAFLUSH, &tio) < 0)
 		goto fail;
-	tty->fd = fd;
 	return;
 
 fail:
-	if(fd >= 0) close(fd);
+	if(tty->fd >= 0) close(tty->fd);
+	tty->fd = -1;
 	fprintf(stderr, "couldn't open file %s\n", path);
 }
 
@@ -143,7 +141,7 @@ maketty(int argc, char *argv[])
 
 	tty->dev.type = tty_ident;
 	tty->dev.name = "";
-	tty->dev.attach = ttyattach;
+	tty->dev.mount = ttyattach;
 	tty->dev.ioconnect = ttyioconnect;
 
 	tty->fd = -1;

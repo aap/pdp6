@@ -2,6 +2,7 @@
 
 char *fmem_ident = FMEM_IDENT;
 char *cmem_ident = CMEM_IDENT;
+char *mmem_ident = MMEM_IDENT;
 
 Membus memterm;
 
@@ -24,8 +25,10 @@ readmem(const char *file, word *mem, word size)
 				if(*s == ':'){
 					a = w;
 					s++;
-				}else
+				}else if(a < size)
 					mem[a++] = w;
+				else
+					fprintf(stderr, "Address out of range: %o\n", a++);
 			}else
 				s++;
 		}
@@ -60,7 +63,7 @@ synccore(Mem *mem)
 {
 	CMem *core;
 	core = mem->module;
-	writemem(core->filename, core->core, 040000);
+	writemem(core->filename, core->core, core->size);
 }
 
 /* Both functions below are very confusing. I'm sorry.
@@ -69,7 +72,7 @@ synccore(Mem *mem)
 
 /* This is based on the 161C memory */
 static int
-wakecore(Mem *mem, Membus *bus)
+wakecore(Mem *mem, int sel, Membus *bus)
 {
 	bool p2, p3;
 	CMem *core;
@@ -123,6 +126,8 @@ wakecore(Mem *mem, Membus *bus)
 
 		/* strobe address and send acknowledge */
 		core->cma |= bus->c12>>4 & 037777;
+core->cma |= sel<<14;
+core->cma &= core->mask;
 		core->cma_rd_rq |= !!(bus->c12 & MEMBUS_RD_RQ);
 		core->cma_wr_rq |= !!(bus->c12 & MEMBUS_WR_RQ);
 		//trace("	sending ADDR ACK\n");
@@ -168,7 +173,7 @@ powercore(Mem *mem)
 
 	printf("[powercore]\n");
 	core = mem->module;
-	readmem(core->filename, core->core, 040000);
+	readmem(core->filename, core->core, core->size);
 	core->cmc_aw_rq = 1;
 	core->cmc_p_act = -1;
 	core->cmc_last_proc = 2;	/* not reset by the hardware :/ */
@@ -176,7 +181,7 @@ powercore(Mem *mem)
 
 /* This is based on the 162 memory */
 static int
-wakeff(Mem *mem, Membus *bus)
+wakeff(Mem *mem, int sel, Membus *bus)
 {
 	FMem *ff;
 	hword fma;
@@ -245,7 +250,7 @@ wakemem(Membus *bus)
 	int nxm;
 
 	if(bus->c12 & MEMBUS_MA_FMC_SEL1){
-		nxm = bus->fmem->wake(bus->fmem, bus);
+		nxm = bus->fmem->wake(bus->fmem, 0, bus);
 		if(nxm)
 			goto core;
 	}else{
@@ -256,17 +261,17 @@ wakemem(Membus *bus)
 		if(bus->c12 & MEMBUS_MA19_1) sel |= 004;
 		if(bus->c12 & MEMBUS_MA18_1) sel |= 010;
 		if(bus->cmem[sel])
-			nxm = bus->cmem[sel]->wake(bus->cmem[sel], bus);
+			nxm = bus->cmem[sel]->wake(bus->cmem[sel], sel, bus);
 		else
 			nxm = 1;
 	}
 	/* TODO: do something when memory didn't respond */
 }
 
-/* Allocate a 16k core memory module and
+/* Allocate a core memory module and
  * a memory bus attachment. */
 Mem*
-makecoremem(const char *file)
+makecoremem(const char *file, int size)
 {
 	CMem *core;
 	Mem *mem;
@@ -274,6 +279,16 @@ makecoremem(const char *file)
 	core = malloc(sizeof(CMem));
 	memset(core, 0, sizeof(CMem));
 	core->filename = strdup(file);
+	core->size = size;
+	core->mask = size-1;
+	if((core->size & core->mask) != 0){
+		fprintf(stderr, "%d not a power of 2\n", core->size);
+		free(core->filename);
+		free(core);
+		return nil;
+	}
+	core->core = malloc(core->size*sizeof(word));
+	memset(core->core, 0, core->size*sizeof(word));
 	mem = malloc(sizeof(Mem));
 	memset(mem, 0, sizeof(Mem));
 	mem->dev.type = cmem_ident;
@@ -334,7 +349,7 @@ makefmem(int argc, char *argv[])
 }
 
 Device*
-makecmem(int argc, char *argv[])
+make16kmem(int argc, char *argv[])
 {
 	Mem *m;
 	char *path;
@@ -342,7 +357,21 @@ makecmem(int argc, char *argv[])
 		path = argv[0];
 	else
 		path = "/dev/null";
-	m = makecoremem(path);
+	m = makecoremem(path, 16*1024);
+	m->poweron(m);
+	return &m->dev;
+}
+Device*
+make256kmem(int argc, char *argv[])
+{
+	Mem *m;
+	char *path;
+	if(argc > 0)
+		path = argv[0];
+	else
+		path = "/dev/null";
+	m = makecoremem(path, 256*1024);
+	m->dev.type = mmem_ident;
 	m->poweron(m);
 	return &m->dev;
 }
@@ -353,10 +382,16 @@ makecmem(int argc, char *argv[])
 void
 attachmem(Mem *mem, int p, Membus *bus, int n)
 {
+	CMem *core;
+	int i;
+
 	if(n < 0)
 		bus->fmem = mem;
-	else
-		bus->cmem[n] = mem;
+	else if(mem->dev.type == cmem_ident || mem->dev.type == mmem_ident){
+		core = mem->module;
+		for(i = 0; i < core->size/040000; i++)
+			bus->cmem[i+n] = mem;
+	}
 	mem->bus[p] = bus;
 }
 
@@ -390,7 +425,7 @@ getmemref(Membus *bus, hword addr, int fastmem)
 	}
 	if(bus->cmem[addr>>14]){
 		core = bus->cmem[addr>>14]->module;
-		return &core->core[addr & 037777];
+		return &core->core[addr & core->mask];
 	}
 	return nil;
 }

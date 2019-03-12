@@ -51,7 +51,7 @@ dxmove(Dx555 *dx)
 }
 
 static void
-dxdetach(Device *dev)
+dxunmount(Device *dev)
 {
 	Dx555 *dx;
 
@@ -67,12 +67,12 @@ dxdetach(Device *dev)
 }
 
 static void
-dxattach(Device *dev, const char *path)
+dxmount(Device *dev, const char *path)
 {
 	Dx555 *dx;
 
 	dx = (Dx555*)dev;
-	dxdetach(dev);
+	dxunmount(dev);
 	memset(dx->start, 0, dx->size);
 	// TODO: resize
 	dx->fd = open(path, O_RDWR | O_CREAT, 0666);
@@ -91,6 +91,13 @@ dxconn(Dt551 *dt, Dx555 *dx, int n)
 	dx->unit = n;
 }
 
+static Device dxproto = {
+	nil, nil, "",
+	dxmount, dxunmount,
+	nil,
+	nil, nil
+};
+
 Device*
 makedx(int argc, char *argv[])
 {
@@ -99,10 +106,8 @@ makedx(int argc, char *argv[])
 	dx = malloc(sizeof(Dx555));
 	memset(dx, 0, sizeof(Dx555));
 
+	dx->dev = dxproto;
 	dx->dev.type = dx_ident;
-	dx->dev.name = "";
-	dx->dev.attach = dxattach;
-	dx->dev.detach = dxdetach;
 
 	dx->fd = -1;
 	dx->size = DTSIZE;
@@ -750,6 +755,16 @@ dtconn(Dc136 *dc, Dt551 *dt)
 	dc->devp[DEVNO] = dt;
 }
 
+word
+dtex(Device *dev, const char *reg)
+{
+	Dt551 *dt;
+
+	dt = (Dt551*)dev;
+	if(strcmp(reg, "btm_wr") == 0) return dt->ut_btm_switch;
+	return ~0;
+}
+
 int
 dtdep(Device *dev, const char *reg, word data)
 {
@@ -762,15 +777,12 @@ dtdep(Device *dev, const char *reg, word data)
 	return 0;
 }
 
-word
-dtex(Device *dev, const char *reg)
-{
-	Dt551 *dt;
-
-	dt = (Dt551*)dev;
-	if(strcmp(reg, "btm_wr") == 0) return dt->ut_btm_switch;
-	return ~0;
-}
+static Device dtproto = {
+	nil, nil, "",
+	nil, nil,
+	dtioconnect,
+	dtex, dtdep
+};
 
 Device*
 makedt(int argc, char *argv[])
@@ -781,11 +793,8 @@ makedt(int argc, char *argv[])
 	dt = malloc(sizeof(Dt551));
 	memset(dt, 0, sizeof(Dt551));
 
+	dt->dev = dtproto;
 	dt->dev.type = dt_ident;
-	dt->dev.name = "";
-	dt->dev.ioconnect = dtioconnect;
-	dt->dev.deposit = dtdep;
-	dt->dev.examine = dtex;
 
 	// should have 30000 cycles per second, so one every 33μs
 	// APR at 1 has an approximate cycle time of 200-300ns

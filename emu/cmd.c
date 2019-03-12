@@ -222,7 +222,8 @@ struct DevDef
 };
 DevDef definitions[] = {
 	{ FMEM_IDENT, makefmem },
-	{ CMEM_IDENT, makecmem },
+	{ CMEM_IDENT, make16kmem },
+	{ MMEM_IDENT, make256kmem },
 	{ APR_IDENT, makeapr },
 	{ TTY_IDENT, maketty },
 	{ PTR_IDENT, makeptr },
@@ -257,7 +258,7 @@ found:
 }
 
 static void
-c_attach(int argc, char *argv[])
+c_mount(int argc, char *argv[])
 {
 	Device *dev;
 
@@ -270,15 +271,15 @@ c_attach(int argc, char *argv[])
 		printf("No device: %s\n", argv[1]);
 		return;
 	}
-	if(dev->attach == nil){
-		printf("No attach for device type %s\n", dev->type);
+	if(dev->mount == nil){
+		printf("No mount for device type %s\n", dev->type);
 		return;
 	}
-	dev->attach(dev, argv[2]);
+	dev->mount(dev, argv[2]);
 }
 
 static void
-c_detach(int argc, char *argv[])
+c_unmount(int argc, char *argv[])
 {
 	Device *dev;
 
@@ -291,11 +292,11 @@ c_detach(int argc, char *argv[])
 		printf("No device: %s\n", argv[1]);
 		return;
 	}
-	if(dev->detach == nil){
-		printf("No detach for device type %s\n", dev->type);
+	if(dev->unmount == nil){
+		printf("No unmount for device type %s\n", dev->type);
 		return;
 	}
-	dev->detach(dev);
+	dev->unmount(dev);
 }
 
 /* ioconnect dev busdev */
@@ -651,10 +652,10 @@ struct {
 } cmdtab[] = {
 	{ "mkdev", c_mkdev,
 		"make a device: mkdev name type [args]" },
-	{ "attach", c_attach,
-		"attach a file to a device: attach name filename" },
-	{ "detach", c_detach,
-		"detach a file from a device: detach name" },
+	{ "mount", c_mount,
+		"mount a file on a device: mount name filename" },
+	{ "unmount", c_unmount,
+		"unmount a file from a device: unmount name" },
 	{ "connectio", c_ioconnect,
 		"connect device to IO bus: connectio devname procname" },
 	{ "connectmem", c_memconnect,

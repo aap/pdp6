@@ -185,34 +185,48 @@ ptr_setmotor(Ptr *ptr, int m)
 }
 
 static void
-ptpattach(Device *dev, const char *path)
+ptpunmount(Device *dev)
 {
 	Ptp *ptp;
-	int fd;
 
 	ptp = (Ptp*)dev;
-	fd = ptp->fd;
-	if(fd >= 0){
+	if(ptp->fd >= 0){
+		close(ptp->fd);
 		ptp->fd = -1;
-		close(fd);
 	}
+}
+
+static void
+ptpmount(Device *dev, const char *path)
+{
+	Ptp *ptp;
+
+	ptp = (Ptp*)dev;
+	ptpunmount(dev);
 	ptp->fd = open(path, O_WRONLY | O_CREAT, 0666);
 	if(ptp->fd < 0)
 		fprintf(stderr, "couldn't open file %s\n", path);
 }
 
 static void
-ptrattach(Device *dev, const char *path)
+ptrunmount(Device *dev)
 {
 	Ptr *ptr;
-	int fd;
 
 	ptr = (Ptr*)dev;
-	fd = ptr->fd;
-	if(fd >= 0){
+	if(ptr->fd >= 0){
+		close(ptr->fd);
 		ptr->fd = -1;
-		close(fd);
 	}
+}
+
+static void
+ptrmount(Device *dev, const char *path)
+{
+	Ptr *ptr;
+
+	ptr = (Ptr*)dev;
+	ptrunmount(dev);
 	ptr->fd = open(path, O_RDONLY);
 	if(ptr->fd < 0)
 		fprintf(stderr, "couldn't open file %s\n", path);
@@ -236,6 +250,21 @@ ptpioconnect(Device *dev, IOBus *bus)
 	bus->dev[PTP] = (Busdev){ ptp, wake_ptp, 0 };
 }
 
+static Device ptpproto = {
+	nil, nil, "",
+	ptpmount, ptpunmount,
+	ptpioconnect,
+	nil, nil
+};
+
+static Device ptrproto = {
+	nil, nil, "",
+	ptrmount, ptrunmount,
+	ptrioconnect,
+	nil, nil
+};
+
+
 Device*
 makeptp(int argc, char *argv[])
 {
@@ -245,10 +274,8 @@ makeptp(int argc, char *argv[])
 	ptp = malloc(sizeof(Ptp));
 	memset(ptp, 0, sizeof(Ptp));
 
+	ptp->dev = ptpproto;
 	ptp->dev.type = ptp_ident;
-	ptp->dev.name = "";
-	ptp->dev.attach = ptpattach;
-	ptp->dev.ioconnect = ptpioconnect;
 	ptp->fd = -1;
 
 	t = (Task){ nil, ptpcycle, ptp, 1000, 0 };
@@ -265,10 +292,8 @@ makeptr(int argc, char *argv[])
 	ptr = malloc(sizeof(Ptr));
 	memset(ptr, 0, sizeof(Ptr));
 
+	ptr->dev = ptrproto;
 	ptr->dev.type = ptr_ident;
-	ptr->dev.name = "";
-	ptr->dev.attach = ptrattach;
-	ptr->dev.ioconnect = ptrioconnect;
 	ptr->fd = -1;
 
 	t = (Task){ nil, ptrcycle, ptr, 1000, 0 };

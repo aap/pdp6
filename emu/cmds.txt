@@ -1,9 +1,9 @@
 mkdev name type
 	creates a device and gives it a name
-attach name path
-	attaches a file to a device
-detach name
-	detach a file from a device
+mount name path
+	mounts a file on a device
+unmount name
+	unmounts a file from a device
 connectio name busdevname
 	connects a device to the IO bus of a processor
 connectmem name procnum busdevname addr

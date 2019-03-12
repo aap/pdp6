@@ -220,6 +220,13 @@ EXDEPSREGS
 	return 1;
 }
 
+static Device aprproto = {
+	nil, nil, "",
+	nil, nil,
+	nil,
+	ex_apr, dep_apr
+};
+
 Device*
 makeapr(int argc, char *argv[])
 {
@@ -229,10 +236,8 @@ makeapr(int argc, char *argv[])
 	apr = malloc(sizeof(Apr));
 	memset(apr, 0, sizeof(Apr));
 
+	apr->dev = aprproto;
 	apr->dev.type = apr_ident;
-	apr->dev.name = "";
-	apr->dev.examine = ex_apr;
-	apr->dev.deposit = dep_apr;
 
 	apr->iobus.dev[CPA] = (Busdev){ apr, wake_cpa, 0 };
 	apr->iobus.dev[PI] = (Busdev){ apr, wake_pi, 0 };
@@ -1021,20 +1026,20 @@ wake_pi(void *dev)
 		return;
 	// 8-4, 8-5
 	if(IOB_STATUS){
-		trace("PI STATUS %llo\n", bus->c12);
+		trace("PI STATUS %012lo\n", bus->c12);
 		if(apr->pi_active) bus->c12 |= F28;
 		bus->c12 |= apr->pio;
 	}
 
 	// 8-4, 8-3
 	if(IOB_CONO_CLEAR){
-		trace("PI CONO CLEAR %llo\n", bus->c12);
+		trace("PI CONO CLEAR %012lo\n", bus->c12);
 		if(bus->c12 & F23)
 			// can call directly
 			pi_reset_p(apr);
 	}
 	if(IOB_CONO_SET){
-		trace("PI CONO SET %llo\n", bus->c12);
+		trace("PI CONO SET %012lo\n", bus->c12);
 		if(bus->c12 & F24) PIR_FM_IOB1;
 		if(bus->c12 & F25) PIO_FM_IOB1;
 		if(bus->c12 & F26) PIO0_FM_IOB1;
@@ -1233,8 +1238,8 @@ defpulse(sct2)
 
 defpulse(sct1)
 {
-	word ar0_shl_inp, ar0_shr_inp, ar35_shl_inp;
-	word mq0_shl_inp, mq0_shr_inp, mq1_shr_inp, mq35_shl_inp;
+	word ar0_shl_inp, ar0_shr_inp = 0, ar35_shl_inp = 0;
+	word mq0_shl_inp, mq0_shr_inp, mq1_shr_inp, mq35_shl_inp = 0;
 
 	SC_INC;		// 6-16
 
@@ -1679,7 +1684,7 @@ defpulse(dst17)
 
 defpulse(dst16)
 {
-	word ar0_shr_inp;
+	word ar0_shr_inp = 0;
 
 	// 6-7
 	if(IR_FDV)
@@ -3307,11 +3312,13 @@ defpulse_(kt4)
 	if(apr->run && (apr->key_ex_st || apr->key_dep_st))
 		pulse(apr, &key_go, 0); 	// 5-2
 
-	rpt.c = apr->rptchan;
-	rpt.interval = ranges[apr->speed_range];
-	/* TODO: is this just a multiplier */
-	rpt.interval *= 1 + apr->speed_set/100.0f*14.0f;
-	chansend(rtcchan, &rpt);
+	if(apr->sw_repeat){
+		rpt.c = apr->rptchan;
+		rpt.interval = ranges[apr->speed_range];
+		/* TODO: is this just a multiplier */
+		rpt.interval *= 1 + apr->speed_set/100.0f*14.0f;
+		chansend(rtcchan, &rpt);
+	}
 }
 
 defpulse(kt3)
