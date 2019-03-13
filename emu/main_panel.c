@@ -47,8 +47,8 @@ struct Element
 typedef struct SwDigit SwDigit;
 struct SwDigit
 {
-	Element *lp;	// lamp
-	Element *sw;	// switch
+	Element *sw;	// these 3 switch
+	Element *first;	// the first one
 	SwDigit *prev;
 	SwDigit *next;
 };
@@ -571,19 +571,33 @@ setdigit(int n)
 	setcurdigit(curdigit->next);
 }
 
-static void
-setdigitfromlamp(void)
-{
-	curdigit->sw[0].state = curdigit->lp[0].state;
-	curdigit->sw[1].state = curdigit->lp[1].state;
-	curdigit->sw[2].state = curdigit->lp[2].state;
-	setcurdigit(curdigit->next);
-}
-
+/* This is in some ways horrible, but oh well */
 static void
 keydown(SDL_Keysym keysym)
 {
 	int i;
+	static Element *dsrc, *asrc, **srcp;
+	static int dlen, alen, *lenp;
+	word mask, s, d;
+	int ctrl, len;
+	const u8 *keystate;
+
+	if(dsrc == nil){
+		dsrc = mi_l;
+		dlen = 36;
+	}
+	if(asrc == nil){
+		asrc = ma_l;
+		alen = 18;
+	}
+	if(srcp == nil){
+		srcp = &dsrc;
+		lenp = &dlen;
+	}
+
+	keystate = SDL_GetKeyboardState(nil);
+	ctrl = keystate[SDL_SCANCODE_CAPSLOCK] ||
+		keystate[SDL_SCANCODE_LCTRL] || keystate[SDL_SCANCODE_RCTRL];
 
 	switch(keysym.scancode){
 	case SDL_SCANCODE_0: setdigit(0); break;
@@ -594,19 +608,78 @@ keydown(SDL_Keysym keysym)
 	case SDL_SCANCODE_5: setdigit(5); break;
 	case SDL_SCANCODE_6: setdigit(6); break;
 	case SDL_SCANCODE_7: setdigit(7); break;
-	case SDL_SCANCODE_A: setcurdigit(addr_digits); break;
-	case SDL_SCANCODE_D: setcurdigit(data_digits); break;
 	case SDL_SCANCODE_LEFT: setcurdigit(curdigit->prev); break;
 	case SDL_SCANCODE_RIGHT: setcurdigit(curdigit->next); break;
+
+	/* Set destination switches */
+	case SDL_SCANCODE_A:
+		setcurdigit(addr_digits);
+		srcp = &asrc;
+		lenp = &alen;
+		break;
+	case SDL_SCANCODE_S:
+		setcurdigit(data_digits);
+		srcp = &dsrc;
+		lenp = &dlen;
+		break;
+
+	/* Set source lights */
+	case SDL_SCANCODE_M:
+		*srcp = ma_l;
+		*lenp = 18;
+		break;
+	case SDL_SCANCODE_P:
+		*srcp = pc_l;
+		*lenp = 18;
+		break;
+	case SDL_SCANCODE_I:
+		*srcp = ir_l;
+		*lenp = 18;
+		break;
+	case SDL_SCANCODE_D:
+		*srcp = mi_l;
+		*lenp = 36;
+		break;
+
+	/* Set MA from IR AC */
+	case SDL_SCANCODE_R:
+		d = getelements(ir_l, 18);
+		d = d>>5 & 017;
+		setelements(d, ma_sw, 18);
+		break;
+	/* Set MA from IR index */
+	case SDL_SCANCODE_X:
+		d = getelements(ir_l, 18);
+		d &= 017;
+		setelements(d, ma_sw, 18);
+		break;
+
+	/* Clear */
 	case SDL_SCANCODE_C:
-		/* clear */
 		for(i = 0; i < 12; i++)
 			setdigit(0);
 		break;
+
+	case SDL_SCANCODE_J:
+		mask = LT;
+		goto load;
+	case SDL_SCANCODE_K:
+		mask = FW;
+		goto load;
 	case SDL_SCANCODE_L:
-		/* load */
-		for(i = 0; i < 12; i++)
-			setdigitfromlamp();
+		mask = RT;
+		goto load;
+
+	load:
+		if(curdigit->first == data_sw)
+			len = 36;
+		else
+			len = 18;
+		d = getelements(curdigit->first, len);
+		s = getelements(*srcp, *lenp);
+		if(ctrl) s = (s&RT)<<18 | (s&LT)>>18;
+		d = s&mask | d&~mask;
+		setelements(d, curdigit->first, len);
 		break;
 	default: break;
 	}
@@ -797,13 +870,13 @@ threadmain(int argc, char *argv[])
 	SDL_SetWindowSize(window, w, h);
 
 	for(i = 0; i < 12; i++){
-		data_digits[i].lp = &mi_l[i*3];
+		data_digits[i].first = data_sw;
 		data_digits[i].sw = &data_sw[i*3];
 		data_digits[i].prev = &data_digits[(i+11) % 12];
 		data_digits[i].next = &data_digits[(i+1) % 12];
 	}
 	for(i = 0; i < 6; i++){
-		addr_digits[i].lp = &ma_l[i*3];
+		addr_digits[i].first = ma_sw;
 		addr_digits[i].sw = &ma_sw[i*3];
 		addr_digits[i].prev = &addr_digits[(i+5) % 6];
 		addr_digits[i].next = &addr_digits[(i+1) % 6];

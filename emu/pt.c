@@ -53,6 +53,7 @@ ptrcycle(void *p)
 	ptr = p;
 	if(!ptr->busy || !ptr->motor_on)
 		return;
+printf("cyling\n");
 
 	// PTR CLR
 	ptr->sr = 0;
@@ -73,6 +74,7 @@ next:
 			ptr->ptr |= c & 0300;
 	}
 	if(!ptr->b || ptr->sr & 040){
+printf("read %012lo\n", ptr->ptr);
 		ptr->busy = 0;
 		ptr->flag = 1;
 	}else
@@ -144,6 +146,7 @@ wake_ptr(void *dev)
 
 	if(bus->devcode == PTR){
 		if(IOB_STATUS){
+printf("PTR STATUS\n");
 			if(ptr->motor_on) bus->c12 |= F27;
 			if(ptr->b) bus->c12 |= F30;
 			if(ptr->busy) bus->c12 |= F31;
@@ -151,6 +154,7 @@ wake_ptr(void *dev)
 			bus->c12 |= ptr->pia & 7;
 		}
 		if(IOB_DATAI){
+printf("PTR DATAI\n");
 			bus->c12 |= ptr->ptr;
 			ptr->flag = 0;
 			// actually when DATAI is negated again
@@ -163,6 +167,9 @@ wake_ptr(void *dev)
 			ptr->b = 0;
 		}
 		if(IOB_CONO_SET){
+printf("PTR CONO %012lo\n", bus->c12);
+			/* TODO: schematics don't have this, but code uses it */
+			if(bus->c12 & F27) ptr_setmotor(ptr, 1);
 			if(bus->c12 & F30) ptr->b = 1;
 			if(bus->c12 & F31) ptr->busy = 1;
 			if(bus->c12 & F32) ptr->flag = 1;

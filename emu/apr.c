@@ -3453,12 +3453,13 @@ aprcycle(void *p)
 
 	int foo;
 	if(channbrecv(apr->clkchan, &foo) == 1){
-//		printf("tick\n");
+/* This isn't correct but how else can you single step? */
+if(apr->run){
 		apr->cpa_clock_flag = 1;
 		recalc_cpa_req(apr);
+}
 	}
 	if(channbrecv(apr->rptchan, &foo) == 1){
-//		printf("rpt\n");
 		if(KEY_MANUAL)
 			pulse(apr, &kt0a, 1);
 	}

@@ -50,6 +50,41 @@ dxmove(Dx555 *dx)
 	}
 }
 
+word
+dxex(Device *dev, const char *reg)
+{
+	Dx555 *dx;
+
+	dx = (Dx555*)dev;
+	if(strcmp(reg, "pos") == 0)
+		return dx->cur - dx->start;
+	else if(strcmp(reg, "size") == 0)
+		return dx->size;
+	return ~0;
+}
+
+int
+dxdep(Device *dev, const char *reg, word data)
+{
+	Dx555 *dx;
+
+	dx = (Dx555*)dev;
+	if(strcmp(reg, "pos") == 0){
+		if(data == 0) dx->cur = dx->start;
+		else if(data == 1) dx->cur = dx->end;
+	}else return 1;
+	return 0;
+}
+
+static void
+resetdx(Dx555 *dx)
+{
+	dx->size = DTSIZE;
+	dx->cur = dx->start;
+	dx->end = dx->start + dx->size;
+	memset(dx->start, 0, dx->size);
+}
+
 static void
 dxunmount(Device *dev)
 {
@@ -63,7 +98,8 @@ dxunmount(Device *dev)
 	write(dx->fd, dx->start, dx->size);
 	close(dx->fd);
 	dx->fd = -1;
-	memset(dx->start, 0, dx->size);
+
+	resetdx(dx);
 }
 
 static void
@@ -73,13 +109,18 @@ dxmount(Device *dev, const char *path)
 
 	dx = (Dx555*)dev;
 	dxunmount(dev);
-	memset(dx->start, 0, dx->size);
-	// TODO: resize
 	dx->fd = open(path, O_RDWR | O_CREAT, 0666);
 	if(dx->fd < 0)
 		fprintf(stderr, "couldn't open file %s\n", path);
-	else
-		read(dx->fd, dx->start, DTSIZE);
+	else{
+		/* Resize buffer to fit file */
+		dx->size = read(dx->fd, dx->start, dx->size);
+		/* Use full buffer if file isn't a valid tape */
+		if(dx->size < 6)
+			dx->size = DTSIZE;
+		dx->cur = dx->start;
+		dx->end = dx->start + dx->size;
+	}
 }
 
 /* Connect a transport to a control */
@@ -95,7 +136,7 @@ static Device dxproto = {
 	nil, nil, "",
 	dxmount, dxunmount,
 	nil,
-	nil, nil
+	dxex, dxdep
 };
 
 Device*
@@ -110,11 +151,8 @@ makedx(int argc, char *argv[])
 	dx->dev.type = dx_ident;
 
 	dx->fd = -1;
-	dx->size = DTSIZE;
-	dx->start = malloc(dx->size);
-	dx->cur = dx->start;
-	dx->end = dx->start + dx->size;
-	memset(dx->start, 0, dx->size);
+	dx->start = malloc(DTSIZE);
+	resetdx(dx);
 
 	return &dx->dev;
 }
@@ -263,6 +301,7 @@ recalc_dt_req(Dt551 *dt)
 	   dt->time_flag && dt->time_enable ||
 	   dt->ut_info_error ||
 	   dt->ut_illegal_op)
+printf("DT PI %o\n", dt->ut_pia),
 		req = dt->ut_pia;
 	else
 		req = 0;
@@ -285,6 +324,19 @@ static void
 setstat(Dt551 *dt, int state)
 {
 	dt->rw_state = state;
+}
+
+static void
+dtsetgo(Dt551 *dt, int go)
+{
+	printf("setting GO %d %d\n", dt->ut_go, go);
+	if(dt->ut_go != go){
+		if(go)
+			printf("DECtape started\n\n\n");
+		else
+			printf("DECtape stopped\n\n\n");
+	}
+	dt->ut_go = go;
 }
 
 static void
@@ -349,7 +401,7 @@ dt_tp2(Dt551 *dt)
 	prev = *dt;
 
 	if(END_ZONE){
-		dt->ut_go = 0;
+		dtsetgo(dt, 0);
 		dt->ut_tape_end_flag = 1;
 		/* TODO: is this right? */
 		setstat(dt, RW_NULL);
@@ -540,8 +592,8 @@ debug("ILL op %d %d %d\n", nunits, dt->ut_btm_switch, UT_WRTM);
 				dt->ut_illegal_op = 1;
 			}
 			if(!UTE_UNIT_OK){
-				dt->ut_go = 0;		// 3-3
-				return;
+				dtsetgo(dt, 0);		// 3-3
+				goto ret;
 			}
 
 			if(UT_WRTM)		// 3-14
@@ -551,15 +603,15 @@ debug("ILL op %d %d %d\n", nunits, dt->ut_btm_switch, UT_WRTM);
 		}else
 			/* Don't move during delay.
 			 * TODO: is this right? */
-			return;
+			goto ret;
 	}
 
 	// TODO: maybe do something else here?
 	if(dt->seldx == nil)
-		return;
+		goto ret;
 
 	if(!dt->ut_go)
-		return;
+		goto ret;
 
 	// sense; start writing
 	dt_tp0(dt);
@@ -588,6 +640,9 @@ dtbuf |= dt->sense & 07;
 	debug(" %012lo %02o %d.%02o\n", dtbuf, dt->rwb, dt->uteck, dt->utek);
 
 	dxmove(dt->seldx);
+
+ret:
+	recalc_dt_req(dt);
 }
 
 static void
@@ -607,7 +662,7 @@ wake_dt(void *dev)
 		dt->ut_fcn = 0;
 		dt->ut_time = 0;
 		dt->ut_wren = 0;
-		dt->ut_go = 0;
+		dtsetgo(dt, 0);
 		dt->ut_rev = 0;
 		dt->ut_tape_end_flag = 0;
 		dt->ut_tape_end_enable = 0;
@@ -678,7 +733,7 @@ dbg("UTC CONO CLEAR\n");
 			dt->ut_time = bus->c12>>9 & 03;
 			dt->time_enable = bus->c12>>11 & 1;
 			dt->ut_rev = bus->c12>>12 & 1;
-			dt->ut_go = bus->c12>>13 & 1;
+			dtsetgo(dt, bus->c12>>13 & 1);
 			dt->ut_jb_done_enable = bus->c12>>14 & 1;
 			dt->ut_tape_end_enable = bus->c12>>15 & 1;
 			dt->ut_units_select = bus->c12>>16 & 1;
@@ -762,6 +817,11 @@ dtex(Device *dev, const char *reg)
 
 	dt = (Dt551*)dev;
 	if(strcmp(reg, "btm_wr") == 0) return dt->ut_btm_switch;
+	else if(strcmp(reg, "go") == 0) return dt->ut_go;
+	else if(dt->seldx && strcmp(reg, "pos") == 0)
+		return dt->seldx->cur - dt->seldx->start;
+	else if(dt->seldx && strcmp(reg, "size") == 0)
+		return dt->seldx->size;
 	return ~0;
 }
 
@@ -799,6 +859,8 @@ makedt(int argc, char *argv[])
 	// should have 30000 cycles per second, so one every 33μs
 	// APR at 1 has an approximate cycle time of 200-300ns
 	t = (Task){ nil, dtcycle, dt, 150, 0 };
+	// ...so slow though
+//	t = (Task){ nil, dtcycle, dt, 80, 0 };
 	addtask(t);
 
 	return &dt->dev;
