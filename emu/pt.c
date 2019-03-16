@@ -3,7 +3,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-/* TODO? implement motor delays */
+/* TODO:
+ * implement motor delays
+ * get rid of waitdatao and use a delay
+ */
 
 char *ptr_ident = PTR_IDENT;
 char *ptp_ident = PTP_IDENT;
@@ -44,43 +47,6 @@ ptpcycle(void *p)
 	}
 }
 
-static void
-ptrcycle(void *p)
-{
-	Ptr *ptr;
-	uchar c;
-
-	ptr = p;
-	if(!ptr->busy || !ptr->motor_on)
-		return;
-printf("cyling\n");
-
-	// PTR CLR
-	ptr->sr = 0;
-	ptr->ptr = 0;
-next:
-	if(ptr->fd >= 0 && hasinput(ptr->fd)){
-		if(read(ptr->fd, &c, 1) != 1)
-			c = 0;
-	}else
-		c = 0;
-	if(!ptr->b || c & 0200){
-		// PTR STROBE
-		ptr->sr <<= 1;
-		ptr->ptr <<= 6;
-		ptr->sr |= 1;
-		ptr->ptr |= c & 077;
-		if(!ptr->b)
-			ptr->ptr |= c & 0300;
-	}
-	if(!ptr->b || ptr->sr & 040){
-printf("read %012lo\n", ptr->ptr);
-		ptr->busy = 0;
-		ptr->flag = 1;
-	}else
-		goto next;
-	recalc_ptr_req(ptr);
-}
 
 static void
 wake_ptp(void *dev)
@@ -130,53 +96,25 @@ wake_ptp(void *dev)
 }
 
 static void
-wake_ptr(void *dev)
+ptr_setbusy(Ptr *ptr, int busy)
 {
-	Ptr *ptr;
-	IOBus *bus;
-
-	ptr = dev;
-	bus = ptr->bus;
-	if(IOB_RESET){
-		ptr->pia = 0;
-		ptr->busy = 0;
-		ptr->flag = 0;
-		ptr->b = 0;
+	if(ptr->busy == busy)
+		return;
+	ptr->busy = busy;
+	if(ptr->busy){
+		// PTR CLR
+		ptr->ptr = 0;
+		ptr->sr = 0;
 	}
+}
 
-	if(bus->devcode == PTR){
-		if(IOB_STATUS){
-printf("PTR STATUS\n");
-			if(ptr->motor_on) bus->c12 |= F27;
-			if(ptr->b) bus->c12 |= F30;
-			if(ptr->busy) bus->c12 |= F31;
-			if(ptr->flag) bus->c12 |= F32;
-			bus->c12 |= ptr->pia & 7;
-		}
-		if(IOB_DATAI){
-printf("PTR DATAI\n");
-			bus->c12 |= ptr->ptr;
-			ptr->flag = 0;
-			// actually when DATAI is negated again
-			ptr->busy = 1;
-		}
-		if(IOB_CONO_CLEAR){
-			ptr->pia = 0;
-			ptr->busy = 0;
-			ptr->flag = 0;
-			ptr->b = 0;
-		}
-		if(IOB_CONO_SET){
-printf("PTR CONO %012lo\n", bus->c12);
-			/* TODO: schematics don't have this, but code uses it */
-			if(bus->c12 & F27) ptr_setmotor(ptr, 1);
-			if(bus->c12 & F30) ptr->b = 1;
-			if(bus->c12 & F31) ptr->busy = 1;
-			if(bus->c12 & F32) ptr->flag = 1;
-			ptr->pia |= bus->c12 & 7;
-		}
-	}
-	recalc_ptr_req(ptr);
+static void
+ptr_ic_clr(Ptr *ptr)
+{
+	ptr->pia = 0;
+	ptr_setbusy(ptr, 0);
+	ptr->flag = 0;
+	ptr->b = 0;
 }
 
 void
@@ -186,8 +124,94 @@ ptr_setmotor(Ptr *ptr, int m)
 		return;
 	ptr->motor_on = m;
 	if(ptr->motor_on)
-		ptr->busy = 0;
+		ptr_setbusy(ptr, 0);
 	ptr->flag = 1;
+	recalc_ptr_req(ptr);
+}
+
+static void
+ptrcycle(void *p)
+{
+	Ptr *ptr;
+	uchar c;
+
+	ptr = p;
+
+	// TODO: reader feed key
+	if(!(ptr->motor_on && ptr->busy))
+		return;
+
+	/* PTR LEAD */
+	if(!hasinput(ptr->fd))
+		return;		/* no feed so no pulses */
+
+	read(ptr->fd, &c, 1);
+
+	if(!ptr->busy)
+		return;
+
+	/* skip invalid chars */
+	if(ptr->b && (c & 0200) == 0)
+		return;
+
+	/* PTR STROBE */
+	ptr->sr <<= 1;
+	ptr->ptr <<= 6;
+	ptr->sr |= 1;
+	if(ptr->b)
+		ptr->ptr |= c & 077;
+	else
+		ptr->ptr |= c;
+
+	/* TRAIL */
+	assert(ptr->busy);
+	if(!ptr->b || ptr->sr & 040){
+		ptr->flag = 1;
+		ptr_setbusy(ptr, 0);
+	}
+
+	recalc_ptr_req(ptr);
+}
+
+static void
+wake_ptr(void *dev)
+{
+	Ptr *ptr;
+	IOBus *bus;
+
+	ptr = dev;
+	bus = ptr->bus;
+	if(IOB_RESET)
+		ptr_ic_clr(ptr);
+
+	if(bus->devcode == PTR){
+		if(IOB_STATUS){
+//printf("PTR STATUS\n");
+			if(ptr->motor_on) bus->c12 |= F27;
+			if(ptr->b) bus->c12 |= F30;
+			if(ptr->busy) bus->c12 |= F31;
+			if(ptr->flag) bus->c12 |= F32;
+			bus->c12 |= ptr->pia & 7;
+		}
+		if(IOB_DATAI){
+//printf("PTR DATAI\n");
+			bus->c12 |= ptr->ptr;
+			ptr->flag = 0;
+			// actually when DATAI is negated again
+			ptr_setbusy(ptr, 1);
+		}
+		if(IOB_CONO_CLEAR)
+			ptr_ic_clr(ptr);
+		if(IOB_CONO_SET){
+//printf("PTR CONO %012lo\n", bus->c12);
+			/* TODO: schematics don't have this, but code uses it */
+			if(bus->c12 & F27) ptr_setmotor(ptr, 1);
+			if(bus->c12 & F30) ptr->b = 1;
+			if(bus->c12 & F31) ptr_setbusy(ptr, 1);
+			if(bus->c12 & F32) ptr->flag = 1;
+			ptr->pia |= bus->c12 & 7;
+		}
+	}
 	recalc_ptr_req(ptr);
 }
 
@@ -285,6 +309,7 @@ makeptp(int argc, char *argv[])
 	ptp->dev.type = ptp_ident;
 	ptp->fd = -1;
 
+	// 63.3 chars per second, value around 60000?
 	t = (Task){ nil, ptpcycle, ptp, 1000, 0 };
 	addtask(t);
 	return &ptp->dev;
@@ -303,6 +328,7 @@ makeptr(int argc, char *argv[])
 	ptr->dev.type = ptr_ident;
 	ptr->fd = -1;
 
+	// 400 chars per second, value around 10000?
 	t = (Task){ nil, ptrcycle, ptr, 1000, 0 };
 	addtask(t);
 	return &ptr->dev;

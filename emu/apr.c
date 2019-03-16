@@ -6,6 +6,8 @@
 // Schematics have a bug in the divide subroutine
 #define FIX_DS
 
+int loginst;
+
 enum Opcode {
 	FSC    = 0132,
 	IBP    = 0133,
@@ -217,6 +219,7 @@ EXDEPREGS
 #define X(name) if(strcmp(#name, reg) == 0) { apr->n.name = data; return 0; }
 EXDEPSREGS
 #undef X
+	if(strcmp("log", reg) == 0) { loginst = data; return 0; }
 	return 1;
 }
 
@@ -2811,11 +2814,13 @@ defpulse(et0)
 
 defpulse(et0a)
 {
+if(loginst){
 	debug("%06o: ", apr->inst_ma);
 	if((apr->inst & 0700) != 0700)
 		debug("%s\n", mnemonics[apr->inst]);
 	else
 		debug("%s\n", iomnemonics[apr->io_inst>>5 & 7]);
+}
 
 	if(PI_HOLD)
 		pih_fm_pi_ch_rq(apr);	// 8-3, 8-4
@@ -3459,6 +3464,13 @@ if(apr->run){
 		recalc_cpa_req(apr);
 }
 	}
+/*
+if(!apr->run){
+		apr->cpa_clock_flag = 0;
+		recalc_cpa_req(apr);
+}
+*/
+
 	if(channbrecv(apr->rptchan, &foo) == 1){
 		if(KEY_MANUAL)
 			pulse(apr, &kt0a, 1);

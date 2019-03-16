@@ -818,10 +818,6 @@ dtex(Device *dev, const char *reg)
 	dt = (Dt551*)dev;
 	if(strcmp(reg, "btm_wr") == 0) return dt->ut_btm_switch;
 	else if(strcmp(reg, "go") == 0) return dt->ut_go;
-	else if(dt->seldx && strcmp(reg, "pos") == 0)
-		return dt->seldx->cur - dt->seldx->start;
-	else if(dt->seldx && strcmp(reg, "size") == 0)
-		return dt->seldx->size;
 	return ~0;
 }
 
@@ -859,8 +855,6 @@ makedt(int argc, char *argv[])
 	// should have 30000 cycles per second, so one every 33μs
 	// APR at 1 has an approximate cycle time of 200-300ns
 	t = (Task){ nil, dtcycle, dt, 150, 0 };
-	// ...so slow though
-//	t = (Task){ nil, dtcycle, dt, 80, 0 };
 	addtask(t);
 
 	return &dt->dev;

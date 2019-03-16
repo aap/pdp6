@@ -17,7 +17,7 @@ ttycycle(void *p)
 {
 	Tty *tty;
 	int n;
-	char c;
+	uchar c;
 
 	tty = p;
 	if(tty->fd >= 0 && hasinput(tty->fd)){
@@ -146,7 +146,10 @@ maketty(int argc, char *argv[])
 
 	tty->fd = -1;
 
-	t = (Task){ nil, ttycycle, tty, 1, 0 };
+	// 110 baud originally (10 chars per second)
+	t = (Task){ nil, ttycycle, tty, 300000, 0 };
+	// but maybe we don't want to be that accurate
+//	t = (Task){ nil, ttycycle, tty, 100, 0 };
 	addtask(t);
 
 	return &tty->dev;
