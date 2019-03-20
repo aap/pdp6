@@ -649,6 +649,13 @@ extern char *dt_ident;
 Device *makedt(int argc, char *argv[]);
 void dtconn(Dc136 *dc, Dt551 *dt);
 
+
+#define DIS (0130>>2)
+#define DIS_IDENT "dis340"
+Device *makedis(int argc, char *argv[]);
+extern char *dis_ident;
+
+
 typedef struct Netmem Netmem;
 struct Netmem
 {

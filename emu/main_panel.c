@@ -53,8 +53,8 @@ struct SwDigit
 	SwDigit *next;
 };
 
-SDL_Window *window;
-SDL_Renderer *renderer;
+static SDL_Window *window;
+static SDL_Renderer *renderer;
 
 Image*
 mustloadimg(const char *path)
@@ -859,6 +859,10 @@ threadmain(int argc, char *argv[])
 
 	SDL_Init(SDL_INIT_EVERYTHING);
 	IMG_Init(IMG_INIT_PNG);
+
+void main340(void);
+//	main340();
+//	return 0;
 
 	if(SDL_CreateWindowAndRenderer(1399, 740, 0, &window, &renderer) < 0)
 		err("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());

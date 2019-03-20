@@ -233,6 +233,7 @@ DevDef definitions[] = {
 	{ DC_IDENT, makedc },
 	{ DT_IDENT, makedt },
 	{ DX_IDENT, makedx },
+	{ DIS_IDENT, makedis },
 	{ NETMEM_IDENT, makenetmem },
 	{ nil, nil }
 };

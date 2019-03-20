@@ -1,4 +1,4 @@
-SRC=emu.c apr.c mem.c tty.c pt.c dc.c dt.c netmem.c cmd.c util.c threading.c rtc.c ../tools/pdp6common.c
+SRC=emu.c apr.c mem.c tty.c pt.c dc.c dt.c dis340.c netmem.c cmd.c util.c threading.c rtc.c ../tools/pdp6common.c
 H=pdp6.h ../tools/pdp6common.h threading.h
 # clang
 #CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses \
@@ -7,7 +7,7 @@ CFLAGS=  -O3 -Wall -Wno-parentheses -fno-diagnostics-show-caret
 #CFLAGS=  -g -Wall -Wno-parentheses -fno-diagnostics-show-caret
 SDLFLAGS=`sdl2-config --cflags` `pkg-config SDL2_image --cflags`
 
-LIBS=`sdl2-config --libs` `pkg-config SDL2_image --libs` -lpthread
+LIBS=`sdl2-config --libs` `pkg-config SDL2_image --libs` -lpthread -lm
 
 
 pdp6: main_panel.c $(SRC) $(H)
