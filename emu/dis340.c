@@ -1,7 +1,7 @@
 #include "pdp6.h"
 #include <SDL2/SDL.h>
 
-#define JUSTTESTING
+//#define JUSTTESTING
 
 char *dis_ident = DIS_IDENT;
 
@@ -67,7 +67,7 @@ static word list[] = {
 	PARAM_W(XYM, 0, 0, 07, 0),
 	XYM_W(1, XYM, 0, 0, 950),
 	XYM_W(0, CM, 0, 0, 0),
-	034<<12 | 034<<6 | 040,
+	036<<12 | 034<<6 | 040,
 	01<<12 | 02<<6 | 03,
 	04<<12 | 05<<6 | 06,
 	07<<12 | 010<<6 | 011,
@@ -166,6 +166,7 @@ struct Dis340
 	/* 342 char gen */
 	int cgstate;	/* 0 - inactive
 			 * 1 - drawing character */
+	int shift;
 	int *cp;	/* current char pointer */
 
 	/* simulated tube */
@@ -201,6 +202,8 @@ initiate(Dis340 *dis)
 	dis->intdelay = 0;
 	dis->cgstate = 0;
 
+	dis->shift = 0;
+
 	dis->lp_enable = 0;	// TODO: not in schematics?
 	dis->lp_find = 0;
 	dis->lp_flag = 0;
@@ -215,7 +218,6 @@ read_to_mode(Dis340 *dis)
 	dis->mode = LDB(13, 3, dis->br);
 	if((dis->br & 0010000) == 0010000)
 		dis->lp_enable = !!(dis->br & 04000);
-//printf("setting mode %o %o\n", dis->mode, dis->lp_enable);
 }
 
 static void
@@ -306,11 +308,11 @@ cg_count(Dis340 *dis)
 
 	if(pnt == 0){
 		/* end of character */
+end:
 		nextchar(dis);
 		return;
 	}
 
-// TODO shift in/out
 	if(pnt & 040){
 		/* escape from char */
 		dis->cgstate = 0;
@@ -320,6 +322,14 @@ cg_count(Dis340 *dis)
 	}
 	if(pnt & 0100)
 		dis->x = 0;
+	if(pnt & 0200){
+		dis->shift = 0;
+		goto end;
+	}
+	if(pnt & 0400){
+		dis->shift = 64;
+		goto end;
+	}
 	r = (pnt & 014) == 010;
 	l = (pnt & 014) == 014;
 	u = (pnt & 003) == 002;
@@ -374,7 +384,7 @@ idp(Dis340 *dis)
 
 	case CM:
 		/* Tell CG to start */
-		dis->cp = chars[LDB(12, 6, dis->chrs)];
+		dis->cp = chars[LDB(12, 6, dis->chrs) + dis->shift];
 		dis->cgstate = 1;
 		break;
 
@@ -881,14 +891,17 @@ static void
 recalc_dis_req(Dis340 *dis)
 {
 	int data, spec;
+	u8 req_data, req_spec;
 
 // TODO: what about RFD?
 	data = dis->ibc == 0 && dis->rfd;
 	spec = dis->lp_flag ||
 		dis->hef || dis->vef ||
 		dis->stop && dis->br&01000;
-	setreq(dis->bus, DIS, data ? dis->pia_data : 0);
-	setreq(dis->bus, DIS, spec ? dis->pia_spec : 0);
+	req_data = data ? 0200 >> dis->pia_data : 0;
+	req_spec = spec ? 0200 >> dis->pia_spec : 0;
+
+	setreq2(dis->bus, DIS, req_data | req_spec);
 }
 
 static void
@@ -999,9 +1012,10 @@ makedis(int argc, char *argv[])
 	dis->dev.type = dis_ident;
 
 	/* dunno about the frequency here */
-	t = (Task){ nil, discycle, dis, 5, 0 };
+	t = (Task){ nil, discycle, dis, 50, 0 };
 	addtask(t);
 
+	/* There's a race somewhere here */
 	threadcreate(renderthread, dis);
 
 	return &dis->dev;

@@ -155,7 +155,12 @@ void
 decompdbl(double d, int *s, word *e, uint64_t *m)
 {
 	uint64_t x;
-	x = *(uint64_t*)&d;
+	union {
+		uint64_t i;
+		double d;
+	} u;
+
+	u.d = d; x = u.i;
 	*s = !!(x & 0x8000000000000000);
 	*e = (x >> 52) & 0x7FF;
 	*m = x & 0xFFFFFFFFFFFFF;
@@ -170,12 +175,17 @@ dtopdp(double d)
 	uint64_t x, e, m;
 	int sign;
 	word f;
+	union {
+		uint64_t i;
+		double d;
+	} u;
+
 	sign = 0;
 	if(d < 0.0){
 		sign = 1;
 		d *= -1.0;
 	}
-	x = *(uint64_t*)&d;
+	u.d = d; x = u.i;
 	/* sign is guaranteed to be 0 now */
 	e = (x >> 52) & 0x7FF;
 	m = x & 0xFFFFFFFFFFFFF;
@@ -200,6 +210,11 @@ double
 pdptod(word f)
 {
 	uint64_t x, s, e, m;
+	union {
+		uint64_t i;
+		double d;
+	} u;
+
 	s = 0;
 	if(f & 0400000000000){
 		f = -f & 0777777777777;
@@ -219,7 +234,8 @@ pdptod(word f)
 	x = m;
 	x |= (e & 0x7FF) << 52;
 	x |= s << 63;
-	return *(double*)&x;
+	u.i = x;
+	return u.d;
 }
 
 /* map ascii to radix50/squoze, also map lower to upper case */

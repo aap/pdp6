@@ -298,6 +298,7 @@ struct IOBus
 	Busdev dev[128];
 };
 void setreq(IOBus *bus, int dev, u8 pia);
+void setreq2(IOBus *bus, int dev, u8 req);
 
 
 /* A pulse modeled as a function, and a name for debugging */

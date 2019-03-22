@@ -613,6 +613,15 @@ setreq(IOBus *bus, int dev, u8 pia)
 		}
 	}
 }
+void
+setreq2(IOBus *bus, int dev, u8 req)
+{
+	req &= 0177;
+	if(bus && bus->dev[dev].req != req){
+		bus->dev[dev].req = req;
+		recalc_req(bus);
+	}
+}
 
 void
 recalc_cpa_req(Apr *apr)
@@ -1214,7 +1223,7 @@ defpulse(blt_t0)
                  apr->fsf1 || apr->fpf1 || apr->faf2 ? apr->c.ar>>27 & 0777 : \
                  apr->fpf2 || apr->faf1 ? apr->c.mb>>27 & 0777 : 0)
 #define SC_PAD apr->sc ^= SC_DATA
-#define SC_CRY apr->sc += (~apr->sc & SC_DATA) << 1
+#define SC_CRY apr->sc = (apr->sc + ((~apr->sc & SC_DATA) << 1))&0777
 // 6-7
 #define SHC_ASHC (apr->inst == ASHC || apr->nrf2 || apr->faf3)
 #define SHC_DIV ((IR_DIV || IR_FDV) && !apr->nrf2)
@@ -1900,7 +1909,8 @@ defpulse(ds_div_t0)
 
 defpulse(nrt6)
 {
-	pulse(apr, &et10, 0);	// 5-5
+	/* HACK: fake delay so values will settle */
+	pulse(apr, &et10, 1);	// 5-5
 }
 
 defpulse(nrt5a)
@@ -1918,7 +1928,7 @@ defpulse(nrt5)
 
 defpulse(nrt4)
 {
-	apr->n.ar |= apr->n.ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4, 6-9
+	apr->n.ar = apr->n.ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4, 6-9
 	pulse(apr, &nrt6, 0);		// 6-27
 }
 
