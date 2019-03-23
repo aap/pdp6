@@ -133,6 +133,20 @@ talkserial(int fd, Apr *apr, Ptr *ptr)
 			buf[n++] = 0100;
 			break;
 		}
+		if(apr->sw_power == 0){
+			buf[1] = 0;
+			buf[2] = 0;
+			buf[3] = 0;
+			buf[5] = 0;
+			buf[6] = 0;
+			buf[7] = 0;
+			buf[9] = 0;
+			buf[10] = 0;
+			buf[11] = 0;
+			buf[13] = 0;
+			buf[14] = 0;
+			buf[15] = 0;
+		}
 		sw = !sw;
 		writen(fd, buf, n);
 	}
@@ -178,9 +192,15 @@ threadmain(int argc, char *argv[])
 		exit(1);
 	}
 
-	dofile("init.ini");
+	rtcchan = chancreate(sizeof(RtcMsg), 20);
+
+	if(dofile("init.ini"))
+		defaultconfig();
 	apr = (Apr*)getdevice("apr");
 	ptr = (Ptr*)getdevice("ptr");
+
+	if(apr == nil || ptr == nil)
+		err("need APR, PTR");
 
 	cmdchans[0] = chancreate(sizeof(char*), 1);
 	cmdchans[1] = chancreate(sizeof(void*), 1);
@@ -188,6 +208,7 @@ threadmain(int argc, char *argv[])
 	addtask(t);
 	threadcreate(simthread, nil);
 	threadcreate(cmdthread, cmdchans);
+	threadcreate(rtcthread, nil);
 
 	if(panelfile){
 		fd = open(panelfile, O_RDWR);
