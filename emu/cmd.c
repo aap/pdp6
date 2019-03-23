@@ -233,7 +233,9 @@ DevDef definitions[] = {
 	{ DC_IDENT, makedc },
 	{ DT_IDENT, makedt },
 	{ DX_IDENT, makedx },
+#ifdef GRAPHICS
 	{ DIS_IDENT, makedis },
+#endif
 	{ NETMEM_IDENT, makenetmem },
 	{ nil, nil }
 };

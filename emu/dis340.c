@@ -482,6 +482,7 @@ data_sync(Dis340 *dis)
 
 	// LOAD BR
 	dis->br |= dis->ib>>18 & RT;
+//printf("DIS: %06o\n", dis->br);
 
 	dis->pnts = dis->br;
 	dis->chrs = dis->br;

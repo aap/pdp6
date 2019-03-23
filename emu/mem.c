@@ -171,7 +171,7 @@ powercore(Mem *mem)
 {
 	CMem *core;
 
-	printf("[powercore]\n");
+//	printf("[powercore]\n");
 	core = mem->module;
 	readmem(core->filename, core->core, core->size);
 	core->cmc_aw_rq = 1;
@@ -237,7 +237,7 @@ powerff(Mem *mem)
 {
 	FMem *ff;
 
-	printf("[powerff]\n");
+//	printf("[powerff]\n");
 	ff = mem->module;
 	ff->fmc_act = 0;
 	ff->fmc_wr = 0;

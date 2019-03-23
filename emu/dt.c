@@ -329,6 +329,7 @@ setstat(Dt551 *dt, int state)
 static void
 dtsetgo(Dt551 *dt, int go)
 {
+/*
 	printf("setting GO %d %d\n", dt->ut_go, go);
 	if(dt->ut_go != go){
 		if(go)
@@ -336,6 +337,7 @@ dtsetgo(Dt551 *dt, int go)
 		else
 			printf("DECtape stopped\n\n\n");
 	}
+*/
 	dt->ut_go = go;
 }
 

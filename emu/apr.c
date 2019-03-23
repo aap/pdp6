@@ -3428,7 +3428,7 @@ aprstart(Apr *apr)
 	static RtcMsg lineclk = { 1, 1, nil, 1000000000/60 };
 
 	int i;
-	printf("[aprstart]\n");
+//	printf("[aprstart]\n");
 
 	apr->pfree = nil;
 	apr->pulse = nil;
@@ -3581,6 +3581,21 @@ if(!apr->run){
 		apr->ia_inh = 0;
 }
 
+void
+apr_testinst(Apr *apr)
+{
+	apr->sw_power = 0;
+	aprcycle(apr);
+	apr->sw_power = 1;
+	aprcycle(apr);
+
+	while(apr->pulse)
+		aprcycle(apr);
+	apr->pc = 020;
+	pulse(apr, &it0, 1);
+	while(apr->pulse)
+		aprcycle(apr);
+}
 
 
 

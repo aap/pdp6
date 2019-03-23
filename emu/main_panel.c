@@ -857,6 +857,9 @@ threadmain(int argc, char *argv[])
 		exit(1);
 	}
 
+void test_apr(void);
+//test_apr();
+
 	SDL_Init(SDL_INIT_EVERYTHING);
 	IMG_Init(IMG_INIT_PNG);
 
