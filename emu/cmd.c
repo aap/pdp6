@@ -592,8 +592,9 @@ sblk:
 	}
 	goto format;
 end:
-	w = readwits(fp);
-	if(left(w) != 0324000)
+	/* use the first JRST, not the second */
+//	w = readwits(fp);
+	if(left(w) != 0324000 && left(w) != 0254000)
 		goto format;
 	getapr()->pc = right(w);
 	return;

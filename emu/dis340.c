@@ -1013,7 +1013,8 @@ makedis(int argc, char *argv[])
 	dis->dev.type = dis_ident;
 
 	/* dunno about the frequency here */
-	t = (Task){ nil, discycle, dis, 50, 0 };
+//	t = (Task){ nil, discycle, dis, 50, 0 };
+	t = (Task){ nil, discycle, dis, 20, 0 };
 	addtask(t);
 
 	/* There's a race somewhere here */

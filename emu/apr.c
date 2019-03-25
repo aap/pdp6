@@ -2011,8 +2011,8 @@ defpulse_(fst0a)
 	apr->fsf1 = 0;	// 6-19
 	if(!AR0_EQ_SC0)
 		SET_OVERFLOW;	// 6-17
-	apr->n.ar |= apr->n.ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4, 6-9
-	pulse(apr, &et10, 0);	// 5-5
+	apr->n.ar = apr->n.ar&0400777777777 | ((word)apr->sc&0377)<<27;	 // 6-4, 6-9
+	pulse(apr, &et10, 1);	// 5-5
 }
 
 defpulse(fst0)
