@@ -503,7 +503,7 @@ void
 ar_cry_in(Apr *apr, word c)
 {
 	word a;
-	a = (apr->n.ar & ~F0) + c;
+	a = (apr->n.ar & ~F0) + (c & ~F0);
 	apr->n.ar += c;
 	if(apr->n.ar & FCRY) apr->ar_cry0 = 1;
 	if(a         &   F0) apr->ar_cry1 = 1;
@@ -1398,7 +1398,7 @@ defpulse(dct3)
 {
 	apr->n.mb &= apr->c.ar;		// 6-3
 	apr->chf7 = 0;			// 6-19
-	pulse(apr, &et10, 0);		// 5-5
+	pulse(apr, &et10, 1);		// 5-5
 }
 
 defpulse(dct2)
@@ -1435,7 +1435,7 @@ defpulse_(lct0a)
 	apr->lcf1 = 0;			// 6-20
 	apr->n.ar &= apr->c.mb;		// 6-8
 	apr->chf7 = 0;			// 6-19
-	pulse(apr, &et10, 0);		// 5-5
+	pulse(apr, &et10, 1);		// 5-5
 }
 
 defpulse(lct0)
@@ -1645,8 +1645,7 @@ defpulse(dst21a)
 {
 	apr->dsf9 = 0;			// 6-26
 	SWAP(mb, mq);			// 6-17
-	if(IR_DIV)
-		pulse(apr, &et9, 0);	// 5-5
+	if(IR_DIV) pulse(apr, &et9, 0);	// 5-5
 	if(apr->fdf2) pulse(apr, &fdt0b, 0);	// 6-22
 }
 
@@ -1694,6 +1693,14 @@ defpulse(dst17)
 	pulse(apr, &cfac_ar_add, 0);	// 6-17
 }
 
+defpulse(dst16_dly)
+{
+	if(apr->c.ar & F0)
+		pulse(apr, apr->c.mb & F0 ? &dst18 : &dst17, 0);	// 6-26
+	else
+		pulse(apr, &dst17a, 0);				// 6-26
+}
+
 defpulse(dst16)
 {
 	word ar0_shr_inp = 0;
@@ -1704,10 +1711,7 @@ defpulse(dst16)
 	if(IR_DIV)
 		ar0_shr_inp = (~apr->c.mq & F35) << 35;
 	AR_SH_RT;	// 6-17
-	if(apr->c.ar & F0)
-		pulse(apr, apr->c.mb & F0 ? &dst18 : &dst17, 100);	// 6-26
-	else
-		pulse(apr, &dst17a, 0);				// 6-26
+	pulse(apr, &dst16_dly, 100);
 }
 
 defpulse(dst15)
@@ -2654,7 +2658,7 @@ defpulse_(et5)
 	if(E_LONG)				// 5-5
 		pulse(apr, &et6, 100);
 	else
-		pulse(apr, &et10, 0);
+		pulse(apr, &et10, 1);
 }
 
 defpulse_(et4)
