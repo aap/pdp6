@@ -12,6 +12,7 @@ void writew(word w, FILE *fp);
 word readw(FILE *fp);
 void writewbak(word w, FILE *fp);
 word readwbak(FILE *fp);
+void writewits(word w, FILE *fp);
 word readwits(FILE *fp);
 
 void decompdbl(double d, int *s, word *e, uint64_t *m);

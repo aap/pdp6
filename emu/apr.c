@@ -2354,10 +2354,11 @@ defpulse_(ar_pm1_t1)
 		ar_cry_in(apr, 1);		// 6-6
 	// There must be some delay after the carry is done
 	// but I don't quite know how this works,
-	// so we just use 50ns a an imaginary value
+	// so we just use 100ns as the average value
+	// given in "The Evolution of the DECsystem-10"
 	if(!apr->ar_com_cont)
-		pulse(apr, &art3, 50);		// 6-9
-	pulse(apr, &ar_cry_comp, 50);		// 6-9
+		pulse(apr, &art3, 100);		// 6-9
+	pulse(apr, &ar_cry_comp, 100);		// 6-9
 }
 
 defpulse(ar_pm1_t0)

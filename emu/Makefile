@@ -3,8 +3,8 @@ H=pdp6.h ../tools/pdp6common.h threading.h
 # clang
 #CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses \
 #        -Wno-bitwise-op-parentheses
-CFLAGS=  -O3 -Wall -Wno-parentheses -fno-diagnostics-show-caret
-#CFLAGS=  -g -Wall -Wno-parentheses -fno-diagnostics-show-caret
+CFLAGS= -g -O3 -Wall -Wno-parentheses -fno-diagnostics-show-caret
+#CFLAGS= -g -Wall -Wno-parentheses -fno-diagnostics-show-caret
 SDLFLAGS=`sdl2-config --cflags` `pkg-config SDL2_image --cflags` -DGRAPHICS
 
 LIBS=-lpthread -lm

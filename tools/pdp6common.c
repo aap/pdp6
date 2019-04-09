@@ -65,6 +65,92 @@ readwbak(FILE *fp)
 }
 
 
+static int prevbyte = -1;
+static void
+flush(FILE *fp)
+{
+	if(prevbyte == 015)
+		putc(0356, fp);
+	else if(prevbyte == 0177)
+		putc(0357, fp);
+	prevbyte = -1;
+}
+
+static void
+binword(word w, FILE *fp)
+{
+	flush(fp);
+
+	putc(w>>32 & 017 | 0360, fp);
+	putc(w>>24 & 0377, fp);
+	putc(w>>16 & 0377, fp);
+	putc(w>>8 & 0377, fp);
+	putc(w & 0377, fp);
+}
+
+static void
+asciiword(word w, FILE *fp)
+{
+	int i;
+	char b, bytes[5];
+
+	bytes[0] = w>>29 & 0177;
+	bytes[1] = w>>22 & 0177;
+	bytes[2] = w>>15 & 0177;
+	bytes[3] = w>>8 & 0177;
+	bytes[4] = w>>1 & 0177;
+
+	for(i = 0; i < 5; i++){
+		b = bytes[i];
+
+again:
+		if(prevbyte == 015){
+			prevbyte = -1;
+			if(b == 012)
+				putc(012, fp);
+			else{
+				putc(0356, fp);
+				goto again;
+			}
+		}else if(prevbyte == 0177){
+			prevbyte = -1;
+			switch(b){
+			case 7: putc(0177, fp); break;
+			case 012: putc(0215, fp); break;
+			case 015: putc(0212, fp); break;
+			case 0177: putc(0207, fp); break;
+			default:
+				if(b <= 0155)
+					putc(b + 0200, fp);
+				else{
+					putc(0357, fp);
+					goto again;
+				}
+			}
+		}else if(b == 015 || b == 0177)
+			prevbyte = b;
+		else if(b == 012)
+			putc(015, fp);
+		else
+			putc(b, fp);
+	}
+}
+
+/* write word in ITS evacuate format. */
+void
+writewits(word w, FILE *fp)
+{
+	if(w == ~0){
+		flush(fp);
+		return;
+	}
+
+	if(w & 1)
+		binword(w, fp);
+	else
+		asciiword(w, fp);
+}
+
 /* read word in ITS evacuate format. */
 static int leftover = -1;
 word
@@ -75,8 +161,10 @@ readwits(FILE *fp)
 	word w;
 	int bits;
 
-	if(feof(fp))
+	if(fp == NULL || feof(fp)){
+		leftover = -1;
 		return ~0;
+	}
 
 	w = 0;
 	bits = 0;
