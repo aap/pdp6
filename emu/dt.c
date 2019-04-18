@@ -301,7 +301,6 @@ recalc_dt_req(Dt551 *dt)
 	   dt->time_flag && dt->time_enable ||
 	   dt->ut_info_error ||
 	   dt->ut_illegal_op)
-printf("DT PI %o\n", dt->ut_pia),
 		req = dt->ut_pia;
 	else
 		req = 0;

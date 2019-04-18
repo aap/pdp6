@@ -12,14 +12,14 @@ static int char_na[] = {
 	R|I, U|I, U|I, U|I, U|I, U|I, U|I,
 	R|I, D|I, D|I, D|I, D|I, D|I, D|I,
 	R|I, U|I, U|I, U|I, U|I, U|I, U|I,
-	D|R, D|R, D|R, D, D, D,
+	D|R, D|R, D, D, D, D,
 	0
 };
 
 static int char_A[] = {
 	I, U|I, U|I, U|I, U|I, U|I, U|R|I,
 	R|I, R|I, R|D|I, D|I, L, L, L|D|I,
-	R|I, R|I, R|I, D|I, D|I, D|I, R, R, R,
+	R|I, R|I, R|I, D|I, D|I, D|I, R, R,
 	0
 };
 
@@ -27,21 +27,21 @@ static int char_B[] = {
 	I, U|I, U|I, U|I, U|I, U|I, U|I, R|I,
 	R|I, R|I, R|D|I, D|I, L|D|I, L|I, L|I,
 	D, D, D|I, R|I, R|I, U|R|I, U|I,
-	D|R, D|R, R,
+	D|R, D|R,
 	0
 };
 
 static int char_C[] = {
 	U|I, U|I, U|I, U|I, U|I, U|R|I, R|I, R|I, D|R|I,
 	D|L, D|L, D|L, D, D|I,
-	R|I, R|I, U|R|I, D|R, R, R,
+	R|I, R|I, U|R|I, D|R, R,
 	0
 };
 
 static int char_D[] = {
 	I, U|I, U|I, U|I, U|I, U|I, U|I,
 	R|I, R|I, R|I, R|D|I, D|I, D|I, D|I, D|I,
-	L, L, L|D|I, R|I, R|I, R, R, R, R,
+	L, L, L|D|I, R|I, R|I, R, R, R,
 	0
 };
 
@@ -51,7 +51,7 @@ static int char_E[] = {
 	D|L, D|L, D|L|I,
 	R|I, R|I, R|I,
 	D|L, D|L, D|L|I,
-	R|I, R|I, R|I, R, R, R,
+	R|I, R|I, R|I, R, R,
 	0
 };
 
@@ -61,7 +61,7 @@ static int char_F[] = {
 	D|L, D|L, D|L|I,
 	R|I, R|I, R|I,
 	D|L, D|L, D|L,
-	R, R, R, R, R, R,
+	R, R, R, R, R,
 	0
 };
 
@@ -69,7 +69,7 @@ static int char_G[] = {
 	U|I, U|I, U|I, U|I, U|I,
 	U|R|I, R|I, R|I, D|R|I,
 	D, D|I, L|I, L|I, D|L, D,
-	D|I, R|I, R|I, U|R|I, U|I, D|R, D|R, R,
+	D|I, R|I, R|I, U|R|I, U|I, D|R, D|R,
 	0
 };
 
@@ -77,7 +77,7 @@ static int char_H[] = {
 	I, U|I, U|I, U|I, U|I, U|I, U|I,
 	D|R, D, D|I, R|I, R|I,
 	U, U, U|R|I,
-	D|I, D|I, D|I, D|I, D|I, D|I, R, R, R,
+	D|I, D|I, D|I, D|I, D|I, D|I, R, R,
 	0
 };
 
@@ -85,14 +85,14 @@ static int char_I[] = {
 	U, U, U, U, U, U|R|I,
 	R|I, R|I, D|L|I,
 	D|I, D|I, D|I, D|I, D|L|I,
-	R|I, R|I, R, R, R, R,
+	R|I, R|I, R, R, R,
 	0
 };
 
 static int char_J[] = {
 	U|I, D|R|I, R|I, R|I,
 	U|R|I, U|I, U|I, U|I, U|I, U|I,
-	D|R, D|R, D|R, D, D, D,
+	D|R, D|R, D, D, D, D,
 	0
 };
 
@@ -100,21 +100,21 @@ static int char_K[] = {
 	I, U|I, U|I, U|I, U|I, U|I, U|I,
 	R, R, R, R|I,
 	D|L|I, D|L|I, D|L|I,
-	D|R|I, D|R|I, D|R|I, R, R, R,
+	D|R|I, D|R|I, D|R|I, R, R,
 	0
 };
 
 static int char_L[] = {
 	I, U|I, U|I, U|I, U|I, U|I, U|I,
 	D|R, D, D, D, D, D|I,
-	R|I, R|I, R|I, R, R, R,
+	R|I, R|I, R|I, R, R,
 	0
 };
 
 static int char_M[] = {
 	I, U|I, U|I, U|I, U|I, U|I, U|I,
 	D|R|I, D|R|I, U|R|I, U|R|I,
-	D|I, D|I, D|I, D|I, D|I, D|I, R, R, R,
+	D|I, D|I, D|I, D|I, D|I, D|I, R, R,
 	0
 };
 
@@ -122,7 +122,7 @@ static int char_N[] = {
 	I, U|I, U|I, U|I, U|I, U|I, U|I,
 	D|R|I, D|R|I, D|R|I,
 	U, U, U|R|I,
-	D|I, D|I, D|I, D|I, D|I, D|I, R, R, R,
+	D|I, D|I, D|I, D|I, D|I, D|I, R, R,
 	0
 };
 
@@ -130,7 +130,7 @@ static int char_O[] = {
 	U|I, U|I, U|I, U|I, U|I,
 	U|R|I, R|I, R|I,
 	D|R|I, D|I, D|I, D|I, D|I,
-	L, L, D|L|I, R|I, R|I, R, R, R, R,
+	L, L, D|L|I, R|I, R|I, R, R, R,
 	0
 };
 
@@ -139,7 +139,7 @@ static int char_P[] = {
 	R|I, R|I, R|I,
 	D|R|I, D|I,
 	D|L|I, L|I, L|I,
-	D|R, D|R, D|R, R, R, R,
+	D|R, D|R, D|R, R, R,
 	0
 };
 
@@ -148,7 +148,7 @@ static int char_Q[] = {
 	U|R|I, R|I, R|I,
 	D|R|I, D|I, D|I, D|I,
 	L, L|I, D|L, D|I,
-	R|I, R|I, U|I, R|I, D|I, R, R, R,
+	R|I, R|I, U|I, R|I, D|I, R, R,
 	0
 };
 
@@ -157,14 +157,14 @@ static int char_R[] = {
 	R|I, R|I, R|I,
 	D|R|I, D|I,
 	D|L|I, L|I, L|I,
-	D|R|I, D|R|I, D|R|I, R, R, R,
+	D|R|I, D|R|I, D|R|I, R, R,
 	0
 };
 
 static int char_S[] = {
 	U|I, D|R|I, R|I, R|I, U|R|I, U|I,
 	U|L|I, L|I, L|I, U|L|I, U|I,
-	U|R|I, R|I, R|I, D|R|I, D|R, D|R, D|R, D, D,
+	U|R|I, R|I, R|I, D|R|I, D|R, D|R, D, D, D,
 	0
 };
 
@@ -173,7 +173,7 @@ static int char_T[] = {
 	R|I, R|I, R|I, R|I,
 	D|L, L|I,
 	D|I, D|I, D|I, D|I, D|I,
-	R, R, R, R, R,
+	R, R, R, R,
 	0
 };
 
@@ -181,28 +181,28 @@ static int char_U[] = {
 	U|I, U|I, U|I, U|I, U|I, U|I,
 	R, R, R, R|I,
 	D|I, D|I, D|I, D|I, D|I,
-	L, L, L|D|I, R|I, R|I, R, R, R, R,
+	L, L, L|D|I, R|I, R|I, R, R, R,
 	0
 };
 
 static int char_V[] = {
 	R, R|I, U|L|I, U|L|I, U|I, U|I, U|I, U|I,
 	R, R, R, R|I,
-	D|I, D|I, D|I, D|I, D|L|I, D|L|I, R, R, R, R, R,
+	D|I, D|I, D|I, D|I, D|L|I, D|L|I, R, R, R, R,
 	0
 };
 
 static int char_W[] = {
 	I, U|I, R|I, U|R|I, L, L|I, U|I, U|I, U|I, U|I,
 	R, R, R, R|I,
-	D|I, D|I, D|I, D|I, D|I, L|I, D|R|I, R, R, R,
+	D|I, D|I, D|I, D|I, D|I, L|I, D|R|I, R, R,
 	0
 };
 
 static int char_X[] = {
 	I, U|R|I, U|R|I, U|I, U|I, U|L|I, U|L|I,
 	R, R, R, R|I,
-	D|L|I, D, D, D, D|I, D|R|I, R, R, R,
+	D|L|I, D, D, D, D|I, D|R|I, R, R,
 	0
 };
 
@@ -210,7 +210,7 @@ static int char_Y[] = {
 	U, U, U, U, U, U|I,
 	R, R, R, R|I, D|L|I,
 	L, L|I,
-	D|R|I, D|I, D|I, D|I, D|I, R, R, R, R, R,
+	D|R|I, D|I, D|I, D|I, D|I, R, R, R, R,
 	0
 };
 
@@ -220,7 +220,7 @@ static int char_Z[] = {
 	R|I, R|I, R|I, R|I,
 	D|I, D|L|I, D|R|I, L|I, L|I,
 	D, D, D|L|I,
-	R|I, R|I, R|I, R, R, R,
+	R|I, R|I, R|I, R, R,
 	0
 };
 
@@ -228,33 +228,33 @@ static int char_null[] = {
 	U, U|I, U|I, R|I, U|L|I,
 	U|R|I, R|I, D|I, U|R|I,
 	D|R|I, D|I, L|I, D|R|I,
-	L, L|I, D|L|I, R|I, R|I, D|R, R, R, R,
+	L, L|I, D|L|I, R|I, R|I, D|R, R, R,
 	0
 };
 
 static int char_ex[] = {
 	R, R|I, U, U|I, U|I, U|I, U|I, U|I,
-	D|R, D|R, D|R, D|R, D|R, D,
+	D|R, D|R, D|R, D|R, D, D,
 	0
 };
 
 static int char_dq[] = {
 	U, U, U, U|R|I, U|I, U|I,
-	R, R|I, D|I, D|I, D|R, D|R, D|R, D,
+	R, R|I, D|I, D|I, D|R, D|R, D, D,
 	0
 };
 
 static int char_sh[] = {
 	R, R|I, U|I, U|I, L|I, U|R|I, U|I, L|I, U|R|I, U|I,
 	R, R|I, D|I, D|R|I, L|I, L|I, D|R|I, D|R|I,
-	L|I, L|I, D|R|I, D|I, R, R, R, R,
+	L|I, L|I, D|R|I, D|I, R, R, R,
 	0
 };
 
 static int char_dl[] = {
 	U|I, D|R|I, R|I, U|I, D|R|I, U|R|I, U|I,
 	U|L|I, D|L|I, U|I, U|I, D|L|I, U|L|I, U|I,
-	U|R|I, R|I, D|I, U|R|I, D|R|I, D|R, D|R, D|R, D, D,
+	U|R|I, R|I, D|I, U|R|I, D|R|I, D|R, D|R, D, D, D,
 	0
 };
 
@@ -262,68 +262,68 @@ static int char_pr[] = {
 	I, U|I, U|R|I, U|R|I, U|R|I, U|R|I, U|I,
 	L|I, L|I, L|I, L|I, D|I, R|I,
 	D|R, D|R, D,
-	D|I, R|I, D|L|I, R|I, R, R, R,
+	D|I, R|I, D|L|I, R|I, R, R,
 	0
 };
 
 static int char_et[] = {
 	R|I, U|L|I, U|I, U|R, U|R|I, U|I, U|L|I,
 	D|L|I, D|I, D|R|I, D|R|I, D|I, D|I, U|R|I, U|R|I,
-	D, D|I, R, R, R,
+	D, D|I, R, R,
 	0
 };
 
 static int char_sq[] = {
 	U, U, U, U, U|R|I, U|I,
-	R|I, D|I, D|I, D|R, D|R, D|R, D|R, R,
+	R|I, D|I, D|I, D|R, D|R, D|R, D|R,
 	0
 };
 
 static int char_lp[] = {
 	R, R|I, U|L|I, U|L|I, U|I, U|I, U|R|I, U|R|I,
-	D|R, D|R, D|R, D|R, D|R, D,
+	D|R, D|R, D|R, D|R, D, D,
 	0
 };
 
 static int char_rp[] = {
 	U, U, U, U, U|R, U|R|I,
 	D|R|I, D|R|I, D|I, D|I, D|L|I, D|L|I,
-	R, R, R, R, R,
+	R, R, R, R,
 	0
 };
 
 static int char_as[] = {
 	U|I, U|R|I, U|I, L|I, U|R|I, U|L|I, R,
 	R|I, R, R|I, D|L|I, L|I, D|I, R|I, R|I,
-	D|L|I, L|I, D|I, R, R|I, D|R, R, R,
+	D|L|I, L|I, D|I, R, R|I, D|R, R,
 	0
 };
 
 static int char_pl[] = {
 	U, U, U|I, R|I, U|R|I, U|I,
 	D|R, D|R|I, L|I, L|I, D|I, D|I,
-	D|R, R, R, R, R,
+	D|R, R, R, R,
 	0
 };
 
 static int char_cm[] = {
-	U|R|I, U|I, R|I, D|I, D|I, R, R, R, R, R,
+	U|R|I, U|I, R|I, D|I, D|I, R, R, R, R,
 	0
 };
 
 static int char_mi[] = {
-	U, U, U|I, R|I, R|I, R|I, R|I, D|R, D|R, D|R,
+	U, U, U|I, R|I, R|I, R|I, R|I, D|R, D|R, D,
 	0
 };
 
 static int char_pe[] = {
-	R|I, U|I, R|I, D|I, R, R, R, R, R,
+	R|I, U|I, R|I, D|I, R, R, R, R,
 	0
 };
 
 static int char_sl[] = {
 	U|I, U|R|I, U|R|I, U|R|I, U|R|I,
-	D|R, D|R, D|R, D, D,
+	D|R, D|R, D, D, D,
 	0
 };
 
@@ -331,169 +331,169 @@ static int char_0[] = {
 	U|I, U|R|I, L|I, U|I, U|I, U|I,
 	U|R|I, R|I, R|I, D|R|I, D|I, L|I, D|L|I,
 	R, R|I, D|I, D|I, D|L|I, L|I, L|I,
-	R, R, R, R, R, R,
+	R, R, R, R, R,
 	0
 };
 
 static int char_1[] = {
 	U, U, U, U, U|R|I, U|R|I, D|I,
 	D|I, D|I, D|I, D|I, D|L|I, R|I, R|I, R,
-	R, R, R,
+	R, R,
 	0
 };
 
 static int char_2[] = {
 	U, U, U, U, U|I, U|R|I, R|I, R|I,
 	D|R|I, D|I, D|L|I, L|I, L|I, D|L|I, D|I, D|I,
-	R|I, R|I, R|I, R|I, R, R, R,
+	R|I, R|I, R|I, R|I, R, R,
 	0
 };
 
 static int char_3[] = {
 	U|I, D|R|I, R|I, R|I, U|R|I, U|I, U|L|I,
 	U|R|I, U|I, U|L|I, L|I, L|I, D|L|I,
-	D|R, D|R|I, D|R, D|R, D|R, R, R,
+	D|R, D|R|I, D|R, D|R, D|R, R,
 	0
 };
 
 static int char_4[] = {
 	U, U, U|I, R|I, R|I, U|L|I, U|R|I, U|R|I,
-	D|I, D|I, D|R|I, L|I, D|I, D|I, D|I, R, R, R, R,
+	D|I, D|I, D|R|I, L|I, D|I, D|I, D|I, R, R, R,
 	0
 };
 
 static int char_5[] = {
 	U|I, D|R|I, R|I, R|I, U|R|I, U|I, U|L|I, L|I, L|I,
 	U|L|I, U|I, U|I, R|I, R|I, R|I, R|I,
-	D|R, D|R, D|R, D, D, D,
+	D|R, D|R, D, D, D, D,
 	0
 };
 
 static int char_6[] = {
 	R|I, U|L|I, U|I, U|R|I, L|I, U|I, U|I,
 	U|R|I, R|I, R|I, D|R|I, D|L, D|L|I, R|I,
-	D|R|I, D|I, L, D|L|I, R|I, R, R, R, R,
+	D|R|I, D|I, L, D|L|I, R|I, R, R, R,
 	0
 };
 
 static int char_7[] = {
 	I, U|I, U|R|I, U|L, U, U|I, U|I,
 	R|I, R|I, R|I, R|I, D|I, D|L|I, D|L|I,
-	D|R, D|R, D|R, R, R,
+	D|R, D|R, D|R, R,
 	0
 };
 
 static int char_8[] = {
 	R|I, U|L|I, U|I, U|R|I, U|L|I, U|I, U|R|I,
 	R|I, R|I, D|R|I, D|I, L, D|L|I, R|I, D|R|I,
-	D|I, L, D|L|I, R|I, R, R, R, R,
+	D|I, L, D|L|I, R|I, R, R, R,
 	0
 };
 
 static int char_9[] = {
 	U|I, D|R|I, R|I, R|I, U|R|I, U|I, U|I, U|I, U|I,
 	U|L|I, L|I, L|I, D|L|I, D|I, D|R|I, R|I, R|I,
-	D|R, D|R, D|R, R,
+	D|R, D|R, D|R,
 	0
 };
 
 static int char_cl[] = {
 	U, U, U, U|R|I, R|I, D|I, L|I,
-	D, D|I, R|I, D|L|I, R|I, R, R, R, R, R,
+	D, D|I, R|I, D|L|I, R|I, R, R, R, R,
 	0
 };
 
 static int char_sm[] = {
 	U, U, U, U, U|R|I, R|I, D|I, L|I,
-	D, D|I, R|I, D|L|I, R|I, D|I, R, R, R, R, R,
+	D, D|I, R|I, D|L|I, R|I, D|I, R, R, R, R,
 	0
 };
 
 static int char_la[] = {
 	R, R, R|I, U|L|I, U|L|I, U|L|I,
 	U|R|I, U|R|I, U|R|I,
-	D|R, D|R, D|R, D|R, D, D,
+	D|R, D|R, D|R, D, D, D,
 	0
 };
 
 static int char_eq[] = {
 	U, U|I, U, U|I, R|I, D, D|I,
 	R|I, U, U|I, R|I, D, D|I, R|I,
-	U, U|I, D|R, D|R, D|R, D,
+	U, U|I, D|R, D|R, D, D,
 	0
 };
 
 static int char_ra[] = {
 	R|I, U|R|I, U|R|I, U|R|I,
 	U|L|I, U|L|I, U|L|I,
-	D|R, D|R, D|R, D|R, D|R, D|R,
+	D|R, D|R, D|R, D|R, D|R, D,
 	0
 };
 
 static int char_qs[] = {
 	U, U, U, U, U|I, U|R|I, R|I, R|I,
 	D|R|I, D|I, D|L|I, L|I,
-	D|I, D|I, D|I, R, R, R, R, R,
+	D|I, D|I, D|I, R, R, R, R,
 	0
 };
 
 
 static int char_bar[] = {
 	R, R|I, U|I, U|I, U|I, U|I, U|I, U|I,
-	D|R, D|R, D|R, D|R, D|R, D,
+	D|R, D|R, D|R, D|R, D, D,
 	0
 };
 
 static int char_bs[] = {
 	U, U, U, U, U|I,
 	D|R|I, D|R|I, D|R|I, D|R|I,
-	D|R, R, R,
+	D|R, R,
 	0
 };
 
 static int char_Lb[] = {
 	I, R|I, R|I, U|L, L|I,
 	U|I, U|I, U|I, U|I, U|I,
-	R|I, R|I, D|R, D|R, D|R, D|R, D|R, D,
+	R|I, R|I, D|R, D|R, D|R, D|R, D, D,
 	0
 };
 
 static int char_Rb[] = {
 	R|U, R|U, U, U, U, U|I, R|I, R|I,
 	D|I, D|I, D|I, D|I, D|L, D|L|I,
-	R|I, R|I, U|I, D|R, R, R,
+	R|I, R|I, U|I, D|R, R,
 	0
 };
 
 static int char_LB[] = {
 	R, R|I, U|L|I, U|I, U|L|I, U|R|I, U|I, U|R|I,
-	D|R, D|R, D|R, D|R, D|R, D,
+	D|R, D|R, D|R, D|R, D, D,
 	0
 };
 
 static int char_RB[] = {
 	U|R, U|R, U, U, U, U|I,
 	D|R|I, D|I, D|R|I, D|L|I, D|I, D|L|I,
-	R, R, R, R, R,
+	R, R, R, R,
 	0
 };
 
 static int char_Ra[] = {
 	U, U, U|I, R|I, R|I, U, U|I,
 	D|R|I, D|R|I, L|I, D|I, D|L|I,
-	D|R, R, R, R, R,
+	D|R, R, R, R,
 	0
 };
 
 static int char_La[] = {
 	R, U|R|I, L|U|I, L|U|I, R|I, U|I, R|U|I,
-	D, D|I, R|I, R|I, D|R, D|R, D|R,
+	D, D|I, R|I, R|I, D|R, D|R, D,
 	0
 };
 
 static int char_Da[] = {
 	U, U|I, D|R|I, D|R|I, U|I, U|I, U|I, U|I, U|I, U|I,
-	D|R, D|R, D, D|I, D|L|I, D|R, R, R, R,
+	D|R, D|R, D, D|I, D|L|I, D|R, R, R,
 	0
 };
 
@@ -508,13 +508,13 @@ static int char_Ua[] = {
 static int char_Ua[] = {
 	R, R|I, U|I, U|I, U|I, U|I, L, L|I,
 	U|R|I, R|I, U|I, D|R|I, D|R|I,
-	D|R, D|R, D|R, D,
+	D|R, D|R, D, D,
 	0
 };
 
 static int char_tl[] = {
 	U, U, U, U, U|I, U|R|I, D|R|I, D|R|I, U|R|I,
-	D|R, D|R, D|R, D, D,
+	D|R, D|R, D, D, D,
 	0
 };
 
@@ -525,16 +525,16 @@ static int char_tk[] = {
 };
 
 static int char_dn[] = {
-	D, D,
+	D, D, D, D,
 	0
 };
 
 static int char_up[] = {
-	U, U,
+	U, U, U, U,
 	0
 };
 
-static int char_sp[] = { R, R, R, R, R, R, R, 0 };
+static int char_sp[] = { R, R, R, R, R, R, 0 };
 static int char_lf[] = { D, D, D, D, D, D, D, D, D, D, D, 0 };
 static int char_cr[] = { 0100, 0 };
 static int char_esc[] = { 040 };
