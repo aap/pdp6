@@ -1172,6 +1172,11 @@ usage(void)
 	exit(1);
 }
 
+extern void joy_motion (SDL_JoyAxisEvent *event);
+extern void joy_button (SDL_JoyButtonEvent *event);
+extern void controller_motion (SDL_ControllerAxisEvent *event);
+extern void controller_button (SDL_ControllerButtonEvent *event);
+
 int
 threadmain(int argc, char *argv[])
 {
@@ -1276,6 +1281,20 @@ void main340(void);
 				mbev = (SDL_MouseButtonEvent*)&ev;
 				mouse(mbev->button, mbev->state, mbev->x, mbev->y);
 				break;
+			case SDL_CONTROLLERAXISMOTION:
+			  controller_motion (&ev.caxis);
+			  break;
+			case SDL_JOYAXISMOTION:
+			  joy_motion (&ev.jaxis);
+			  break;
+			case SDL_JOYBUTTONUP:
+			case SDL_JOYBUTTONDOWN:
+			  joy_button (&ev.jbutton);
+			  break;
+			case SDL_CONTROLLERBUTTONUP:
+			case SDL_CONTROLLERBUTTONDOWN:
+			  controller_button (&ev.cbutton);
+			  break;
 			case SDL_KEYDOWN:
 				keydown(ev.key.keysym);
 				break;
