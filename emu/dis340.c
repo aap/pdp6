@@ -845,6 +845,10 @@ renderthread(void *arg)
 		SDL_TEXTUREACCESS_STREAMING, 1024, 1024);
 	SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
 
+	lock(&initlock);
+	awaitinit--;
+	unlock(&initlock);
+
 	for(;;){
 #ifdef JUSTTESTING
 		while(SDL_PollEvent(&ev))
@@ -1016,6 +1020,10 @@ makedis(int argc, char *argv[])
 //	t = (Task){ nil, discycle, dis, 50, 0 };
 	t = (Task){ nil, discycle, dis, 20, 0 };
 	addtask(t);
+
+	lock(&initlock);
+	awaitinit++;
+	unlock(&initlock);
 
 	/* There's a race somewhere here */
 	threadcreate(renderthread, dis);

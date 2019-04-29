@@ -55,6 +55,8 @@ struct SwDigit
 
 static SDL_Window *window;
 static SDL_Renderer *renderer;
+Lock initlock;
+volatile int awaitinit;
 
 Image*
 mustloadimg(const char *path)
@@ -902,6 +904,8 @@ void main340(void);
 
 	if(apr == nil || tty == nil || ptr == nil || ptp == nil)
 		err("need APR, TTY, PTR and PTP");
+
+	while(awaitinit);
 
 	cmdchans[0] = chancreate(sizeof(char*), 1);
 	cmdchans[1] = chancreate(sizeof(void*), 1);

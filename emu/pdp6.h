@@ -42,6 +42,9 @@ void *rtcthread(void *p);
 int dofile(const char *path);
 void defaultconfig(void);
 
+extern Lock initlock;
+extern volatile int awaitinit;
+
 enum {
 	MAXPULSE = 20
 };
