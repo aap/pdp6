@@ -236,6 +236,7 @@ DevDef definitions[] = {
 #ifdef GRAPHICS
 	{ DIS_IDENT, makedis },
 	{ JOY_IDENT, makejoy },
+	{ OJOY_IDENT, makeojoy },
 #endif
 	{ NETMEM_IDENT, makenetmem },
 	{ NETCONS_IDENT, makenetcons },

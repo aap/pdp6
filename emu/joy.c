@@ -2,14 +2,21 @@
 #include <SDL2/SDL.h>
 
 char *joy_ident = JOY_IDENT;
+char *ojoy_ident = OJOY_IDENT;
 
 typedef struct Joy Joy;
 struct Joy
 {
 	Device dev;
 	IOBus *bus;
-	int pia_data;
-	int pia_spec;
+};
+
+
+typedef struct OJoy OJoy;
+struct OJoy
+{
+	Device dev;
+	IOBus *bus;
 };
 
 
@@ -73,10 +80,12 @@ joyinit(void)
 }
 
 static word bits = 0777777777777;
+static word obits = 0;
 
 void joy_motion (SDL_JoyAxisEvent *ev)
 {
-  int n = ev->which;
+  int m, n = ev->which;
+  m = n * 18;
   n *= 9;
 
   if (ev->axis == 0) {
@@ -85,28 +94,49 @@ void joy_motion (SDL_JoyAxisEvent *ev)
       bits &= ~(0200LL << n);
     if (ev->value > 10000)
       bits &= ~(0400LL << n);
+
+    obits &= ~(060LL << m);
+    if (ev->value < -10000)
+      obits |= 020LL << m;
+    if (ev->value > 10000)
+      obits |= 040LL << m;
   } else if (ev->axis == 1) {
     bits |= 0100LL << n;
-    if (ev->value < -3000)
+    obits &= ~(0300LL << m);
+    if (ev->value < -10000) {
       bits &= ~(0100LL << n);
+      obits |= 0200LL << m;
+    } else if (ev->value > 10000) {
+      bits &= ~(0100LL << n);
+      obits |= 0100LL << m;
+    }
   }
 }
 
 void joy_button (SDL_JoyButtonEvent *ev)
 {
-  int n = ev->which;
-  word y = 0;
+  int m, n = ev->which;
+  word x = 0, y = 0;
+  m = n * 18;
   n *= 9;
 
   switch (ev->button) {
-  case 0: y = 020; break; //Torpedo
-  case 1: y = 040; break; //Hyperspace
+  case 0: x = 000010; y = 020; break; //Torpedo
+  case 1: x = 000004; y = 040; break; //Hyperspace
+  case 2: x = 020000; break; //Beacon beam
+  case 3: x = 000001; break; //Time K
+  case 4: x = 000002; break; //Time 0
+  case 5: x = 000400; break; //"Xmit data" = torpedo
+  case 6: x = 010000; break; //"General cancel" = destruct
   }
 
-  if (ev->state)
+  if (ev->state) {
     bits &= ~(y << n);
-  else
+    obits |= x << m;
+  }  else {
     bits |= y << n;
+    obits &= ~(x << m);
+  }
 }
 
 void controller_motion (SDL_ControllerAxisEvent *event)
@@ -164,12 +194,48 @@ wake_joy(void *dev)
 }
 
 static void
+wake_ojoy(void *dev)
+{
+	OJoy *joy;
+	IOBus *bus;
+
+	joy = dev;
+	bus = joy->bus;
+
+	if(bus->devcode == OJOY){
+		if(IOB_STATUS){
+		}
+		if(IOB_DATAI){
+                  bus->c12 |= obits;
+		}
+		if(IOB_CONO_CLEAR){
+		}
+		if(IOB_CONO_SET){
+		}
+		if(IOB_DATAO_CLEAR){
+		}
+		if(IOB_DATAO_SET){
+		}
+	}
+}
+
+static void
 joyioconnect(Device *dev, IOBus *bus)
 {
 	Joy *joy;
 	joy = (Joy*)dev;
 	joy->bus = bus;
 	bus->dev[JOY] = (Busdev){ joy, wake_joy, 0 };
+}
+
+
+static void
+ojoyioconnect(Device *dev, IOBus *bus)
+{
+	OJoy *joy;
+	joy = (OJoy*)dev;
+	joy->bus = bus;
+	bus->dev[OJOY] = (Busdev){ joy, wake_ojoy, 0 };
 }
 
 
@@ -180,11 +246,17 @@ static Device joyproto = {
 	nil, nil
 };
 
+static Device ojoyproto = {
+	nil, nil, "",
+	nil, nil,
+	ojoyioconnect,
+	nil, nil
+};
+
 Device*
 makejoy(int argc, char *argv[])
 {
 	Joy *joy;
-	Task t;
 
 	joy = malloc(sizeof(Joy));
 	memset(joy, 0, sizeof(Joy));
@@ -192,7 +264,23 @@ makejoy(int argc, char *argv[])
 	joy->dev = joyproto;
 	joy->dev.type = joy_ident;
 
-	//addtask(t);
+
+        joyinit();
+
+	return &joy->dev;
+}
+
+Device*
+makeojoy(int argc, char *argv[])
+{
+	OJoy *joy;
+
+	joy = malloc(sizeof(OJoy));
+	memset(joy, 0, sizeof(OJoy));
+
+	joy->dev = ojoyproto;
+	joy->dev.type = ojoy_ident;
+
         joyinit();
 
 	return &joy->dev;
