@@ -230,7 +230,7 @@ Device *make256kmem(int argc, char *argv[]);
 void attachmem(Mem *mem, int p, Membus *bus, int n);
 void readmem(const char *file, word *mem, word size);
 void showmem(Membus *bus);
-word *getmemref(Membus *bus, hword addr, int fastmem);
+word *getmemref(Membus *bus, hword addr, int fastmem, int *busy);
 
 /*
  * IO bus
@@ -665,6 +665,9 @@ struct Netmem
 {
 	Device dev;
 	int fd;
+	u8 buf[9];
+	int waiting;
+
 	// tmp?
 	Apr *apr;
 };

@@ -184,7 +184,7 @@ static void
 exam(word addr, int fastmem, int format)
 {
 	word *p;
-	p = getmemref(&getapr()->membus, addr, fastmem);
+	p = getmemref(&getapr()->membus, addr, fastmem, nil);
 	if(p == nil){
 		printf("Non existent memory\n");
 		return;
@@ -206,7 +206,7 @@ static void
 dep(word addr, int fastmem, word w)
 {
 	word *p;
-	p = getmemref(&getapr()->membus, addr, fastmem);
+	p = getmemref(&getapr()->membus, addr, fastmem, nil);
 	if(p == nil){
 		printf("Non existent memory\n");
 		return;

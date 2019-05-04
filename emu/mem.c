@@ -414,17 +414,19 @@ showmem(Membus *bus)
 }
 
 word*
-getmemref(Membus *bus, hword addr, int fastmem)
+getmemref(Membus *bus, hword addr, int fastmem, int *busy)
 {
 	CMem *core;
 	FMem *ff;
 
 	if(fastmem && addr < 020 && bus->fmem){
 		ff = bus->fmem->module;
+		if(busy) *busy = ff->fmc_act;
 		return &ff->ff[addr];
 	}
 	if(bus->cmem[addr>>14]){
 		core = bus->cmem[addr>>14]->module;
+		if(busy) *busy = core->cmc_p_act >= 0;
 		return &core->core[addr & core->mask];
 	}
 	return nil;

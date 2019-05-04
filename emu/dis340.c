@@ -865,7 +865,7 @@ renderthread(void *arg)
 		SDL_RenderClear(renderer);
 
 		render(dis->crt);
-//		SDL_Delay(1);
+//		SDL_Delay(30);
 
 		SDL_UpdateTexture(tex, nil, dis->crt->pixels, 1024*sizeof(u32));
 		SDL_RenderCopy(renderer, tex, nil, nil);

@@ -16,72 +16,81 @@ netmemcycle(void *dev)
 {
 	Netmem *nm;
 	nm = (Netmem*)dev;
-	u8 buf[9], len;
+	u8 len;
 	word a, d, *p;
+	int busy;
 
 	if(nm->fd < 0)
 		return;
 
-	if(!hasinput(nm->fd))
-		return;
+	if(!nm->waiting){
+		if(!hasinput(nm->fd))
+			return;
 
-	if(readn(nm->fd, buf, 2)){
-		fprintf(stderr, "netmem fd closed\n");
-		nm->fd = -1;
-		return;
+		if(readn(nm->fd, nm->buf, 2)){
+			fprintf(stderr, "netmem fd closed\n");
+			nm->fd = -1;
+			return;
+		}
+		len = nm->buf[0]<<8 | nm->buf[1];
+		if(len > 9){
+			fprintf(stderr, "netmem botch(%d), closing\n", len);
+			close(nm->fd);
+			nm->fd = -1;
+			return;
+		}
+		memset(nm->buf, 0, sizeof(nm->buf));
+		readn(nm->fd, nm->buf, len);
 	}
-	len = buf[0]<<8 | buf[1];
-	if(len > 9){
-		fprintf(stderr, "netmem botch(%d), closing\n", len);
-		close(nm->fd);
-		nm->fd = -1;
-		return;
-	}
-	memset(buf, 0, sizeof(buf));
-	readn(nm->fd, buf, len);
+	nm->waiting = 0;
 
-	a = buf[1] | buf[2]<<8 | buf[3]<<16;
-	d = buf[4] | buf[5]<<8 | buf[6]<<16 |
-		(word)buf[7]<<24 | (word)buf[8]<<32;
+	a = nm->buf[1] | nm->buf[2]<<8 | nm->buf[3]<<16;
+	d = nm->buf[4] | nm->buf[5]<<8 | nm->buf[6]<<16 |
+		(word)nm->buf[7]<<24 | (word)nm->buf[8]<<32;
 	a &= 0777777;
 	d &= 0777777777777;
 
-	switch(buf[0]){
+	switch(nm->buf[0]){
 	case WRRQ:
-		p = getmemref(&nm->apr->membus, a, 0);
+		p = getmemref(&nm->apr->membus, a, 0, &busy);
 		if(p == nil) goto err;
+		if(busy) goto wait;
 		*p = d;
 		printf("write %06lo %012lo\n", a, d);
-		buf[0] = 0;
-		buf[1] = 1;
-		buf[2] = ACK;
-		writen(nm->fd, buf, buf[1]+2);
+		nm->buf[0] = 0;
+		nm->buf[1] = 1;
+		nm->buf[2] = ACK;
+		writen(nm->fd, nm->buf, nm->buf[1]+2);
 		break;
 	case RDRQ:
-		p = getmemref(&nm->apr->membus, a, 0);
+		p = getmemref(&nm->apr->membus, a, 0, &busy);
 		if(p == nil) goto err;
+		if(busy) goto wait;
 		d = *p;
 		printf("read %06lo %012lo\n", a, d);
-		buf[0] = 0;
-		buf[1] = 6;
-		buf[2] = ACK;
-		buf[3] = d;
-		buf[4] = d>>8;
-		buf[5] = d>>16;
-		buf[6] = d>>24;
-		buf[7] = d>>32;
-		writen(nm->fd, buf, buf[1]+2);
+		nm->buf[0] = 0;
+		nm->buf[1] = 6;
+		nm->buf[2] = ACK;
+		nm->buf[3] = d;
+		nm->buf[4] = d>>8;
+		nm->buf[5] = d>>16;
+		nm->buf[6] = d>>24;
+		nm->buf[7] = d>>32;
+		writen(nm->fd, nm->buf, nm->buf[1]+2);
 		break;
 	default:
-		fprintf(stderr, "unknown netmem message %d\n", buf[0]);
+		fprintf(stderr, "unknown netmem message %d\n", nm->buf[0]);
 		break;
 	}
 	return;
 err:
 	printf("error address %06lo\n", a);
-	buf[0] = 1;
-	buf[1] = ERR;
-	writen(nm->fd, buf, buf[0]+1);
+	nm->buf[0] = 1;
+	nm->buf[1] = ERR;
+	writen(nm->fd, nm->buf, nm->buf[0]+1);
+	return;
+wait:
+	nm->waiting = 1;
 }
 
 Device*
