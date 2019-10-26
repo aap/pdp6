@@ -11,7 +11,7 @@ LIBS=-lpthread -lm
 SDLLIBS=`sdl2-config --libs` `pkg-config SDL2_image --libs`
 
 
-pdp6: main_panel.c dis340.c $(SRC) $(H)
+pdp6: main_panel.c dis340.c chargen.inc $(SRC) $(H)
 	$(CC) -o $@ $(CFLAGS) $(SDLFLAGS) main_panel.c dis340.c $(SRC) $(LIBS) $(SDLLIBS)
 pdp6_s: main_serial.c $(SRC) $(H)
 	$(CC) -o $@ $(CFLAGS) main_serial.c $(SRC) $(LIBS)
