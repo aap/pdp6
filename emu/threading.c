@@ -85,6 +85,8 @@ rsleep(Rendez *r)
 void
 rwakeup(Rendez *r)
 {
+	if(!r->init)
+		return;
 	if(pthread_cond_signal(&r->cond) != 0)
 		abort();
 }
@@ -92,6 +94,8 @@ rwakeup(Rendez *r)
 void
 rwakeupall(Rendez *r)
 {
+	if(!r->init)
+		return;
 	if(pthread_cond_broadcast(&r->cond) != 0)
 		abort();
 }

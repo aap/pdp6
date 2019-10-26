@@ -237,6 +237,7 @@ DevDef definitions[] = {
 	{ DIS_IDENT, makedis },
 #endif
 	{ NETMEM_IDENT, makenetmem },
+	{ NETCONS_IDENT, makenetcons },
 	{ nil, nil }
 };
 
@@ -684,7 +685,7 @@ struct {
 		"quit emulator" },
 	{ "help", c_help,
 		"print help" },
-	{ "", nil}
+	{ nil, nil}
 };
 
 static void
@@ -692,7 +693,7 @@ c_help(int argc, char *argv[])
 {
 	int i;
 
-	for(i = 0; cmdtab[i].cmd[0]; i++)
+	for(i = 0; cmdtab[i].cmd; i++)
 		printf(" %s:\t%s\n", cmdtab[i].cmd, cmdtab[i].desc);
 }
 
@@ -709,7 +710,7 @@ commandline(char *line)
 
 	if(numops && ops[0][0] != '#'){
 		nfound = 0;
-		for(i = 0; cmdtab[i].cmd[0]; i++){
+		for(i = 0; cmdtab[i].cmd; i++){
 			cmd = cmdtab[i].cmd;
 			l = strlen(ops[0]);
 			if(strncmp(ops[0], cmd, l) == 0){
@@ -723,7 +724,7 @@ commandline(char *line)
 			cmdtab[n].f(numops, ops);
 		else{
 			printf("Ambiguous command: %s\n", ops[0]);
-			for(i = 0; cmdtab[i].cmd[0]; i++){
+			for(i = 0; cmdtab[i].cmd; i++){
 				cmd = cmdtab[i].cmd;
 				l = strlen(ops[0]);
 				if(strncmp(ops[0], cmd, l) == 0)

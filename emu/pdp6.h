@@ -674,3 +674,21 @@ struct Netmem
 #define NETMEM_IDENT "netmem"
 extern char *netmem_ident;
 Device *makenetmem(int argc, char *argv[]);
+
+
+typedef struct Netcons Netcons;
+struct Netcons
+{
+	Device dev;
+	int fd;
+	u8 buf[9];
+
+	// tmp?
+	Apr *apr;
+};
+#define NETCONS_IDENT "netcons"
+extern char *netcons_ident;
+Device *makenetcons(int argc, char *argv[]);
+
+void writeconsreg(Apr *apr, u32 addr, u32 data);
+u32 readconsreg(Apr *apr, u32 addr);

@@ -1,3 +1,15 @@
+// two's complement of long dividend isn't taken correctly
+`define FIX_DS
+// USER IOT isn't implemented fully
+`define FIX_USER_IOT
+// A LONG flip-flop is missing
+`define FIX_A_LONG
+// guard against firing MC RS T0 twice on
+// MEM CONT when RUN is 0. Although clearing
+// the SBR FF probably prevents the same after MC RS T1
+`define FIX_MEMSTOP
+
+
 module apr(
 	input wire clk,
 	input wire reset,
@@ -32,6 +44,7 @@ module apr(
 	input wire sw_split_cyc,
 
 	// lights
+	output wire power,
 	output reg [0:17] ir,
 	output reg [0:35] mi,
 	output reg [0:35] ar,
@@ -91,6 +104,14 @@ module apr(
 	input  wire [0:35] iobus_iob_in
 );
 
+`ifdef simulation
+	assign power = sw_power;
+`else
+	assign power = ~key_pwr_clr_enbl & ~reset & sw_power;
+`endif
+	wire rst = reset | ~sw_power;
+
+
 	assign ff0 = { key_ex_st, key_ex_sync, key_dep_st, key_dep_sync, key_rdwr, mc_rd, mc_wr, mc_rq  };
 	assign ff1 = { if1a, af0, af3, af3a, et4_ar_pse, f1a, f4a, f6a };
 	assign ff2 = { sf3, sf5a, sf7, ar_com_cont, blt_f0a, blt_f3a, blt_f5a, iot_f0a };
@@ -105,9 +126,6 @@ module apr(
 	assign ff11 = { ~ex_user, cpa_illeg_op, ex_ill_op, ex_uuo_sync, ex_pi_sync, mq36, sc[0], fe[0] };
 	assign ff12 = { key_rim_sbr, ar_cry0_xor_cry1, ar_cry0, ar_cry1, ar_ov_flag, ar_cry0_flag, ar_cry1_flag, ar_pc_chg_flag };
 	assign ff13 = { cpa_non_exist_mem, cpa_clock_enable, cpa_clock_flag, cpa_pc_chg_enable, cpa_arov_enable, cpa_pia[33:35] };
-
-	// TODO:
-	reg a_long = 1'b0;
 
 	/*
 	 * KEY
@@ -162,40 +180,48 @@ module apr(
 	wire key_wr = kt3 & key_dp_OR_dp_nxt;
 
 	wire kt0a_D, kt1_D, kt2_D, kt3_D;
-	pg key_pg0(.clk(clk), .reset(reset), .in(key_inst_stop), .p(run_clr));
-	pg key_pg1(.clk(clk), .reset(reset), .in(sw_power), .p(mr_pwr_clr));
-	pg key_pg2(.clk(clk), .reset(reset), .in(key_manual), .p(kt0));
-	pg key_pg3(.clk(clk), .reset(reset),
+`ifdef simulation
+	pg key_pg0(.clk(clk), .reset(reset), .in(sw_power), .p(mr_pwr_clr));
+`else
+	wire sw_power_pulse;
+	wire key_pwr_clr_enbl;
+	pg key_pg7(clk, reset, sw_power, sw_power_pulse);
+	ldly5s key_dly4(.clk(clk), .reset(reset), .in(sw_power_pulse), .l(key_pwr_clr_enbl));
+	clk25khz key_clk0(clk, key_pwr_clr_enbl, mr_pwr_clr);
+`endif
+	pg key_pg1(.clk(clk), .reset(rst), .in(key_inst_stop), .p(run_clr));
+	pg key_pg2(.clk(clk), .reset(rst), .in(key_manual), .p(kt0));
+	pg key_pg3(.clk(clk), .reset(rst),
 		.in(kt2 & key_execute_OR_dp_OR_dp_nxt |
 		    cpa & iobus_iob_fm_datai),
 		.p(key_ar_fm_datasw1));
 
-	pa key_pa0(.clk(clk), .reset(reset), .in(kt0), .p(kt0a));
-	pa key_pa1(.clk(clk), .reset(reset),
+	pa key_pa0(.clk(clk), .reset(rst), .in(kt0), .p(kt0a));
+	pa key_pa1(.clk(clk), .reset(rst),
 		.in(kt0a_D & ~run |
-		    kt0a & key_mem_cont |	// TODO: check run?
+		    kt0a & key_mem_cont |
 		    st7 & run & key_ex_OR_dep_st),
 		.p(kt1));
-	pa key_pa2(.clk(clk), .reset(reset), .in(kt1_D), .p(kt2));
-	pa key_pa3(.clk(clk), .reset(reset), .in(kt2_D), .p(kt3));
-	pa key_pa4(.clk(clk), .reset(reset),
+	pa key_pa2(.clk(clk), .reset(rst), .in(kt1_D), .p(kt2));
+	pa key_pa3(.clk(clk), .reset(rst), .in(kt2_D), .p(kt3));
+	pa key_pa4(.clk(clk), .reset(rst),
 		.in(kt3 & key_execute |
 		    key_rdwr_ret |
 		    mc_stop_set & key_mem_cont |
 		    st7 & key_start_OR_cont_OR_read_in),
 		.p(kt4));
-	pa key_pa5(.clk(clk), .reset(reset),
+	pa key_pa5(.clk(clk), .reset(rst),
 		.in(kt3 & key_start_OR_cont_OR_read_in |
 		    key_run_AND_ex_OR_dep),
 		.p(key_go));
-	pa key_pa6(.clk(clk), .reset(reset),
+	pa key_pa6(.clk(clk), .reset(rst),
 		.in(key_rdwr & mc_rs_t1),
 		.p(key_rdwr_ret));
 
-	dly100ns key_dly0(.clk(clk), .reset(reset), .in(kt0a), .p(kt0a_D));
-	dly200ns key_dly1(.clk(clk), .reset(reset), .in(kt1), .p(kt1_D));
-	dly200ns key_dly2(.clk(clk), .reset(reset), .in(kt2), .p(kt2_D));
-	dly100ns key_dly3(.clk(clk), .reset(reset), .in(kt3), .p(kt3_D));
+	dly100ns key_dly0(.clk(clk), .reset(rst), .in(kt0a), .p(kt0a_D));
+	dly200ns key_dly1(.clk(clk), .reset(rst), .in(kt1), .p(kt1_D));
+	dly200ns key_dly2(.clk(clk), .reset(rst), .in(kt2), .p(kt2_D));
+	dly100ns key_dly3(.clk(clk), .reset(rst), .in(kt3), .p(kt3_D));
 
 `ifdef simulation
 	/* add to this as needed */
@@ -256,33 +282,33 @@ module apr(
 	wire it1;
 	wire it1a;
 
-	pa i_pa0(.clk(clk), .reset(reset),
+	pa i_pa0(.clk(clk), .reset(rst),
 		.in(key_go | (st7 & key_run_AND_NOT_ex_OR_dep)),
 		.p(it0));
-	pa i_pa1(.clk(clk), .reset(reset),
+	pa i_pa1(.clk(clk), .reset(rst),
 		.in(pi_sync_D & pi_rq & ~pi_cyc),
 		.p(iat0));
-	pa i_pa2(.clk(clk), .reset(reset),
+	pa i_pa2(.clk(clk), .reset(rst),
 		.in(iat0_D1 |
 		    pi_sync_D & if1a & ia_NOT_int),
 		.p(it1));
-	pa i_pa3(.clk(clk), .reset(reset),
+	pa i_pa3(.clk(clk), .reset(rst),
 		.in(mc_rs_t1 & if1a |
 		    kt3_D & key_execute |
 		    xct_t0_D),
 		.p(it1a));
 
 	wire it0_D, iat0_D0, iat0_D1;
-	ldly100us i_dly0(.clk(clk), .reset(reset),
+	ldly100us i_dly0(.clk(clk), .reset(rst),
 		.in(run_clr),
 		.l(at1_inh));
-	dly50ns i_dly1(.clk(clk), .reset(reset),
+	dly50ns i_dly1(.clk(clk), .reset(rst),
 		.in(it0),
 		.p(it0_D));
-	dly100ns i_dly2(.clk(clk), .reset(reset),
+	dly100ns i_dly2(.clk(clk), .reset(rst),
 		.in(iat0),
 		.p(iat0_D0));
-	dly200ns i_dly23(.clk(clk), .reset(reset),
+	dly200ns i_dly23(.clk(clk), .reset(rst),
 		.in(iat0),
 		.p(iat0_D1));
 
@@ -307,33 +333,35 @@ module apr(
 	wire at4;
 	wire at5;
 
-	pa a_pa0(.clk(clk), .reset(reset),
+	reg a_long = 1'b0;
+
+	pa a_pa0(.clk(clk), .reset(rst),
 		.in(it1a | cht9 | mc_rs_t1 & af0),
 		.p(at0));
-	pa a_pa1(.clk(clk), .reset(reset),
+	pa a_pa1(.clk(clk), .reset(rst),
 		.in(pi_sync_D & ~if1a & ia_NOT_int),
 		.p(at1));
-	pa a_pa2(.clk(clk), .reset(reset),
+	pa a_pa2(.clk(clk), .reset(rst),
 		.in(at1 & ~ir14_17_eq_0),
 		.p(at2));
-	pa a_pa3(.clk(clk), .reset(reset),
+	pa a_pa3(.clk(clk), .reset(rst),
 		.in(mc_rs_t1 & af3),
 		.p(at3));
-	pa a_pa4(.clk(clk), .reset(reset),
+	pa a_pa4(.clk(clk), .reset(rst),
 		.in(ar_t3 & af3a),
 		.p(at3a));
-	pa a_pa5(.clk(clk), .reset(reset),
+	pa a_pa5(.clk(clk), .reset(rst),
 		.in(at1 & ir14_17_eq_0 | at3a_D),
 		.p(at4));
-	pa a_pa6(.clk(clk), .reset(reset),
+	pa a_pa6(.clk(clk), .reset(rst),
 		.in(at4 & ir[13]),
 		.p(at5));
 
 	wire at3a_D, at5_D;
-	dly100ns a_dly0(.clk(clk), .reset(reset),
+	dly100ns a_dly0(.clk(clk), .reset(rst),
 		.in(at3a),
 		.p(at3a_D));
-	dly50ns a_dly1(.clk(clk), .reset(reset),
+	dly50ns a_dly1(.clk(clk), .reset(rst),
 		.in(at5),
 		.p(at5_D));
 
@@ -350,6 +378,13 @@ module apr(
 			af3a <= 0;
 		if(at3)
 			af3a <= 1;
+
+`ifdef FIX_A_LONG
+		if(mr_clr)
+			a_long <= 0;
+		if(at2 | at5)
+			a_long <= 1;
+`endif
 	end
 
 	/*
@@ -385,48 +420,48 @@ module apr(
 		boole_as_10 | boole_as_11;
 	wire f_c_e_OR_pse = f_c_e | f_c_e_pse;
 
-	pa f_pa0(.clk(clk), .reset(reset),
+	pa f_pa0(.clk(clk), .reset(rst),
 		.in(at4 & ~ir[13] | iot_t0a_D),
 		.p(ft0));
-	pa f_pa1(.clk(clk), .reset(reset),
+	pa f_pa1(.clk(clk), .reset(rst),
 		.in(ft0 & ~f_ac_inh),
 		.p(ft1));
-	pa f_pa2(.clk(clk), .reset(reset),
+	pa f_pa2(.clk(clk), .reset(rst),
 		.in(f1a & mc_rs_t1 | blt_t6_D),
 		.p(ft1a));
-	pa f_pa4(.clk(clk), .reset(reset),
+	pa f_pa4(.clk(clk), .reset(rst),
 		.in(ft1a_D & f_c_c_aclt_OR_rt),
 		.p(ft3));
-	pa f_pa5(.clk(clk), .reset(reset),
+	pa f_pa5(.clk(clk), .reset(rst),
 		.in(ft3_D | ft1a_D & f_ac_2),
 		.p(ft4));
-	pa f_pa6(.clk(clk), .reset(reset),
+	pa f_pa6(.clk(clk), .reset(rst),
 		.in(f4a & mc_rs_t1),
 		.p(ft4a));
-	pa f_pa7(.clk(clk), .reset(reset),
+	pa f_pa7(.clk(clk), .reset(rst),
 		.in(ft0 & f_ac_inh |
 		    ft1a_D & ~f_ac_2_etc |
 		    ft4a_D),
 		.p(ft5));
-	pa f_pa8(.clk(clk), .reset(reset),
+	pa f_pa8(.clk(clk), .reset(rst),
 		.in(ft5 & f_c_e),
 		.p(ft6));
-	pa f_pa9(.clk(clk), .reset(reset),
+	pa f_pa9(.clk(clk), .reset(rst),
 		.in(ft5 & f_c_e_pse),
 		.p(ft7));
-	pa f_pa10(.clk(clk), .reset(reset),
+	pa f_pa10(.clk(clk), .reset(rst),
 		.in(f6a & mc_rs_t1 |
 		    ft5 & ~f_c_e_OR_pse),
 		.p(ft6a));
 
 	wire ft1a_D, ft3_D, ft4a_D;
-	dly100ns f_dly0(.clk(clk), .reset(reset),
+	dly100ns f_dly0(.clk(clk), .reset(rst),
 		.in(ft1a),
 		.p(ft1a_D));
-	dly100ns f_dly1(.clk(clk), .reset(reset),
+	dly100ns f_dly1(.clk(clk), .reset(rst),
 		.in(ft3),
 		.p(ft3_D));
-	dly100ns f_dly2(.clk(clk), .reset(reset),
+	dly100ns f_dly2(.clk(clk), .reset(rst),
 		.in(ft4a),
 		.p(ft4a_D));
 
@@ -466,38 +501,38 @@ module apr(
 	wire e_long = iot_consz | ir_jp | ir_acbm | pc_set |
 		mb_pc_sto | pc_inc_et9 | iot_conso | ir_accp_OR_memac;
 
-	pa e_pa0(.clk(clk), .reset(reset),
+	pa e_pa0(.clk(clk), .reset(rst),
 		.in(ft6a),
 		.p(et0a));
-	pa e_pa1(.clk(clk), .reset(reset),
+	pa e_pa1(.clk(clk), .reset(rst),
 		.in(ft6a),
 		.p(et0));
-	pa e_pa2(.clk(clk), .reset(reset),
+	pa e_pa2(.clk(clk), .reset(rst),
 		.in(ft6a_D),
 		.p(et1));
-	pa e_pa3(.clk(clk), .reset(reset),
+	pa e_pa3(.clk(clk), .reset(rst),
 		.in(et1_D),
 		.p(et3));
-	pa e_pa4(.clk(clk), .reset(reset),
+	pa e_pa4(.clk(clk), .reset(rst),
 		.in(et3 & ~et4_inh |
 		    ar_t3 & et4_ar_pse),
 		.p(et4));
-	pa e_pa5(.clk(clk), .reset(reset),
+	pa e_pa5(.clk(clk), .reset(rst),
 		.in(et4_D & ~et5_inh | iot_t3_D),
 		.p(et5));
-	pa e_pa6(.clk(clk), .reset(reset),
+	pa e_pa6(.clk(clk), .reset(rst),
 		.in(et5_D & e_long),
 		.p(et6));
-	pa e_pa7(.clk(clk), .reset(reset),
+	pa e_pa7(.clk(clk), .reset(rst),
 		.in(et6_D),
 		.p(et7));
-	pa e_pa8(.clk(clk), .reset(reset),
+	pa e_pa8(.clk(clk), .reset(rst),
 		.in(et7_D),
 		.p(et8));
-	pa e_pa9(.clk(clk), .reset(reset),
+	pa e_pa9(.clk(clk), .reset(rst),
 		.in(et8_D | dst21a & ir_div),
 		.p(et9));
-	pa e_pa10(.clk(clk), .reset(reset),
+	pa e_pa10(.clk(clk), .reset(rst),
 		.in(et9_D | et5 & ~e_long |
 		    lct0a | dct3 |
 		    nrt6 | fst0a | sht1a |
@@ -507,31 +542,31 @@ module apr(
 	wire ft6a_D, et1_D, et4_D, et5_D;
 	wire et6_D, et7_D, et8_D, et9_D;
 	wire iot_t3_D;
-	dly100ns e_dly0(.clk(clk), .reset(reset),
+	dly100ns e_dly0(.clk(clk), .reset(rst),
 		.in(ft6a),
 		.p(ft6a_D));
-	dly100ns e_dly1(.clk(clk), .reset(reset),
+	dly100ns e_dly1(.clk(clk), .reset(rst),
 		.in(et1),
 		.p(et1_D));
-	dly200ns e_dly2(.clk(clk), .reset(reset),
+	dly200ns e_dly2(.clk(clk), .reset(rst),
 		.in(iot_t3),
 		.p(iot_t3_D));
-	dly100ns e_dly3(.clk(clk), .reset(reset),
+	dly100ns e_dly3(.clk(clk), .reset(rst),
 		.in(et4),
 		.p(et4_D));
-	dly100ns e_dly4(.clk(clk), .reset(reset),
+	dly100ns e_dly4(.clk(clk), .reset(rst),
 		.in(et5),
 		.p(et5_D));
-	dly100ns e_dly5(.clk(clk), .reset(reset),
+	dly100ns e_dly5(.clk(clk), .reset(rst),
 		.in(et6),
 		.p(et6_D));
-	dly100ns e_dly6(.clk(clk), .reset(reset),
+	dly100ns e_dly6(.clk(clk), .reset(rst),
 		.in(et7),
 		.p(et7_D));
-	dly200ns e_dly7(.clk(clk), .reset(reset),
+	dly200ns e_dly7(.clk(clk), .reset(rst),
 		.in(et8),
 		.p(et8_D));
-	dly200ns e_dly8(.clk(clk), .reset(reset),
+	dly200ns e_dly8(.clk(clk), .reset(rst),
 		.in(et9),
 		.p(et9_D));
 
@@ -569,32 +604,32 @@ module apr(
 	wire s_ac_2 = sh_ac_2 | ir_fp_rem | ir_md_s_ac_2;
 	wire s_ac_0 = ir[9:12] == 0;
 
-	pa s_pa0(.clk(clk), .reset(reset),
+	pa s_pa0(.clk(clk), .reset(rst),
 		.in(et10 & s_c_e),
 		.p(st1));
-	pa s_pa1(.clk(clk), .reset(reset),
+	pa s_pa1(.clk(clk), .reset(rst),
 		.in(et10 & f_c_e_pse),
 		.p(st2));
-	pa s_pa2(.clk(clk), .reset(reset),
+	pa s_pa2(.clk(clk), .reset(rst),
 		.in(mc_rs_t1 & sf3 |
 		    et10 & ~f_c_e_pse & ~s_c_e),
 		.p(st3));
-	pa s_pa3(.clk(clk), .reset(reset),
+	pa s_pa3(.clk(clk), .reset(rst),
 		.in(st3 & ~s_ac_inh),
 		.p(st3a));
-	pa s_pa4(.clk(clk), .reset(reset),
+	pa s_pa4(.clk(clk), .reset(rst),
 		.in(st3a_D),
 		.p(st5));
-	pa s_pa5(.clk(clk), .reset(reset),
+	pa s_pa5(.clk(clk), .reset(rst),
 		.in(mc_rs_t1 & sf5a),
 		.p(st5a));
-	pa s_pa6(.clk(clk), .reset(reset),
+	pa s_pa6(.clk(clk), .reset(rst),
 		.in(st5a & s_ac_2),
 		.p(st6));
-	pa s_pa7(.clk(clk), .reset(reset),
+	pa s_pa7(.clk(clk), .reset(rst),
 		.in(st6_D),
 		.p(st6a));
-	pa s_pa8(.clk(clk), .reset(reset),
+	pa s_pa8(.clk(clk), .reset(rst),
 		.in(st3 & s_ac_inh |
 		    st5a & ~s_ac_2 |
 		    cht8b & ir_cao |
@@ -605,13 +640,13 @@ module apr(
 		.p(st7));
 
 	wire st3a_D, st6_D, mc_illeg_address_D;
-	dly100ns s_dly0(.clk(clk), .reset(reset),
+	dly100ns s_dly0(.clk(clk), .reset(rst),
 		.in(st3a),
 		.p(st3a_D));
-	dly50ns s_dly1(.clk(clk), .reset(reset),
+	dly50ns s_dly1(.clk(clk), .reset(rst),
 		.in(st6),
 		.p(st6_D));
-	dly100ns s_dly2(.clk(clk), .reset(reset),
+	dly100ns s_dly2(.clk(clk), .reset(rst),
 		.in(mc_illeg_address),
 		.p(mc_illeg_address_D));
 
@@ -804,12 +839,12 @@ module apr(
 
 	/* XCT */
 	wire xct_t0;
-	pa xct_pa0(.clk(clk), .reset(reset),
+	pa xct_pa0(.clk(clk), .reset(rst),
 		.in(et3 & ir_xct),
 		.p(xct_t0));
 
 	wire xct_t0_D;
-	dly200ns xct_dly0(.clk(clk), .reset(reset),
+	dly200ns xct_dly0(.clk(clk), .reset(rst),
 		.in(xct_t0),
 		.p(xct_t0_D));
 
@@ -820,15 +855,15 @@ module apr(
 	wire uuo_t1;
 	wire uuo_t2;
 
-	pa uuo_pa0(.clk(clk), .reset(reset),
+	pa uuo_pa0(.clk(clk), .reset(rst),
 		.in(uuo_f1 & mc_rs_t1),
 		.p(uuo_t1));
-	pa uuo_pa1(.clk(clk), .reset(reset),
+	pa uuo_pa1(.clk(clk), .reset(rst),
 		.in(uuo_t1_D),
 		.p(uuo_t2));
 
 	wire uuo_t1_D;
-	dly100ns uuo_dly0(.clk(clk), .reset(reset),
+	dly100ns uuo_dly0(.clk(clk), .reset(rst),
 		.in(uuo_t1),
 		.p(uuo_t1_D));
 
@@ -976,14 +1011,13 @@ module apr(
 	wire mb_fm_pc1_et6 = jp_jsa;
 
 	wire mc_mb_clr_D;
-	dly100ns mb_dly0(.clk(clk), .reset(reset), .in(mc_mb_clr), .p(mc_mb_clr_D));
-
-	wire membus_mb_pulse;
-	pg mb_pg0(.clk(clk), .reset(reset), .in(| membus_mb_in), .p(membus_mb_pulse));
+	dly100ns mb_dly0(.clk(clk), .reset(rst), .in(mc_mb_clr), .p(mc_mb_clr_D));
 
 
 	always @(posedge clk) begin: mbctl
 		integer i;
+		if(mc_mb_membus_enable)
+			mb <= mb | membus_mb_in;
 		if(mblt_clr)
 			mb[0:17] <= 0;
 		if(mbrt_clr)
@@ -1027,9 +1061,10 @@ module apr(
 			if(ar_pc_chg_flag) mb[3] <= 1;
 			if(chf7) mb[4] <= 1;
 			if(ex_user) mb[5] <= 1;
+`ifdef FIX_USER_IOT
+			if(cpa_iot_user) mb[6] <= 1;
+`endif
 		end
-		if(membus_mb_pulse & mc_mb_membus_enable)
-			mb <= mb | membus_mb_in;
 	end
 
 	/*
@@ -1158,56 +1193,56 @@ module apr(
 
 	wire set_flags_et10 = et10 & (memac | ir_as);
 
-	pa ar_pa0(.clk(clk), .reset(reset),
+	pa ar_pa0(.clk(clk), .reset(rst),
 		.in(et3 & ar_dec),
 		.p(ar_incdec_t0));
-	pa ar_pa1(.clk(clk), .reset(reset),
+	pa ar_pa1(.clk(clk), .reset(rst),
 		.in(et3 & fwt_negate |
 		    et3 & ir_fsb |
 		    cfac_ar_negate),
 		.p(ar_negate_t0));
-	pa ar_pa2(.clk(clk), .reset(reset),
+	pa ar_pa2(.clk(clk), .reset(rst),
 		.in(ar_incdec_t0_D |
 		    ar_negate_t0_D |
 		    et3 & ar_inc |
 		    blt_t5 | nrt5 | cht4),
 		.p(ar_incdec_t1));
 	pa ar_pa3();	// AR17 CRY IN
-	pa ar_pa4(.clk(clk), .reset(reset),
+	pa ar_pa4(.clk(clk), .reset(rst),
 		.in(et3 & ar_sub |
 		    cfac_ar_sub |
 		    blt_t3),
 		.p(ar_as_t0));
-	pa ar_pa5(.clk(clk), .reset(reset),
+	pa ar_pa5(.clk(clk), .reset(rst),
 		.in(ar_as_t0_D | et3 & ar_add |
 		    at3 | cfac_ar_add),
 		.p(ar_as_t1));
-	pa ar_pa6(.clk(clk), .reset(reset),
+	pa ar_pa6(.clk(clk), .reset(rst),
 		.in(ar_as_t1_D),
 		.p(ar_as_t2));
-	pa ar_pa7(.clk(clk), .reset(reset),
+	pa ar_pa7(.clk(clk), .reset(rst),
 		.in(ar_as_t2 | ar_incdec_t1 | ar17_cry_in),
 		.p(ar_cry_comp));
-	pa ar_pa8(.clk(clk), .reset(reset),
+	pa ar_pa8(.clk(clk), .reset(rst),
 		.in(ar_cry_comp & ~ar_com_cont |
 		    ar_cry_comp_D & ar_com_cont),
 		.p(ar_t3));
 
 	wire ar_incdec_t0_D, ar_negate_t0_D;
 	wire ar_as_t0_D, ar_as_t1_D, ar_cry_comp_D;
-	dly100ns ar_dly0(.clk(clk), .reset(reset),
+	dly100ns ar_dly0(.clk(clk), .reset(rst),
 		.in(ar_incdec_t0),
 		.p(ar_incdec_t0_D));
-	dly100ns ar_dly1(.clk(clk), .reset(reset),
+	dly100ns ar_dly1(.clk(clk), .reset(rst),
 		.in(ar_negate_t0),
 		.p(ar_negate_t0_D));
-	dly100ns ar_dly2(.clk(clk), .reset(reset),
+	dly100ns ar_dly2(.clk(clk), .reset(rst),
 		.in(ar_as_t0),
 		.p(ar_as_t0_D));
-	dly100ns ar_dly3(.clk(clk), .reset(reset),
+	dly100ns ar_dly3(.clk(clk), .reset(rst),
 		.in(ar_as_t1),
 		.p(ar_as_t1_D));
-	dly100ns ar_dly4(.clk(clk), .reset(reset),
+	dly100ns ar_dly4(.clk(clk), .reset(rst),
 		.in(ar_cry_comp),
 		.p(ar_cry_comp_D));
 
@@ -1438,33 +1473,33 @@ module apr(
 	wire sat21;
 	wire sat3;
 
-	pa sa_pa0(.clk(clk), .reset(reset),
+	pa sa_pa0(.clk(clk), .reset(rst),
 		.in(cht3 | fst0 | fat1 | fpt1 | fpt1aa),
 		.p(sat0));
-	pa sa_pa1(.clk(clk), .reset(reset),
+	pa sa_pa1(.clk(clk), .reset(rst),
 		.in(sat0_D),
 		.p(sat1));
-	pa sa_pa2(.clk(clk), .reset(reset),
+	pa sa_pa2(.clk(clk), .reset(rst),
 		.in(sat1_D),
 		.p(sat2));
-	pa sa_pa3(.clk(clk), .reset(reset),
+	pa sa_pa3(.clk(clk), .reset(rst),
 		.in(sat2_D),
 		.p(sat21));
-	pa sa_pa4(.clk(clk), .reset(reset),
+	pa sa_pa4(.clk(clk), .reset(rst),
 		.in(sat21_D),
 		.p(sat3));
 
 	wire sat0_D, sat1_D, sat2_D, sat21_D;
-	dly150ns sa_dly0(.clk(clk), .reset(reset),
+	dly150ns sa_dly0(.clk(clk), .reset(rst),
 		.in(sat0),
 		.p(sat0_D));
-	dly200ns sa_dly1(.clk(clk), .reset(reset),
+	dly200ns sa_dly1(.clk(clk), .reset(rst),
 		.in(sat1),
 		.p(sat1_D));
-	dly50ns sa_dly2(.clk(clk), .reset(reset),
+	dly50ns sa_dly2(.clk(clk), .reset(rst),
 		.in(sat2),
 		.p(sat2_D));
-	dly100ns sa_dly3(.clk(clk), .reset(reset),
+	dly100ns sa_dly3(.clk(clk), .reset(rst),
 		.in(sat21),
 		.p(sat21_D));
 
@@ -1472,23 +1507,23 @@ module apr(
 	wire sct1;
 	wire sct2;
 
-	pa sc_pa0(.clk(clk), .reset(reset),
+	pa sc_pa0(.clk(clk), .reset(rst),
 		.in(lct0 | dct0 | sht1 | fat5 |
 		    cht8b & ~ir_cao),
 		.p(sct0));
-	pa sc_pa1(.clk(clk), .reset(reset),
+	pa sc_pa1(.clk(clk), .reset(rst),
 		.in((sct0_D | sct1_D) & ~sc_eq_777),
 		.p(sct1));
-	pa sc_pa2(.clk(clk), .reset(reset),
+	pa sc_pa2(.clk(clk), .reset(rst),
 		.in((sct0_D | sct1_D) & sc_eq_777),
 		.p(sct2));
 
 	wire sct0_D, sct1_D;
-	dly200ns sc_dly0(.clk(clk), .reset(reset),
+	dly200ns sc_dly0(.clk(clk), .reset(rst),
 		.in(sct0),
 		.p(sct0_D));
 	// should be 75ns
-	dly70ns sc_dly1(.clk(clk), .reset(reset),
+	dly70ns sc_dly1(.clk(clk), .reset(rst),
 		.in(sct1),
 		.p(sct1_D));
 
@@ -1581,56 +1616,56 @@ module apr(
 	wire blt_t5a;
 	wire blt_t6;
 
-	pa blt_pa0(.clk(clk), .reset(reset),
+	pa blt_pa0(.clk(clk), .reset(rst),
 		.in(et3 & ir_blt),
 		.p(blt_t0));
-	pa blt_pa1(.clk(clk), .reset(reset),
+	pa blt_pa1(.clk(clk), .reset(rst),
 		.in(mc_rs_t1 & blt_f0a),
 		.p(blt_t0a));
-	pa blt_pa2(.clk(clk), .reset(reset),
+	pa blt_pa2(.clk(clk), .reset(rst),
 		.in(blt_t0a_D),
 		.p(blt_t1));
-	pa blt_pa3(.clk(clk), .reset(reset),
+	pa blt_pa3(.clk(clk), .reset(rst),
 		.in(blt_t1_D),
 		.p(blt_t2));
-	pa blt_pa4(.clk(clk), .reset(reset),
+	pa blt_pa4(.clk(clk), .reset(rst),
 		.in(blt_t2_D),
 		.p(blt_t3));
-	pa blt_pa5(.clk(clk), .reset(reset),
+	pa blt_pa5(.clk(clk), .reset(rst),
 		.in(ar_t3 & blt_f3a),
 		.p(blt_t3a));
-	pa blt_pa6(.clk(clk), .reset(reset),
+	pa blt_pa6(.clk(clk), .reset(rst),
 		.in(blt_t3a_D),
 		.p(blt_t4));
-	pa blt_pa7(.clk(clk), .reset(reset),
+	pa blt_pa7(.clk(clk), .reset(rst),
 		.in(blt_t4_D),
 		.p(blt_t5));
-	pa blt_pa8(.clk(clk), .reset(reset),
+	pa blt_pa8(.clk(clk), .reset(rst),
 		.in(ar_t3 & blt_f5a),
 		.p(blt_t5a));
-	pa blt_pa9(.clk(clk), .reset(reset),
+	pa blt_pa9(.clk(clk), .reset(rst),
 		.in(blt_t5a & ~blt_done),
 		.p(blt_t6));
 
 	wire blt_t0a_D, blt_t1_D;
 	wire blt_t2_D, blt_t3a_D;
 	wire blt_t4_D, blt_t6_D;
-	dly100ns blt_dly0(.clk(clk), .reset(reset),
+	dly100ns blt_dly0(.clk(clk), .reset(rst),
 		.in(blt_t0a),
 		.p(blt_t0a_D));
-	dly100ns blt_dly1(.clk(clk), .reset(reset),
+	dly100ns blt_dly1(.clk(clk), .reset(rst),
 		.in(blt_t1),
 		.p(blt_t1_D));
-	dly100ns blt_dly2(.clk(clk), .reset(reset),
+	dly100ns blt_dly2(.clk(clk), .reset(rst),
 		.in(blt_t2),
 		.p(blt_t2_D));
-	dly100ns blt_dly3(.clk(clk), .reset(reset),
+	dly100ns blt_dly3(.clk(clk), .reset(rst),
 		.in(blt_t3a),
 		.p(blt_t3a_D));
-	dly100ns blt_dly4(.clk(clk), .reset(reset),
+	dly100ns blt_dly4(.clk(clk), .reset(rst),
 		.in(blt_t4),
 		.p(blt_t4_D));
-	dly100ns blt_dly5(.clk(clk), .reset(reset),
+	dly100ns blt_dly5(.clk(clk), .reset(rst),
 		.in(blt_t6),
 		.p(blt_t6_D));
 
@@ -1660,13 +1695,13 @@ module apr(
 	wire fst0a;
 	wire fst1;
 
-	pa fs_pa0(.clk(clk), .reset(reset),
+	pa fs_pa0(.clk(clk), .reset(rst),
 		.in(et3 & fsc),
 		.p(fst0));
-	pa fs_pa1(.clk(clk), .reset(reset),
+	pa fs_pa1(.clk(clk), .reset(rst),
 		.in(et3 & fsc & ar[0]),
 		.p(fst1));
-	pa fs_pa2(.clk(clk), .reset(reset),
+	pa fs_pa2(.clk(clk), .reset(rst),
 		.in(sat3 & fsf1),
 		.p(fst0a));
 
@@ -1706,61 +1741,61 @@ module apr(
 	wire cht8b;
 	wire cht9;
 
-	pa ch_pa0(.clk(clk), .reset(reset),
+	pa ch_pa0(.clk(clk), .reset(rst),
 		.in(et0 & ch_inc_op),
 		.p(cht1));
-	pa ch_pa1(.clk(clk), .reset(reset),
+	pa ch_pa1(.clk(clk), .reset(rst),
 		.in(cht1_D),
 		.p(cht2));
-	pa ch_pa2(.clk(clk), .reset(reset),
+	pa ch_pa2(.clk(clk), .reset(rst),
 		.in(cht2 | cht4a),
 		.p(cht3));
-	pa ch_pa3(.clk(clk), .reset(reset),
+	pa ch_pa3(.clk(clk), .reset(rst),
 		.in(sat3 & chf2),
 		.p(cht3a));
-	pa ch_pa4(.clk(clk), .reset(reset),
+	pa ch_pa4(.clk(clk), .reset(rst),
 		.in(cht3a & ~sc[0]),
 		.p(cht4));
-	pa ch_pa5(.clk(clk), .reset(reset),
+	pa ch_pa5(.clk(clk), .reset(rst),
 		.in(ar_t3 & chf3),
 		.p(cht4a));
-	pa ch_pa6(.clk(clk), .reset(reset),
+	pa ch_pa6(.clk(clk), .reset(rst),
 		.in(cht3a & sc[0]),
 		.p(cht5));
-	pa ch_pa7(.clk(clk), .reset(reset),
+	pa ch_pa7(.clk(clk), .reset(rst),
 		.in(et0 & ch_NOT_inc_op | cht5_D),
 		.p(cht6));
-	pa ch_pa8(.clk(clk), .reset(reset),
+	pa ch_pa8(.clk(clk), .reset(rst),
 		.in(cht6_D),
 		.p(cht7));
-	pa ch_pa9(.clk(clk), .reset(reset),
+	pa ch_pa9(.clk(clk), .reset(rst),
 		.in(cht7_D & ch_inc_op),
 		.p(cht8));
-	pa ch_pa10(.clk(clk), .reset(reset),
+	pa ch_pa10(.clk(clk), .reset(rst),
 		.in(cht7_D & ch_NOT_inc_op |
 		    mc_rs_t1 & chf6),
 		.p(cht8b));
-	pa ch_pa11(.clk(clk), .reset(reset),
+	pa ch_pa11(.clk(clk), .reset(rst),
 		.in(sct2 & chf4),
 		.p(cht8a));
-	pa ch_pa12(.clk(clk), .reset(reset),
+	pa ch_pa12(.clk(clk), .reset(rst),
 		.in(cht8a),
 		.p(cht9));
 
 	wire cht1_D, cht5_D, cht6_D, cht7_D, cht8a_D;
-	dly100ns ch_dly0(.clk(clk), .reset(reset),
+	dly100ns ch_dly0(.clk(clk), .reset(rst),
 		.in(cht1),
 		.p(cht1_D));
-	dly100ns ch_dly1(.clk(clk), .reset(reset),
+	dly100ns ch_dly1(.clk(clk), .reset(rst),
 		.in(cht5),
 		.p(cht5_D));
-	dly150ns ch_dly2(.clk(clk), .reset(reset),
+	dly150ns ch_dly2(.clk(clk), .reset(rst),
 		.in(cht6),
 		.p(cht6_D));
-	dly100ns ch_dly3(.clk(clk), .reset(reset),
+	dly100ns ch_dly3(.clk(clk), .reset(rst),
 		.in(cht7),
 		.p(cht7_D));
-	dly100ns ch_dly4(.clk(clk), .reset(reset),
+	dly100ns ch_dly4(.clk(clk), .reset(rst),
 		.in(cht8a),
 		.p(cht8a_D));
 
@@ -1812,10 +1847,10 @@ module apr(
 	wire lct0;
 	wire lct0a;
 
-	pa lc_pa0(.clk(clk), .reset(reset),
+	pa lc_pa0(.clk(clk), .reset(rst),
 		.in(et0 & ch_load),
 		.p(lct0));
-	pa lc_pa1(.clk(clk), .reset(reset),
+	pa lc_pa1(.clk(clk), .reset(rst),
 		.in(sct2 & lcf1),
 		.p(lct0a));
 
@@ -1839,30 +1874,30 @@ module apr(
 	wire dct2;
 	wire dct3;
 
-	pa dc_pa0(.clk(clk), .reset(reset),
+	pa dc_pa0(.clk(clk), .reset(rst),
 		.in(et0 & ch_dep),
 		.p(dct0));
-	pa dc_pa1(.clk(clk), .reset(reset),
+	pa dc_pa1(.clk(clk), .reset(rst),
 		.in(sct2 & dcf1),
 		.p(dct0a));
-	pa dc_pa2(.clk(clk), .reset(reset),
+	pa dc_pa2(.clk(clk), .reset(rst),
 		.in(dct0a_D),
 		.p(dct1));
-	pa dc_pa3(.clk(clk), .reset(reset),
+	pa dc_pa3(.clk(clk), .reset(rst),
 		.in(dct1_D),
 		.p(dct2));
-	pa dc_pa4(.clk(clk), .reset(reset),
+	pa dc_pa4(.clk(clk), .reset(rst),
 		.in(dct2_D),
 		.p(dct3));
 
 	wire dct0a_D, dct1_D, dct2_D;
-	dly150ns dc_dly0(.clk(clk), .reset(reset),
+	dly150ns dc_dly0(.clk(clk), .reset(rst),
 		.in(dct0a),
 		.p(dct0a_D));
-	dly100ns dc_dly1(.clk(clk), .reset(reset),
+	dly100ns dc_dly1(.clk(clk), .reset(rst),
 		.in(dct1),
 		.p(dct1_D));
-	dly100ns dc_dly2(.clk(clk), .reset(reset),
+	dly100ns dc_dly2(.clk(clk), .reset(rst),
 		.in(dct2),
 		.p(dct2_D));
 
@@ -1886,18 +1921,18 @@ module apr(
 	wire sht1;
 	wire sht1a;
 
-	pa sh_p0(.clk(clk), .reset(reset),
+	pa sh_p0(.clk(clk), .reset(rst),
 		.in(et1 & shift_op & mb[18]),
 		.p(sht0));
-	pa sh_p1(.clk(clk), .reset(reset),
+	pa sh_p1(.clk(clk), .reset(rst),
 		.in(et3_D & shift_op),
 		.p(sht1));
-	pa sh_p2(.clk(clk), .reset(reset),
+	pa sh_p2(.clk(clk), .reset(rst),
 		.in(sct2 & shf1),
 		.p(sht1a));
 
 	wire et3_D;
-	dly100ns sh_dly(.clk(clk), .reset(reset),
+	dly100ns sh_dly(.clk(clk), .reset(rst),
 		.in(et3),
 		.p(et3_D));
 
@@ -1920,27 +1955,27 @@ module apr(
 	wire mpt1;
 	wire mpt2;
 
-	pa mp_pa0(.clk(clk), .reset(reset),
+	pa mp_pa0(.clk(clk), .reset(rst),
 		.in(et0 & ir_mul),
 		.p(mpt0));
-	pa mp_pa1(.clk(clk), .reset(reset),
+	pa mp_pa1(.clk(clk), .reset(rst),
 		.in(mst6 & mpf1),
 		.p(mpt0a));
-	pa mp_pa2(.clk(clk), .reset(reset),
+	pa mp_pa2(.clk(clk), .reset(rst),
 		.in(mpt0a_D & ~ir[6]),
 		.p(mpt1));
-	pa mp_pa3(.clk(clk), .reset(reset),
+	pa mp_pa3(.clk(clk), .reset(rst),
 		.in(mpt1_D),
 		.p(mpt2));
 
 	wire mpt0a_D, mpt1_D, mpt2_D;
-	dly200ns mp_dly0(.clk(clk), .reset(reset),
+	dly200ns mp_dly0(.clk(clk), .reset(rst),
 		.in(mpt0a),
 		.p(mpt0a_D));
-	dly100ns mp_dly1(.clk(clk), .reset(reset),
+	dly100ns mp_dly1(.clk(clk), .reset(rst),
 		.in(mpt1),
 		.p(mpt1_D));
-	dly100ns mp_dly2(.clk(clk), .reset(reset),
+	dly100ns mp_dly2(.clk(clk), .reset(rst),
 		.in(mpt2),
 		.p(mpt2_D));
 
@@ -1980,80 +2015,80 @@ module apr(
 	wire fat9;
 	wire fat10;
 
-	pa fa_pa0(.clk(clk), .reset(reset),
+	pa fa_pa0(.clk(clk), .reset(rst),
 		.in(et0 & ir_fad |
 		    et4 & ir_fsb),
 		.p(fat0));
-	pa fa_pa1(.clk(clk), .reset(reset),
+	pa fa_pa1(.clk(clk), .reset(rst),
 		.in(fat0_D),
 		.p(fat1));
-	pa fa_pa2(.clk(clk), .reset(reset),
+	pa fa_pa2(.clk(clk), .reset(rst),
 		.in(sat3 & faf2),
 		.p(fat1a));
-	pa fa_pa3(.clk(clk), .reset(reset),
+	pa fa_pa3(.clk(clk), .reset(rst),
 		.in(fat1_D),
 		.p(fat1b));
-	pa fa_pa4(.clk(clk), .reset(reset),
+	pa fa_pa4(.clk(clk), .reset(rst),
 		.in(fat1a & ~sc[0]),
 		.p(fat2));
-	pa fa_pa5(.clk(clk), .reset(reset),
+	pa fa_pa5(.clk(clk), .reset(rst),
 		.in(fat2_D),
 		.p(fat3));
-	pa fa_pa6(.clk(clk), .reset(reset),
+	pa fa_pa6(.clk(clk), .reset(rst),
 		.in(fat1a & sc[0]),
 		.p(fat4));
-	pa fa_pa7(.clk(clk), .reset(reset),
+	pa fa_pa7(.clk(clk), .reset(rst),
 		.in((fat3_D | fat4_D) & sc0_2_eq_7),
 		.p(fat5));
-	pa fa_pa8(.clk(clk), .reset(reset),
+	pa fa_pa8(.clk(clk), .reset(rst),
 		.in(sct2 & faf3),
 		.p(fat5a));
-	pa fa_pa9(.clk(clk), .reset(reset),
+	pa fa_pa9(.clk(clk), .reset(rst),
 		.in((fat3_D | fat4_D) & ~sc0_2_eq_7),
 		.p(fat6));
-	pa fa_pa10(.clk(clk), .reset(reset),
+	pa fa_pa10(.clk(clk), .reset(rst),
 		.in(fat5a_D),
 		.p(fat7));
-	pa fa_pa11(.clk(clk), .reset(reset),
+	pa fa_pa11(.clk(clk), .reset(rst),
 		.in(fat7_D),
 		.p(fat8));
-	pa fa_pa12(.clk(clk), .reset(reset),
+	pa fa_pa12(.clk(clk), .reset(rst),
 		.in(fat8_D),
 		.p(fat8a));
-	pa fa_pa13(.clk(clk), .reset(reset),
+	pa fa_pa13(.clk(clk), .reset(rst),
 		.in(fat8a_D),
 		.p(fat9));
-	pa fa_pa14(.clk(clk), .reset(reset),
+	pa fa_pa14(.clk(clk), .reset(rst),
 		.in(ar_t3 & faf4),
 		.p(fat10));
 
 	wire fat0_D, fat1_D, fat2_D, fat3_D, fat4_D;
 	wire fat5a_D, fat7_D, fat8_D, fat8a_D;
-	dly100ns fa_dly0(.clk(clk), .reset(reset),
+	dly100ns fa_dly0(.clk(clk), .reset(rst),
 		.in(fat0),
 		.p(fat0_D));
-	dly50ns fa_dly1(.clk(clk), .reset(reset),
+	dly50ns fa_dly1(.clk(clk), .reset(rst),
 		.in(fat1),
 		.p(fat1_D));
-	dly150ns fa_dly2(.clk(clk), .reset(reset),
+	dly150ns fa_dly2(.clk(clk), .reset(rst),
 		.in(fat2),
 		.p(fat2_D));
-	dly150ns fa_dly3(.clk(clk), .reset(reset),
+	dly150ns fa_dly3(.clk(clk), .reset(rst),
 		.in(fat3),
 		.p(fat3_D));
-	dly100ns fa_dly4(.clk(clk), .reset(reset),
+	dly100ns fa_dly4(.clk(clk), .reset(rst),
 		.in(fat4),
 		.p(fat4_D));
-	dly100ns fa_dly5(.clk(clk), .reset(reset),
+	dly100ns fa_dly5(.clk(clk), .reset(rst),
 		.in(fat5a),
 		.p(fat5a_D));
-	dly100ns fa_dly6(.clk(clk), .reset(reset),
+	dly100ns fa_dly6(.clk(clk), .reset(rst),
 		.in(fat7),
 		.p(fat7_D));
-	dly50ns fa_dly7(.clk(clk), .reset(reset),
+	dly50ns fa_dly7(.clk(clk), .reset(rst),
 		.in(fat8),
 		.p(fat8_D));
-	dly100ns fa_dly8(.clk(clk), .reset(reset),
+	dly100ns fa_dly8(.clk(clk), .reset(rst),
 		.in(fat8a),
 		.p(fat8a_D));
 
@@ -2089,18 +2124,18 @@ module apr(
 	wire fmt0a;
 	wire fmt0b;
 
-	pa fm_pa0(.clk(clk), .reset(reset),
+	pa fm_pa0(.clk(clk), .reset(rst),
 		.in(et0 & ir_fmp),
 		.p(fmt0));
-	pa fm_pa1(.clk(clk), .reset(reset),
+	pa fm_pa1(.clk(clk), .reset(rst),
 		.in(fpt4 & fmf1),
 		.p(fmt0a));
-	pa fm_pa2(.clk(clk), .reset(reset),
+	pa fm_pa2(.clk(clk), .reset(rst),
 		.in(mst6 & fmf2),
 		.p(fmt0b));
 
 	wire fmt0b_D;
-	dly100ns fm_dly0(.clk(clk), .reset(reset),
+	dly100ns fm_dly0(.clk(clk), .reset(rst),
 		.in(fmt0b),
 		.p(fmt0b_D));
 
@@ -2127,21 +2162,21 @@ module apr(
 	wire fdt0b;
 	wire fdt1;
 
-	pa fd_pa0(.clk(clk), .reset(reset),
+	pa fd_pa0(.clk(clk), .reset(rst),
 		.in(et0 & ir_fdv),
 		.p(fdt0));
-	pa fd_pa1(.clk(clk), .reset(reset),
+	pa fd_pa1(.clk(clk), .reset(rst),
 		.in(fpt4 & fdf1),
 		.p(fdt0a));
-	pa fd_pa2(.clk(clk), .reset(reset),
+	pa fd_pa2(.clk(clk), .reset(rst),
 		.in(dst21a & fdf2),
 		.p(fdt0b));
-	pa fd_pa3(.clk(clk), .reset(reset),
+	pa fd_pa3(.clk(clk), .reset(rst),
 		.in(fdt0b_D),
 		.p(fdt1));
 
 	wire fdt0b_D;
-	dly100ns fd_dly0(.clk(clk), .reset(reset),
+	dly100ns fd_dly0(.clk(clk), .reset(rst),
 		.in(fdt0b),
 		.p(fdt0b_D));
 
@@ -2176,45 +2211,45 @@ module apr(
 	wire fpt3;
 	wire fpt4;
 
-	pa fp_pa0(.clk(clk), .reset(reset),
+	pa fp_pa0(.clk(clk), .reset(rst),
 		.in(fmt0 | fdt0),
 		.p(fpt0));
-	pa fp_pa1(.clk(clk), .reset(reset),
+	pa fp_pa1(.clk(clk), .reset(rst),
 		.in(fpt0),
 		.p(fpt01));
-	pa fp_pa2(.clk(clk), .reset(reset),
+	pa fp_pa2(.clk(clk), .reset(rst),
 		.in(fpt01_D),
 		.p(fpt1));
-	pa fp_pa3(.clk(clk), .reset(reset),
+	pa fp_pa3(.clk(clk), .reset(rst),
 		.in(sat3 & fpf1),
 		.p(fpt1a));
-	pa fp_pa4(.clk(clk), .reset(reset),
+	pa fp_pa4(.clk(clk), .reset(rst),
 		.in(fpt1a_D),
 		.p(fpt1aa));
-	pa fp_pa5(.clk(clk), .reset(reset),
+	pa fp_pa5(.clk(clk), .reset(rst),
 		.in(sat3 & fpf2),
 		.p(fpt1b));
-	pa fp_pa6(.clk(clk), .reset(reset),
+	pa fp_pa6(.clk(clk), .reset(rst),
 		.in(fpt1a & fp_ar0_xor_mb0_xor_fmf1),
 		.p(fpt2));
-	pa fp_pa7(.clk(clk), .reset(reset),
+	pa fp_pa7(.clk(clk), .reset(rst),
 		.in(fpt1b_D),
 		.p(fpt3));
-	pa fp_pa8(.clk(clk), .reset(reset),
+	pa fp_pa8(.clk(clk), .reset(rst),
 		.in(fpt3_D),
 		.p(fpt4));
 
 	wire fpt01_D, fpt1a_D, fpt1b_D, fpt3_D;
-	dly100ns fp_dly0(.clk(clk), .reset(reset),
+	dly100ns fp_dly0(.clk(clk), .reset(rst),
 		.in(fpt01),
 		.p(fpt01_D));
-	dly100ns fp_dly1(.clk(clk), .reset(reset),
+	dly100ns fp_dly1(.clk(clk), .reset(rst),
 		.in(fpt1a),
 		.p(fpt1a_D));
-	dly100ns fp_dly2(.clk(clk), .reset(reset),
+	dly100ns fp_dly2(.clk(clk), .reset(rst),
 		.in(fpt1b),
 		.p(fpt1b_D));
-	dly100ns fp_dly3(.clk(clk), .reset(reset),
+	dly100ns fp_dly3(.clk(clk), .reset(rst),
 		.in(fpt3),
 		.p(fpt3_D));
 
@@ -2244,40 +2279,40 @@ module apr(
 	wire mst5;
 	wire mst6;
 
-	pa ms_pa0(.clk(clk), .reset(reset),
+	pa ms_pa0(.clk(clk), .reset(rst),
 		.in(mpt0 | fmt0a),
 		.p(mst1));
-	pa ms_pa1(.clk(clk), .reset(reset),
+	pa ms_pa1(.clk(clk), .reset(rst),
 		.in(((mst1_D1 | mst2_D) & mq35_eq_mq36 | mst3a) & ~sc_eq_777),
 		.p(mst2));
-	pa ms_pa2(.clk(clk), .reset(reset),
+	pa ms_pa2(.clk(clk), .reset(rst),
 		.in((mst1_D1 | mst2_D) & ~mq[35] & mq36),
 		.p(mst3));
-	pa ms_pa3(.clk(clk), .reset(reset),
+	pa ms_pa3(.clk(clk), .reset(rst),
 		.in((mst1_D1 | mst2_D) & mq[35] & ~mq36),
 		.p(mst4));
-	pa ms_pa4(.clk(clk), .reset(reset),
+	pa ms_pa4(.clk(clk), .reset(rst),
 		.in(ar_t3 & msf1),
 		.p(mst3a));
-	pa ms_pa5(.clk(clk), .reset(reset),
+	pa ms_pa5(.clk(clk), .reset(rst),
 		.in((mst2_D & mq35_eq_mq36 | mst3a) & sc_eq_777),
 		.p(mst5));
-	pa ms_pa6(.clk(clk), .reset(reset),
+	pa ms_pa6(.clk(clk), .reset(rst),
 		.in(mst5_D),
 		.p(mst6));
 
 	wire mst1_D0, mst1_D1;
 	wire mst2_D, mst5_D;
-	dly50ns ms_dly0(.clk(clk), .reset(reset),
+	dly50ns ms_dly0(.clk(clk), .reset(rst),
 		.in(mst1),
 		.p(mst1_D0));
-	dly200ns ms_dly1(.clk(clk), .reset(reset),
+	dly200ns ms_dly1(.clk(clk), .reset(rst),
 		.in(mst1),
 		.p(mst1_D1));
-	dly150ns ms_dly2(.clk(clk), .reset(reset),
+	dly150ns ms_dly2(.clk(clk), .reset(rst),
 		.in(mst2),
 		.p(mst2_D));
-	dly100ns ms_dly3(.clk(clk), .reset(reset),
+	dly100ns ms_dly3(.clk(clk), .reset(rst),
 		.in(mst5),
 		.p(mst5_D));
 
@@ -2341,116 +2376,124 @@ module apr(
 
 	wire ds_div_t0;
 
-	pa ds_pa0(.clk(clk), .reset(reset),
+	pa ds_pa0(.clk(clk), .reset(rst),
 		.in(mr_clr),
 		.p(ds_clr));
-	pa ds_pa1(.clk(clk), .reset(reset),
+	pa ds_pa1(.clk(clk), .reset(rst),
 		.in(et0 & ir_div),
 		.p(ds_div_t0));
-	pa ds_pa2(.clk(clk), .reset(reset),
+	pa ds_pa2(.clk(clk), .reset(rst),
 		.in((et0 & ds_divi | fdt0a) & ar[0]),
 		.p(dst0));
-	pa ds_pa3(.clk(clk), .reset(reset),
+	pa ds_pa3(.clk(clk), .reset(rst),
 		.in(ar_t3 & dsf1),
 		.p(dst0a));
-	pa ds_pa4(.clk(clk), .reset(reset),
+	pa ds_pa4(.clk(clk), .reset(rst),
 		.in((et0 & ~ar[0] | dst0a) & ds_divi),
 		.p(dst1));
-	pa ds_pa5(.clk(clk), .reset(reset),
+	pa ds_pa5(.clk(clk), .reset(rst),
 		.in(dst1_D),
 		.p(dst2));
-	pa ds_pa6(.clk(clk), .reset(reset),
+	pa ds_pa6(.clk(clk), .reset(rst),
 		.in(et0 & ar[0] & ds_div),
 		.p(dst3));
-	pa ds_pa7(.clk(clk), .reset(reset),
+	pa ds_pa7(.clk(clk), .reset(rst),
 		.in(dst3_D),
 		.p(dst4));
-	pa ds_pa8(.clk(clk), .reset(reset),
+	pa ds_pa8(.clk(clk), .reset(rst),
 		.in(dst4_D),
 		.p(dst5));
-	pa ds_pa9(.clk(clk), .reset(reset),
+	pa ds_pa9(.clk(clk), .reset(rst),
 		.in(ar_t3 & dsf2),
 		.p(dst5a));
-	pa ds_pa10(.clk(clk), .reset(reset),
+	pa ds_pa10(.clk(clk), .reset(rst),
+`ifdef FIX_DS
 		.in(dst5a_D & ~ar_eq_0),
+`else
+		.in(dst5a_D & ~ar_cry1),
+`endif
 		.p(dst6));
-	pa ds_pa11(.clk(clk), .reset(reset),
+	pa ds_pa11(.clk(clk), .reset(rst),
 		.in(dst6_D),
 		.p(dst7));
-	pa ds_pa12(.clk(clk), .reset(reset),
+	pa ds_pa12(.clk(clk), .reset(rst),
+`ifdef FIX_DS
 		.in(dst5a_D & ar_eq_0),
+`else
+		.in(dst5a_D & ar_cry1),
+`endif
 		.p(dst8));
-	pa ds_pa13(.clk(clk), .reset(reset),
+	pa ds_pa13(.clk(clk), .reset(rst),
 		.in(dst8_D),
 		.p(dst9));
-	pa ds_pa14(.clk(clk), .reset(reset),
+	pa ds_pa14(.clk(clk), .reset(rst),
 		.in(ar_t3 & dsf3 |
 		    fdt0a & ~ar[0] |
 		    dst0a & ~ds_divi |
 		    et0 & ds_div & ~ar[0] |
 		    dst2 | dst7),
 		.p(dst10));
-	pa ds_pa15(.clk(clk), .reset(reset),
+	pa ds_pa15(.clk(clk), .reset(rst),
 		.in(dst10_D & ir_fdv),
 		.p(dst10a));
-	pa ds_pa16(.clk(clk), .reset(reset),
+	pa ds_pa16(.clk(clk), .reset(rst),
 		.in(dst10_D & ir_div),
 		.p(dst10b));
-	pa ds_pa17(.clk(clk), .reset(reset),
+	pa ds_pa17(.clk(clk), .reset(rst),
 		.in((dst10a_D | dst10b_D) & mb[0]),
 		.p(dst11));
-	pa ds_pa18(.clk(clk), .reset(reset),
+	pa ds_pa18(.clk(clk), .reset(rst),
 		.in((dst10a_D | dst10b_D) & ~mb[0]),
 		.p(dst12));
-	pa ds_pa19(.clk(clk), .reset(reset),
+	pa ds_pa19(.clk(clk), .reset(rst),
 		.in(ar_t3 & dsf4),
 		.p(dst11a));
-	pa ds_pa20(.clk(clk), .reset(reset),
+	pa ds_pa20(.clk(clk), .reset(rst),
 		.in(dst11a & ~ar[0]),
 		.p(dst13));
-	pa ds_pa21(.clk(clk), .reset(reset),
+	pa ds_pa21(.clk(clk), .reset(rst),
 		.in(ar_t3 & dsf5 | 
 		    dst11a & ar[0]),
 		.p(dst14a));
-	pa ds_pa22(.clk(clk), .reset(reset),
+	pa ds_pa22(.clk(clk), .reset(rst),
 		.in(dst14a),
 		.p(dst14b));
-	pa ds_pa23(.clk(clk), .reset(reset),
+	pa ds_pa23(.clk(clk), .reset(rst),
 		.in(dst14b_D & ~sc_eq_777 & mq35_xor_mb0),
 		.p(dst14));
-	pa ds_pa24(.clk(clk), .reset(reset),
+	pa ds_pa24(.clk(clk), .reset(rst),
 		.in(dst14b_D & ~sc_eq_777 & ~mq35_xor_mb0),
 		.p(dst15));
-	pa ds_pa25(.clk(clk), .reset(reset),
+	pa ds_pa25(.clk(clk), .reset(rst),
 		.in(dst14b_D & sc_eq_777),
 		.p(dst16));
-	pa ds_pa26(.clk(clk), .reset(reset),
+	pa ds_pa26(.clk(clk), .reset(rst),
 		.in(dst16_D & ar[0] & ~mb[0]),
 		.p(dst17));
-	pa ds_pa27(.clk(clk), .reset(reset),
+	pa ds_pa27(.clk(clk), .reset(rst),
 		.in(dst16_D & ar[0] & mb[0]),
 		.p(dst18));
-	pa ds_pa28(.clk(clk), .reset(reset),
+	pa ds_pa28(.clk(clk), .reset(rst),
 		.in(dst16_D & ~ar[0] |
 		    ar_t3 & dsf6),
 		.p(dst17a));
-	pa ds_pa29(.clk(clk), .reset(reset),
+	pa ds_pa29(.clk(clk), .reset(rst),
 		.in(dst17a & dsf7),
 		.p(dst19));
-	pa ds_pa30(.clk(clk), .reset(reset),
+	pa ds_pa30(.clk(clk), .reset(rst),
 		.in(dst17a & ~dsf7 |
 		    ar_t3 & dsf8),
 		.p(dst19a));
-	pa ds_pa31(.clk(clk), .reset(reset),
+	pa ds_pa31(.clk(clk), .reset(rst),
 		.in(dst19_D),
 		.p(dst19b));
-	pa ds_pa32(.clk(clk), .reset(reset),
+	pa ds_pa32(.clk(clk), .reset(rst),
 		.in(dst19a_D),
 		.p(dst20));
-	pa ds_pa33(.clk(clk), .reset(reset),
+	pa ds_pa33(.clk(clk), .reset(rst),
 		.in(dst20_D & dsf7_xor_mq0),
 		.p(dst21));
-	pa ds_pa34(.clk(clk), .reset(reset),
+	pa ds_pa34(.clk(clk), .reset(rst),
 		.in(dst20_D & ~dsf7_xor_mq0 |
 		    ar_t3 & dsf9),
 		.p(dst21a));
@@ -2459,46 +2502,46 @@ module apr(
 	wire dst1_D, dst3_D, dst4_D, dst5a_D, dst6_D, dst8_D;
 	wire dst10_D, dst10a_D, dst10b_D, dst14b_D, dst16_D;
 	wire dst19_D, dst19a_D, dst20_D;
-	dly150ns ds_dly0(.clk(clk), .reset(reset),
+	dly150ns ds_dly0(.clk(clk), .reset(rst),
 		.in(dst1),
 		.p(dst1_D));
-	dly100ns ds_dly1(.clk(clk), .reset(reset),
+	dly100ns ds_dly1(.clk(clk), .reset(rst),
 		.in(dst3),
 		.p(dst3_D));
-	dly100ns ds_dly2(.clk(clk), .reset(reset),
+	dly100ns ds_dly2(.clk(clk), .reset(rst),
 		.in(dst4),
 		.p(dst4_D));
-	dly100ns ds_dly3(.clk(clk), .reset(reset),
+	dly100ns ds_dly3(.clk(clk), .reset(rst),
 		.in(dst5a),
 		.p(dst5a_D));
-	dly100ns ds_dly4(.clk(clk), .reset(reset),
+	dly100ns ds_dly4(.clk(clk), .reset(rst),
 		.in(dst6),
 		.p(dst6_D));
-	dly100ns ds_dly5(.clk(clk), .reset(reset),
+	dly100ns ds_dly5(.clk(clk), .reset(rst),
 		.in(dst8),
 		.p(dst8_D));
-	dly100ns ds_dly6(.clk(clk), .reset(reset),
+	dly100ns ds_dly6(.clk(clk), .reset(rst),
 		.in(dst10),
 		.p(dst10_D));
-	dly200ns ds_dly7(.clk(clk), .reset(reset),
+	dly200ns ds_dly7(.clk(clk), .reset(rst),
 		.in(dst10a),
 		.p(dst10a_D));
-	dly200ns ds_dly8(.clk(clk), .reset(reset),
+	dly200ns ds_dly8(.clk(clk), .reset(rst),
 		.in(dst10b),
 		.p(dst10b_D));
-	dly100ns ds_dly9(.clk(clk), .reset(reset),
+	dly100ns ds_dly9(.clk(clk), .reset(rst),
 		.in(dst14b),
 		.p(dst14b_D));
-	dly100ns ds_dly10(.clk(clk), .reset(reset),
+	dly100ns ds_dly10(.clk(clk), .reset(rst),
 		.in(dst16),
 		.p(dst16_D));
-	dly50ns ds_dly11(.clk(clk), .reset(reset),
+	dly50ns ds_dly11(.clk(clk), .reset(rst),
 		.in(dst19),
 		.p(dst19_D));
-	dly100ns ds_dly12(.clk(clk), .reset(reset),
+	dly100ns ds_dly12(.clk(clk), .reset(rst),
 		.in(dst19a),
 		.p(dst19a_D));
-	dly100ns ds_dly13(.clk(clk), .reset(reset),
+	dly100ns ds_dly13(.clk(clk), .reset(rst),
 		.in(dst20),
 		.p(dst20_D));
 
@@ -2571,37 +2614,37 @@ module apr(
 	wire nrt5a;
 	wire nrt6;
 
-	pa nr_pa0(.clk(clk), .reset(reset),
+	pa nr_pa0(.clk(clk), .reset(rst),
 		.in(fdt1 | fat10 | nrt5a),
 		.p(nrt05));
-	pa nr_pa1(.clk(clk), .reset(reset),
+	pa nr_pa1(.clk(clk), .reset(rst),
 		.in(nrt05_D),
 		.p(nrt0));
-	pa nr_pa2(.clk(clk), .reset(reset),
+	pa nr_pa2(.clk(clk), .reset(rst),
 		.in(nrt0),
 		.p(nrt01));
-	pa nr_pa3(.clk(clk), .reset(reset),
+	pa nr_pa3(.clk(clk), .reset(rst),
 		.in((fmt0b_D | nrt01_D) & ~nr_ar_eq_0_AND_mq1_0),
 		.p(nrt1));
-	pa nr_pa4(.clk(clk), .reset(reset),
+	pa nr_pa4(.clk(clk), .reset(rst),
 		.in((nrt1_D | nrt2_D) & nr_ar9_eq_ar0 & ~ar_eq_fp_half),
 		.p(nrt2));
-	pa nr_pa5(.clk(clk), .reset(reset),
+	pa nr_pa5(.clk(clk), .reset(rst),
 		.in((nrt1_D | nrt2_D) & (~nr_ar9_eq_ar0 | ar_eq_fp_half)),
 		.p(nrt3));
-	pa nr_pa6(.clk(clk), .reset(reset),
+	pa nr_pa6(.clk(clk), .reset(rst),
 		.in(nrt3),
 		.p(nrt31));
-	pa nr_pa7(.clk(clk), .reset(reset),
+	pa nr_pa7(.clk(clk), .reset(rst),
 		.in(nrt31_D & ~nr_round),
 		.p(nrt4));
-	pa nr_pa8(.clk(clk), .reset(reset),
+	pa nr_pa8(.clk(clk), .reset(rst),
 		.in(nrt31_D & nr_round),
 		.p(nrt5));
-	pa nr_pa9(.clk(clk), .reset(reset),
+	pa nr_pa9(.clk(clk), .reset(rst),
 		.in(ar_t3 & nrf1),
 		.p(nrt5a));
-	pa nr_pa10(.clk(clk), .reset(reset),
+	pa nr_pa10(.clk(clk), .reset(rst),
 		.in((fmt0b_D | nrt01_D) & nr_ar_eq_0_AND_mq1_0 |
 		    nrt4 |
 		    mpt0a & ir[6] |
@@ -2609,19 +2652,19 @@ module apr(
 		.p(nrt6));
 
 	wire nrt05_D, nrt01_D, nrt1_D, nrt2_D, nrt31_D;
-	dly100ns nr_dly0(.clk(clk), .reset(reset),
+	dly100ns nr_dly0(.clk(clk), .reset(rst),
 		.in(nrt05),
 		.p(nrt05_D));
-	dly200ns nr_dly1(.clk(clk), .reset(reset),
+	dly200ns nr_dly1(.clk(clk), .reset(rst),
 		.in(nrt01),
 		.p(nrt01_D));
-	dly100ns nr_dly2(.clk(clk), .reset(reset),
+	dly100ns nr_dly2(.clk(clk), .reset(rst),
 		.in(nrt1),
 		.p(nrt1_D));
-	dly150ns nr_dly3(.clk(clk), .reset(reset),
+	dly150ns nr_dly3(.clk(clk), .reset(rst),
 		.in(nrt2),
 		.p(nrt2_D));
-	dly100ns nr_dly4(.clk(clk), .reset(reset),
+	dly100ns nr_dly4(.clk(clk), .reset(rst),
 		.in(nrt31),
 		.p(nrt31_D));
 
@@ -2746,17 +2789,17 @@ module apr(
 	wire mi_clr;
 	wire mi_fm_mb1;
 
-	pa mi_pa0(.clk(clk), .reset(reset),
+	pa mi_pa0(.clk(clk), .reset(rst),
 		.in(mc_rs_t1 & key_ex_OR_dep_nxt |
 		    mc_wr_rs & ma_eq_mas |
 		    mai_rd_rs & ma_eq_mas),
 		.p(mi_clr));
-	pa mi_pa1(.clk(clk), .reset(reset),
+	pa mi_pa1(.clk(clk), .reset(rst),
 		.in(mi_clr_D),
 		.p(mi_fm_mb1));
 
 	wire mi_clr_D;
-	dly100ns mi_dly0(.clk(clk), .reset(reset),
+	dly100ns mi_dly0(.clk(clk), .reset(rst),
 		.in(mi_clr),
 		.p(mi_clr_D));
 
@@ -2780,8 +2823,8 @@ module apr(
 	// reg mc_stop;
 	reg mc_stop_sync;
 	reg mc_split_cyc_sync;
-	// TODO: what is MC DR SPLIT?
-	wire mc_sw_stop = key_mem_stop | sw_addr_stop;
+	wire mc_dr_split = 0;	// we don't support drums right now
+	wire mc_sw_stop = key_mem_stop | sw_addr_stop | mc_dr_split;
 	wire mc_rd_rq_pulse;
 	wire mc_wr_rq_pulse;
 	wire mc_rdwr_rq_pulse;
@@ -2807,88 +2850,88 @@ module apr(
 	wire mc_membus_fm_mb1;
 	wire mc_mb_membus_enable = mc_rd;
 
-	pg mc_pg0(.clk(clk), .reset(reset),
+	pg mc_pg0(.clk(clk), .reset(rst),
 		.in(membus_addr_ack), .p(mai_addr_ack));
-	pg mc_pg1(.clk(clk), .reset(reset),
+	pg mc_pg1(.clk(clk), .reset(rst),
 		.in(membus_rd_rs), .p(mai_rd_rs));
 
-	pa mc_pa0(.clk(clk), .reset(reset),
+	pa mc_pa0(.clk(clk), .reset(rst),
 		.in(it1 | at2 | at5 |
 		    ft1 | ft4 | ft6 |
 		    key_rd | uuo_t2 | mc_split_rd_rq),
 		.p(mc_rd_rq_pulse));
-	pa mc_pa1(.clk(clk), .reset(reset),
+	pa mc_pa1(.clk(clk), .reset(rst),
 		.in(st1 | st5 | st6 | key_wr |
 		    mblt_fm_ir1_uuo_t0 | mc_split_wr_rq | blt_t0),
 		.p(mc_wr_rq_pulse));
-	pa mc_pa2(.clk(clk), .reset(reset),
+	pa mc_pa2(.clk(clk), .reset(rst),
 		.in(ft7 & ~mc_split_cyc_sync),
 		.p(mc_rdwr_rq_pulse));
-	pa mc_pa3(.clk(clk), .reset(reset),
+	pa mc_pa3(.clk(clk), .reset(rst),
 		.in(mc_rdwr_rq_pulse | mc_rd_rq_pulse | mc_wr_rq_pulse),
 		.p(mc_rq_pulse));
-	pa mc_pa4(.clk(clk), .reset(reset),
+	pa mc_pa4(.clk(clk), .reset(rst),
 		.in(st2 | iot_t0 | cht8),
 		.p(mc_rdwr_rs_pulse));
-	pa mc_pa5(.clk(clk), .reset(reset),
+	pa mc_pa5(.clk(clk), .reset(rst),
 		.in(ft7 & mc_split_cyc_sync),
 		.p(mc_split_rd_rq));
-	pa mc_pa6(.clk(clk), .reset(reset),
+	pa mc_pa6(.clk(clk), .reset(rst),
 		.in(mc_rdwr_rs_pulse & mc_split_cyc_sync),
 		.p(mc_split_wr_rq));
-	pa mc_pa7(.clk(clk), .reset(reset),
+	pa mc_pa7(.clk(clk), .reset(rst),
 		.in(mc_rd_rq_pulse | mc_rdwr_rq_pulse),
 		.p(mc_mb_clr));
-	pa mc_pa8(.clk(clk), .reset(reset),
+	pa mc_pa8(.clk(clk), .reset(rst),
 		.in(mc_rq_pulse_D3 & mc_rq & ~mc_stop),
 		.p(mc_non_exist_mem));
-	pa mc_pa9(.clk(clk), .reset(reset),
+	pa mc_pa9(.clk(clk), .reset(rst),
 		.in(mc_non_exist_mem & ~sw_mem_disable),
 		.p(mc_non_exist_mem_rst));
-	pa mc_pa10(.clk(clk), .reset(reset),
+	pa mc_pa10(.clk(clk), .reset(rst),
 		.in(mc_non_exist_mem_rst & mc_rd),
 		.p(mc_non_exist_rd));
-	pa mc_pa11(.clk(clk), .reset(reset),
+	pa mc_pa11(.clk(clk), .reset(rst),
 		.in(mc_rq_pulse_D0 & ex_inh_rel |
 		    mc_rq_pulse_D1 & pr_rel_AND_ma_ok),
 		.p(mc_rq_set));
-	pa mc_pa12(.clk(clk), .reset(reset),
+	pa mc_pa12(.clk(clk), .reset(rst),
 		.in(mc_rq_pulse_D1 & pr_rel_AND_NOT_ma_ok),
 		.p(mc_illeg_address));
-	pa mc_pa13(.clk(clk), .reset(reset),
+	pa mc_pa13(.clk(clk), .reset(rst),
 		.in(mai_addr_ack | mc_non_exist_mem_rst),
 		.p(mc_addr_ack));
-	pa mc_pa14(.clk(clk), .reset(reset),
+	pa mc_pa14(.clk(clk), .reset(rst),
 		.in(mc_addr_ack & ~mc_rd & mc_wr |
 		    mc_rdwr_rs_pulse_D & ~mc_split_cyc_sync |
 		    kt1 & key_manual & mc_stop & mc_stop_sync & ~key_mem_cont),
 		.p(mc_wr_rs));
-	pa mc_pa15(.clk(clk), .reset(reset),
+	pa mc_pa15(.clk(clk), .reset(rst),
 		.in(kt1 & key_mem_cont & mc_stop |
 		    ~mc_stop & (mc_wr_rs | mai_rd_rs | mc_non_exist_rd)),
 		.p(mc_rs_t0));
-	pa mc_pa16(.clk(clk), .reset(reset), .in(mc_rs_t0_D), .p(mc_rs_t1));
+	pa mc_pa16(.clk(clk), .reset(rst), .in(mc_rs_t0_D), .p(mc_rs_t1));
 
-	bd  mc_bd0(.clk(clk), .reset(reset), .in(mc_wr_rs), .p(membus_wr_rs));
-	bd2 mb_bd1(.clk(clk), .reset(reset), .in(mc_wr_rs), .p(mc_membus_fm_mb1));
+	bd  mc_bd0(.clk(clk), .reset(rst), .in(mc_wr_rs), .p(membus_wr_rs));
+	bd2 mb_bd1(.clk(clk), .reset(rst), .in(mc_wr_rs), .p(mc_membus_fm_mb1));
 
 	wire mc_rdwr_rs_pulse_D, mc_rs_t0_D;
 	wire mc_rq_pulse_D0, mc_rq_pulse_D1, mc_rq_pulse_D2, mc_rq_pulse_D3;
-	dly100ns mc_dly0(.clk(clk), .reset(reset),
+	dly100ns mc_dly0(.clk(clk), .reset(rst),
 		.in(mc_rdwr_rs_pulse),
 		.p(mc_rdwr_rs_pulse_D));
-	dly50ns mc_dly1(.clk(clk), .reset(reset),
+	dly50ns mc_dly1(.clk(clk), .reset(rst),
 		.in(mc_rq_pulse),
 		.p(mc_rq_pulse_D0));
-	dly150ns mc_dly2(.clk(clk), .reset(reset),
+	dly150ns mc_dly2(.clk(clk), .reset(rst),
 		.in(mc_rq_pulse),
 		.p(mc_rq_pulse_D1));
-	dly200ns mc_dly3(.clk(clk), .reset(reset),
+	dly200ns mc_dly3(.clk(clk), .reset(rst),
 		.in(mc_rq_pulse),
 		.p(mc_rq_pulse_D2));
-	dly100us mc_dly4(.clk(clk), .reset(reset), .in(mc_rq_pulse),
+	dly100us mc_dly4(.clk(clk), .reset(rst), .in(mc_rq_pulse),
 		.p(mc_rq_pulse_D3));
-	dly50ns mc_dly5(.clk(clk), .reset(reset), .in(mc_rs_t0),
+	dly50ns mc_dly5(.clk(clk), .reset(rst), .in(mc_rs_t0),
 		.p(mc_rs_t0_D));
 
 	assign membus_rq_cyc = mc_rq & (mc_rd | mc_wr);
@@ -2920,7 +2963,11 @@ module apr(
 			mc_rq <= 0;
 		if(mc_rq_set)
 			mc_rq <= 1;
-		if(mc_rq_pulse)
+		if(mc_rq_pulse
+`ifdef FIX_MEMSTOP
+		| mc_rs_t0
+`endif
+		)
 			mc_stop <= 0;
 		if(mc_stop_set)
 			mc_stop <= 1;
@@ -2962,30 +3009,30 @@ module apr(
 	wire iot_t4;
 
 	wire iot_go_P;
-	pg iot_pg0(.clk(clk), .reset(reset),
+	pg iot_pg0(.clk(clk), .reset(rst),
 		.in(iot_go & ~iot_reset),
 		.p(iot_go_P));
 
 	assign iobus_iob_poweron = sw_power;
-	pa iot_pa0(.clk(clk), .reset(reset),
+	pa iot_pa0(.clk(clk), .reset(rst),
 		.in(mr_start | cpa_cono_set & iob[19]),
 		.p(iobus_iob_reset));
-	pa iot_pa1(.clk(clk), .reset(reset),
+	pa iot_pa1(.clk(clk), .reset(rst),
 		.in(iot_t2 & iot_cono),
 		.p(iobus_cono_clear));
-	pa iot_pa2(.clk(clk), .reset(reset),
+	pa iot_pa2(.clk(clk), .reset(rst),
 		.in(iot_t3 & iot_cono),
 		.p(iobus_cono_set));
-	pa iot_pa3(.clk(clk), .reset(reset),
+	pa iot_pa3(.clk(clk), .reset(rst),
 		.in(iot_t2 & iot_datao),
 		.p(iobus_datao_clear));
-	pa iot_pa4(.clk(clk), .reset(reset),
+	pa iot_pa4(.clk(clk), .reset(rst),
 		.in(iot_t3 & iot_datao),
 		.p(iobus_datao_set));
-	pa iot_pa5(.clk(clk), .reset(reset),
+	pa iot_pa5(.clk(clk), .reset(rst),
 		.in(et4 & iot_blk),
 		.p(iot_t0));
-	pa iot_pa6(.clk(clk), .reset(reset),
+	pa iot_pa6(.clk(clk), .reset(rst),
 		.in(mc_rs_t1 & iot_f0a),
 		.p(iot_t0a));
 	assign iobus_iob_fm_datai = iot_datai & iot_drive;
@@ -2993,22 +3040,22 @@ module apr(
 	wire iob_fm_ar1 = iot_outgoing & iot_drive;
 
 	wire iot_t0a_D;
-	dly200ns iot_dly0(.clk(clk), .reset(reset),
+	dly200ns iot_dly0(.clk(clk), .reset(rst),
 		.in(iot_t0a),
 		.p(iot_t0a_D));
-	ldly1us iot_dly1(.clk(clk), .reset(reset),
+	ldly1us iot_dly1(.clk(clk), .reset(rst),
 		.in(iot_go_P),
 		.p(iot_t2),
 		.l(iot_init_setup));
-	ldly1_5us iot_dly2(.clk(clk), .reset(reset),
+	ldly1_5us iot_dly2(.clk(clk), .reset(rst),
 		.in(iot_t2),
 		.p(iot_t3a),
 		.l(iot_final_setup));
-	ldly2us iot_dly3(.clk(clk), .reset(reset),
+	ldly2us iot_dly3(.clk(clk), .reset(rst),
 		.in(iot_t3a),
 		.p(iot_t4),
 		.l(iot_reset));
-	ldly1us iot_dly4(.clk(clk), .reset(reset),
+	ldly1us iot_dly4(.clk(clk), .reset(rst),
 		.in(iot_t2),
 		.p(iot_t3),
 		.l(iot_restart));
@@ -3123,19 +3170,19 @@ module apr(
 
 	wire [0:35] pi_iob = { 28'b0, pi_active, pio };
 
-	pa pi_pa0(.clk(clk), .reset(reset),
+	pa pi_pa0(.clk(clk), .reset(rst),
 		.in(it0 | at0),
 		.p(pi_sync));
-	pa pi_pa1(.clk(clk), .reset(reset),
+	pa pi_pa1(.clk(clk), .reset(rst),
 		.in(pi_sync & ~pi_cyc | blt_t4),
 		.p(pir_stb));
-	pa pi_pa2(.clk(clk), .reset(reset),
+	pa pi_pa2(.clk(clk), .reset(rst),
 		.in(mr_start |
 		    pi_select & iobus_cono_clear & iob[23]),
 		.p(pi_reset));
 
 	wire pi_sync_D;
-	dly200ns pi_dly0(.clk(clk), .reset(reset),
+	dly200ns pi_dly0(.clk(clk), .reset(rst),
 		.in(pi_sync),
 		.p(pi_sync_D));
 
@@ -3207,10 +3254,22 @@ module apr(
 			cpa_pia <= 0;
 		end
 
+`ifdef FIX_USER_IOT
+		// 20 and 21 seem to be flipped
+		// IO reset seems to reset it too
+		if(cpa_cono_set & iob[20] | iobus_iob_reset)
+			cpa_iot_user <= 0;
+		if(cpa_cono_set & iob[21])
+			cpa_iot_user <= 1;
+
+		if(ar_flag_set & ~ex_user)
+			cpa_iot_user <= mb[6];
+`else
 		if(cpa_cono_set & iob[21])
 			cpa_iot_user <= 0;
 		if(cpa_cono_set & iob[20])
 			cpa_iot_user <= 1;
+`endif
 
 		if(cpa_cono_set & iob[22])
 			cpa_illeg_op <= 0;

@@ -156,6 +156,9 @@ getelements(Element *sw, int n)
 
 #define KEYPULSE(k) (apr->k && !oldapr.k)
 
+Lock panellock;
+Rendez panelsynch;
+
 /* Set panel from internal APR state */
 void
 updatepanel(Apr *apr)
@@ -356,7 +359,352 @@ updateapr(Apr *apr, Ptr *ptr)
 	setelements(apr->rlr, rlr_l, 8);
 	setelements(apr->rla, rla_l, 8);
 	setelements(apr->iobus.c12, iobus_l, 36);
+
+	rwakeupall(&panelsynch);
 }
+
+#include "mmregs.h"
+
+void
+writeconsreg(Apr *apr, u32 addr, u32 data)
+{
+	switch(addr){
+	case MM_APR_CTL1_UP:
+//printf("write CTL1 UP %o\n", data);
+		if(data & 3){
+			keys[0].active = 0;
+			keys[0].state = 0;
+		}
+		if(data & 014){
+			keys[1].active = 0;
+			keys[1].state = 0;
+		}
+		if(data & 060){
+			keys[2].active = 0;
+			keys[2].state = 0;
+		}
+		if(data & 0300){
+			keys[3].active = 0;
+			keys[3].state = 0;
+		}
+		if(data & 0400)
+			misc_sw[1].state = 0;
+		break;
+	case MM_APR_CTL1_DN:
+//printf("write CTL1 DN %o\n", data);
+		if(data & 1){
+			keys[0].active = 1;
+			keys[0].state = 1;
+		}
+		if(data & 2){
+			keys[0].active = 1;
+			keys[0].state = 2;
+		}
+		if(data & 4){
+			keys[1].active = 1;
+			keys[1].state = 1;
+		}
+		if(data & 010){
+			keys[1].active = 1;
+			keys[1].state = 2;
+		}
+		if(data & 020){
+			keys[2].active = 1;
+			keys[2].state = 1;
+		}
+		if(data & 040){
+			keys[2].active = 1;
+			keys[2].state = 2;
+		}
+		if(data & 0100){
+			keys[3].active = 1;
+			keys[3].state = 1;
+		}
+		if(data & 0200){
+			keys[3].active = 1;
+			keys[3].state = 2;
+		}
+		if(data & 0400)
+			misc_sw[1].state = 1;
+		break;
+
+	case MM_APR_CTL2_UP:
+//printf("write CTL2 UP %o\n", data);
+		if(data & 3){
+			keys[4].active = 0;
+			keys[4].state = 0;
+		}
+		if(data & 014){
+			keys[5].active = 0;
+			keys[5].state = 0;
+		}
+		if(data & 060){
+			keys[6].active = 0;
+			keys[6].state = 0;
+		}
+		if(data & 0300){
+			keys[7].active = 0;
+			keys[7].state = 0;
+		}
+		if(data & 0400)
+			misc_sw[0].state = 0;
+		if(data & 01000)
+			misc_sw[3].state = 0;
+		break;
+	case MM_APR_CTL2_DN:
+//printf("write CTL2 DN %o\n", data);
+		if(data & 1){
+			keys[4].active = 1;
+			keys[4].state = 1;
+		}
+		if(data & 2){
+			keys[4].active = 1;
+			keys[4].state = 2;
+		}
+		if(data & 4){
+			keys[5].active = 1;
+			keys[5].state = 1;
+		}
+		if(data & 010){
+			keys[5].active = 1;
+			keys[5].state = 2;
+		}
+		if(data & 020){
+			keys[6].active = 1;
+			keys[6].state = 1;
+		}
+		if(data & 040){
+			keys[6].active = 1;
+			keys[6].state = 2;
+		}
+		if(data & 0100){
+			keys[7].active = 1;
+			keys[7].state = 1;
+		}
+		if(data & 0200){
+			keys[7].active = 1;
+			keys[7].state = 2;
+		}
+		if(data & 0400)
+			misc_sw[0].state = 1;
+		if(data & 01000)
+			misc_sw[3].state = 1;
+		break;
+
+	case MM_APR_MAINT_DN:
+		// TODO:
+		break;
+
+	case MM_APR_DSLT:
+		setelements(data, data_sw, 18);
+		break;
+	case MM_APR_DSRT:
+		setelements(data, data_sw+18, 18);
+		break;
+	case MM_APR_MAS:
+		setelements(data, ma_sw, 18);
+		break;
+	case MM_APR_REPEAT:
+		break;	// TODO
+	}
+
+	// wait for panel to pick up values
+	rsleep(&panelsynch);
+}
+
+u32
+readconsreg(Apr *apr, u32 addr)
+{
+	u32 d;
+	switch(addr){
+	case MM_APR_CTL1_DN:
+		d = apr->key_start;
+		d |= apr->key_readin<<1;
+		d |= apr->key_inst_cont<<2;
+		d |= apr->key_mem_cont<<3;
+		d |= apr->key_inst_stop<<4;
+		d |= apr->key_mem_stop<<5;
+		d |= apr->key_io_reset<<6;
+		d |= apr->key_exec<<7;
+		d |= apr->sw_addr_stop<<8;
+		d |= apr->run<<9;
+		d |= apr->mc_stop<<10;
+		d |= apr->sw_power<<11;
+		return d;
+
+	case MM_APR_CTL2_DN:
+		d = apr->key_dep;
+		d |= apr->key_dep_nxt<<1;
+		d |= apr->key_ex<<2;
+		d |= apr->key_ex_nxt<<3;
+		d |= apr->key_rd_off<<4;
+		d |= apr->key_rd_on<<5;
+		d |= apr->key_pt_rd<<6;
+		d |= apr->key_pt_wr<<7;
+		d |= apr->sw_repeat<<8;
+		d |= apr->sw_mem_disable<<9;
+		return d;
+
+	case MM_APR_MAINT_DN:
+		// TODO:
+		break;
+
+	case MM_APR_DSLT:
+		return getelements(data_sw, 36)>>18;
+	case MM_APR_DSRT:
+		return getelements(data_sw, 36)&RT;
+	case MM_APR_MAS:
+		return getelements(ma_sw, 18);
+	case MM_APR_REPEAT:
+		return 0;	// TODO
+	case MM_APR_IR:
+		return apr->ir;
+	case MM_APR_MILT:
+		return apr->mi>>18;
+	case MM_APR_MIRT:
+		return apr->mi&RT;
+	case MM_APR_PC:
+		return apr->pc;
+	case MM_APR_MA:
+		return apr->ma;
+	case MM_APR_PI:
+		return apr->pi_active |
+			apr->pio<<1 |
+			apr->pir<<8 |
+			apr->pih<<15;
+
+	case MM_APR_MBLT:
+		return apr->c.mb>>18;
+	case MM_APR_MBRT:
+		return apr->c.mb&RT;
+	case MM_APR_ARLT:
+		return apr->c.ar>>18;
+	case MM_APR_ARRT:
+		return apr->c.ar&RT;
+	case MM_APR_MQLT:
+		return apr->c.mq>>18;
+	case MM_APR_MQRT:
+		return apr->c.mq&RT;
+
+	case MM_APR_FF1:
+		d = 0;
+		d |= (u32)apr->key_ex_st << 31;
+		d |= (u32)apr->key_ex_sync << 30;
+		d |= (u32)apr->key_dep_st << 29;
+		d |= (u32)apr->key_dep_sync << 28;
+		d |= (u32)apr->key_rd_wr << 27;
+		d |= (u32)apr->mc_rd << 26;
+		d |= (u32)apr->mc_wr << 25;
+		d |= (u32)apr->mc_rq << 24;
+		d |= (u32)apr->if1a << 23;
+		d |= (u32)apr->af0 << 22;
+		d |= (u32)apr->af3 << 21;
+		d |= (u32)apr->af3a << 20;
+		d |= (u32)apr->et4_ar_pse << 19;
+		d |= (u32)apr->f1a << 18;
+		d |= (u32)apr->f4a << 17;
+		d |= (u32)apr->f6a << 16;
+		d |= (u32)apr->sf3 << 15;
+		d |= (u32)apr->sf5a << 14;
+		d |= (u32)apr->sf7 << 13;
+		d |= (u32)apr->ar_com_cont << 12;
+		d |= (u32)apr->blt_f0a << 11;
+		d |= (u32)apr->blt_f3a << 10;
+		d |= (u32)apr->blt_f5a << 9;
+		d |= (u32)apr->iot_f0a << 8;
+		d |= (u32)apr->fpf1 << 7;
+		d |= (u32)apr->fpf2 << 6;
+		d |= (u32)apr->faf1 << 5;
+		d |= (u32)apr->faf2 << 4;
+		d |= (u32)apr->faf3 << 3;
+		d |= (u32)apr->faf4 << 2;
+		d |= (u32)apr->fmf1 << 1;
+		d |= (u32)apr->fmf2 << 0;
+		return d;
+	case MM_APR_FF2:
+		d = 0;
+		d |= (u32)apr->fdf1 << 31;
+		d |= (u32)apr->fdf2 << 30;
+		d |= (u32)(apr->ir & H6 && apr->c.mq & F1 && !apr->nrf3) << 29;
+		d |= (u32)apr->nrf1 << 28;
+		d |= (u32)apr->nrf2 << 27;
+		d |= (u32)apr->nrf3 << 26;
+		d |= (u32)apr->fsf1 << 25;
+		d |= (u32)apr->chf7 << 24;
+		d |= (u32)apr->dsf1 << 23;
+		d |= (u32)apr->dsf2 << 22;
+		d |= (u32)apr->dsf3 << 21;
+		d |= (u32)apr->dsf4 << 20;
+		d |= (u32)apr->dsf5 << 19;
+		d |= (u32)apr->dsf6 << 18;
+		d |= (u32)apr->dsf7 << 17;
+		d |= (u32)apr->dsf8 << 16;
+		d |= (u32)apr->dsf9 << 15;
+		d |= (u32)apr->msf1 << 14;
+		d |= (u32)apr->mpf1 << 13;
+		d |= (u32)apr->mpf2 << 12;
+		d |= (u32)apr->mc_split_cyc_sync << 11;
+		d |= (u32)apr->mc_stop_sync << 10;
+		d |= (u32)apr->shf1 << 9;
+		d |= (u32)(apr->sc == 0777) << 8;
+		d |= (u32)apr->chf1 << 7;
+		d |= (u32)apr->chf2 << 6;
+		d |= (u32)apr->chf3 << 5;
+		d |= (u32)apr->chf4 << 4;
+		d |= (u32)apr->chf5 << 3;
+		d |= (u32)apr->chf6 << 2;
+		d |= (u32)apr->lcf1 << 1;
+		d |= (u32)apr->dcf1 << 0;
+		return d;
+	case MM_APR_FF3:
+		d = 0;
+		d |= (u32)apr->pi_ov << 31;
+		d |= (u32)apr->pi_cyc << 30;
+		d |= (u32)(!!apr->pi_req) << 29;
+		d |= (u32)apr->iot_go << 28;
+		d |= (u32)apr->a_long << 27;
+		d |= (u32)(apr->ma == apr->mas) << 26;
+		d |= (u32)apr->uuo_f1 << 25;
+		d |= (u32)apr->cpa_pdl_ov << 24;
+		d |= (u32)(apr->fe&0377) << 16;
+		d |= (u32)(apr->fe&0377) << 8;
+		d |= (u32)(!apr->ex_user) << 7;
+		d |= (u32)apr->cpa_illeg_op << 6;
+		d |= (u32)apr->ex_ill_op << 5;
+		d |= (u32)apr->ex_uuo_sync << 4;
+		d |= (u32)apr->ex_pi_sync << 3;
+		d |= (u32)apr->mq36 << 2;
+		d |= (u32)(!!(apr->sc&0400)) << 1;
+		d |= (u32)(!!(apr->fe&0400)) << 0;
+		return d;
+	case MM_APR_FF4:
+		d = 0;
+		d |= (u32)apr->key_rim_sbr << 31;
+		d |= (u32)apr->ar_cry0_xor_cry1 << 30;
+		d |= (u32)apr->ar_cry0 << 29;
+		d |= (u32)apr->ar_cry1 << 28;
+		d |= (u32)apr->ar_ov_flag << 27;
+		d |= (u32)apr->ar_cry0_flag << 26;
+		d |= (u32)apr->ar_cry1_flag << 25;
+		d |= (u32)apr->ar_pc_chg_flag << 24;
+		d |= (u32)apr->cpa_non_exist_mem << 23;
+		d |= (u32)apr->cpa_clock_enable << 22;
+		d |= (u32)apr->cpa_clock_flag << 21;
+		d |= (u32)apr->cpa_pc_chg_enable << 20;
+		d |= (u32)apr->cpa_arov_enable << 19;
+		d |= (u32)(!!(apr->cpa_pia&4)) << 18;
+		d |= (u32)(!!(apr->cpa_pia&2)) << 17;
+		d |= (u32)(!!(apr->cpa_pia&1)) << 16;
+		return d;
+	case MM_APR_MMU:
+		d = apr->pr;
+		d = (u32)apr->rlr << 8;
+		d = (u32)apr->rla << 16;
+		return d;
+	}
+	return 0;
+}
+
 
 static void
 updatetty(Tty *tty)
@@ -873,6 +1221,7 @@ void main340(void);
 		err("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
 
 	initpanel();
+	panelsynch.l = &panellock;
 
 	findlayout(&w, &h);
 

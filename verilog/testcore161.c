@@ -1,4 +1,4 @@
-module core161c_x(
+module core161c(
 	input wire clk,
 	input wire reset,
 	input wire power,
@@ -51,15 +51,7 @@ module core161c_x(
 	input  wire [0:35] membus_mb_in_p3,
 	output wire membus_addr_ack_p3,
 	output wire membus_rd_rs_p3,
-	output wire [0:35] membus_mb_out_p3,
-
-	// 36 bit Avalon Master
-	output wire [17:0] m_address,
-	output reg m_write,
-	output reg m_read,
-	output wire [35:0] m_writedata,
-	input wire [35:0] m_readdata,
-	input wire m_waitrequest
+	output wire [0:35] membus_mb_out_p3
 );
 
 	/* Jumpers */
@@ -168,6 +160,7 @@ module core161c_x(
 	pg cmc_pg2(.clk(clk), .reset(reset),
 		.in(cmpc_p0_rq | cmpc_p1_rq | cmpc_p2_rq | cmpc_p3_rq),
 		.p(cmc_t0));
+	pg cmc_pg3(.clk(clk), .reset(reset), .in(| mb_in), .p(mb_pulse_in));
 	pg cmc_pg4(.clk(clk), .reset(reset), .in(wr_rs), .p(cmpc_rs_strb));
 	pg cmc_pg5(.clk(clk), .reset(reset), .in(cmc_proc_rs), .p(cmc_proc_rs_P));
 	pg cmc_pg6(.clk(clk), .reset(reset), .in(cmc_pse_sync & cmc_proc_rs), .p(cmc_wr_rs));
@@ -176,19 +169,14 @@ module core161c_x(
 	pa cmc_pa0(.clk(clk), .reset(reset), .in(cmc_pwr_clr | cmc_t9a_D), .p(cmc_t12));
 	pa cmc_pa1(.clk(clk), .reset(reset), .in(cmc_pwr_clr_D), .p(cmc_pwr_start));
 	pa cmc_pa2(.clk(clk), .reset(reset),
-		.in(cmc_t9a & ~cmc_stop |
-		    cmc_pwr_start |
-		    cmc_key_restart),
+		.in(cmc_t9a & ~cmc_stop | cmc_pwr_start | cmc_key_restart),
 		.p(cmc_t10));
 	pa cmc_pa3(.clk(clk), .reset(reset), .in(cmc_t10_D), .p(cmc_t11));
 	pa cmc_pa4(.clk(clk), .reset(reset),
-		.in(cmc_t10 |
-		    cmc_strb_sa_D1 & ~cma_wr_rq |
-		    cmc_proc_rs_P),
+		.in(cmc_t10 | ~cma_wr_rq & cmc_strb_sa_D1 | cmc_proc_rs_P),
 		.p(cmc_state_clr));
 	pa cmc_pa5(.clk(clk), .reset(reset),
-		.in(cmc_t0 |
-		    cmc_strb_sa_D2 & cma_wr_rq),
+		.in(cmc_t0 | cmc_strb_sa_D2 & cma_wr_rq),
 		.p(cmc_cmb_clr));
 	pa cmc_pa6(.clk(clk), .reset(reset), .in(cmc_t0_D), .p(cmc_t1));
 	pa cmc_pa7(.clk(clk), .reset(reset), .in(cmc_t1_D), .p(cmc_t2));
@@ -206,9 +194,9 @@ module core161c_x(
 		.p(cmc_strb_sa));
 
 	// not on schematics
-	bd cmc_bd0(.clk(clk), .reset(reset), .in(cmc_t1), .p(cmc_addr_ack));
-	bd cmc_bd1(.clk(clk), .reset(reset), .in(cmc_strb_sa_D0), .p(cmc_rd_rs));
-	bd cmc_bd2(.clk(clk), .reset(reset), .in(cmc_strb_sa), .p(mb_pulse_out));
+	bd  cmc_bd0(.clk(clk), .reset(reset), .in(cmc_t1), .p(cmc_addr_ack));
+	bd  cmc_bd1(.clk(clk), .reset(reset), .in(cmc_strb_sa_D0), .p(cmc_rd_rs));
+	bd2 cmc_bd2(.clk(clk), .reset(reset), .in(cmc_strb_sa), .p(mb_pulse_out));
 
 	wire cmc_pwr_clr_D;
 	wire cmc_t0_D, cmc_t1_D, cmc_t2_D0, cmc_t2_D1, cmc_t4_D;
@@ -233,11 +221,12 @@ module core161c_x(
 	dly250ns cmc_dly14(.clk(clk), .reset(reset),
 		.in(cmc_strb_sa), .p(cmc_strb_sa_D2));
 
-	reg [0:35] sa;	// "sense amplifiers"
-	wire [13:0] core_addr = cma[22:35];
+//	wire [0:35] sa = core[cma];	// "sense amplifiers"
 
-	assign m_address = { 4'b0, core_addr };
-	assign m_writedata = cmb;
+	reg [0:35] sa;	// "sense amplifiers"
+	reg [0:35] core[0:'o40000-1];
+	wire [13:0] core_addr = cma[22:35];
+	reg core_rd, core_wr;
 
 	always @(posedge clk or posedge reset) begin
 		if(reset) begin
@@ -245,16 +234,16 @@ module core161c_x(
 			cmc_last_proc <= 0;
 			cmc_proc_rs <= 0;
 
-			m_read <= 0;
-			m_write <= 0;
+			core_rd <= 0;
+			core_wr <= 0;
 			sa <= 0;
 		end else begin
-			if(m_write & ~m_waitrequest) begin
-				m_write <= 0;
-			end
-			if(m_read & ~m_waitrequest) begin
-				m_read <= 0;
-				sa <= m_readdata;
+			if(core_rd) begin
+				sa <= core[core_addr];
+				core_rd <= 0;
+			end else if(core_wr) begin
+				core[core_addr] <= cmb;
+				core_wr <= 0;
 			end
 
 			if(cmc_state_clr) begin
@@ -263,14 +252,14 @@ module core161c_x(
 				cmc_p2_act <= 0;
 				cmc_p3_act <= 0;
 			end
-			cmb <= cmb | mb_in;
 			if(cmc_cmb_clr)
 				cmb <= 0;
 			if(cmc_strb_sa)
 				cmb <= cmb | sa;
+			if(mb_pulse_in)
+				cmb <= cmb | mb_in;
 			if(cmpc_rs_strb)
 				cmc_proc_rs <= 1;
-
 			if(cmc_t0) begin
 				cmc_await_rq <= 0;
 				cmc_proc_rs <= 0;
@@ -307,10 +296,13 @@ module core161c_x(
 				if(cmc_p3_act)
 					cmc_last_proc <= 1;
 
-				/* start read */
-				m_read <= 1;
+				core_rd <= 1;
+				sa <= 0;
+///				sa <= core[cma[22:35]];
 			end
-			// hack: zero memory at cmc_t4
+///			if(cmc_t4)
+///				/* As a hack zero core here */
+///				core[cma[22:35]] <= 0;
 			if(cmc_t5) begin
 				cmc_rd <= 0;
 				cmc_pse_sync <= 1;
@@ -322,9 +314,13 @@ module core161c_x(
 			end
 			if(cmc_t8) begin
 				cmc_wr <= 1;
-				/* again a hack. core is written some time after t8. */
-				m_write <= 1;
 			end
+			if(cmc_t9 & cmc_wr)
+				/* again a hack. core is written some time after t8.
+				 * (cmc_wr is always set here) */
+			//	core[cma[22:35]] <= core[cma[22:35]] | cmb;
+///				core[cma[22:35]] <= cmb;
+				core_wr <= 1;
 			if(cmc_t11)
 				cmc_await_rq <= 1;
 			if(cmc_t12) begin

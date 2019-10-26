@@ -1,10 +1,11 @@
-module fast162(
+module fast162_dp(
 	input wire clk,
 	input wire reset,
 	input wire power,
 	input wire sw_single_step,
 	input wire sw_restart,
 
+	// 4 Membus slaves
 	input  wire membus_wr_rs_p0,
 	input  wire membus_rq_cyc_p0,
 	input  wire membus_rd_rq_p0,
@@ -51,7 +52,15 @@ module fast162(
 	input  wire [0:35] membus_mb_in_p3,
 	output wire membus_addr_ack_p3,
 	output wire membus_rd_rs_p3,
-	output wire [0:35] membus_mb_out_p3
+	output wire [0:35] membus_mb_out_p3,
+
+	// 36 bit Avalon Slave
+	input wire [17:0] s_address,
+	input wire s_write,
+	input wire s_read,
+	input wire [35:0] s_writedata,
+	output wire [35:0] s_readdata,
+	output wire s_waitrequest
 );
 
 	/* Jumpers */
@@ -230,5 +239,13 @@ module fast162(
 			fmc_stop <= 0;
 			fmc_wr <= 0;
 		end
+
+		if(s_write)
+			ff[s_address[3:0]] <= s_writedata;
 	end
+
+
+	assign s_readdata = ff[s_address[3:0]];
+	assign s_waitrequest = 0;
+
 endmodule

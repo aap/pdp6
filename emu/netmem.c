@@ -16,7 +16,7 @@ netmemcycle(void *dev)
 {
 	Netmem *nm;
 	nm = (Netmem*)dev;
-	u8 len;
+	u16 len;
 	word a, d, *p;
 	int busy;
 
@@ -86,8 +86,9 @@ netmemcycle(void *dev)
 err:
 	printf("error address %06lo\n", a);
 	nm->buf[0] = 1;
-	nm->buf[1] = ERR;
-	writen(nm->fd, nm->buf, nm->buf[0]+1);
+	nm->buf[1] = 1;
+	nm->buf[2] = ERR;
+	writen(nm->fd, nm->buf, nm->buf[0]+2);
 	return;
 wait:
 	nm->waiting = 1;

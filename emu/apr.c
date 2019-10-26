@@ -5,6 +5,11 @@
 #define FIX_USER_IOT
 // Schematics have a bug in the divide subroutine
 #define FIX_DS
+// flow diagrams have it, block diagrams don't.
+// should guard against firing MC RS T0 twice
+// on MEM CONT when RUN is 0. Although clearing
+// the SBR FF probably prevents the same after MC RS T1
+#define FIX_MEMSTOP
 
 int loginst;
 
@@ -3003,7 +3008,7 @@ defpulse(at5)
 defpulse(at4)
 {
 	ARLT_CLEAR;		// 6-8
-	// TODO: what is MC DR SPLIT? what happens here anyway?
+	// no support for drums right now, so no MC DR SPLIT here
 	if(apr->sw_addr_stop || apr->key_mem_stop)
 		apr->mc_split_cyc_sync = 1;	// 7-9
 	pulse(apr, apr->ir & 020 ? &at5 : &ft0, 0);	// 5-3, 5-4
@@ -3152,7 +3157,9 @@ defpulse(mc_rs_t1)
 
 defpulse_(mc_rs_t0)
 {
-//	apr->mc_stop = 0;		// ?? not found on 7-9
+#ifdef FIX_MEMSTOP
+	apr->mc_stop = 0;		// ?? not found on 7-9
+#endif
 	pulse(apr, &mc_rs_t1, 50);	// 7-8
 }
 
@@ -3369,6 +3376,10 @@ defpulse(kt2)
 
 defpulse_(kt1)
 {
+	// has to happen before mc_stop_sync is cleared in MR CLR
+	// TODO: test this
+	if(KEY_MANUAL && apr->mc_stop && apr->mc_stop_sync && !apr->key_mem_cont)
+		pulse(apr, &mc_wr_rs, 0);	// 7-8
 	if(apr->key_io_reset)
 		pulse(apr, &mr_start, 0);	// 5-2
 	if(KEY_MANUAL && !apr->key_mem_cont)
@@ -3377,8 +3388,6 @@ defpulse_(kt1)
 		set_key_rim_sbr(apr, 0);	// 5-2
 	if(apr->key_mem_cont && apr->mc_stop)
 		pulse(apr, &mc_rs_t0, 0);	// 7-8
-	if(KEY_MANUAL && apr->mc_stop && apr->mc_stop_sync && !apr->key_mem_cont)
-		pulse(apr, &mc_wr_rs, 0);	// 7-8
 
 	if(apr->key_readin)
 		set_key_rim_sbr(apr, 1);	// 5-2
