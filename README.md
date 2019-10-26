@@ -37,6 +37,7 @@ Otherwise you need SDL and pthread.
 
 The cpu (apr), console tty, paper tape and punch,
 the data control and DECtape are implemented.
+340 display is also sort of working.
 The panel is missing the repeat delay knobs,
 but the functionality is implemented.
 
@@ -47,17 +48,18 @@ Since the real machine is asynchronous I had to pull some tricks to make it
 work on an FPGA.
 The real machine uses delays that are triggered by pulses and output another
 pulse after some time. Instead of pulses I use clock enables, and delays are
-implemented by a counter synchronized to the 100MHz system clock.
+implemented by a counter synchronized to the 50MHz system clock.
 
 ### FPGA
 
-My FPGA board is a Terasic Cyclone V GX Starter Kit.
-Communication with the virtual front panel is done over I²C via
-GPIO pins 2 (SCL) and 3 (SDA).
-The board's SRAM can also be read and written over I²C.
-The TTY is connected to UART over GPIO pins 4 (RX) and 5 (TX)
+I'm using a DE0-Nano-SoC with has an ARM hps connected to the Cyclone V FPGA.
+On the ARM side runs fe6 (a DDT-like interface) which communicates with
+the FPGA through memory mapped IO registers.
+The quartus project is not yet part of this repo
+but the important modules are in the verilog directory.
 
 ## File tree
+NB: not up to date
  
 ```
 emu	the C emulator
@@ -99,17 +101,7 @@ tools/ptdump.c	print a paper tape file in octal
 tools/dtdump.c	print dtr DECtape
 
 verilog
-verilog/apr.v	Arithmetic Processor 166 simulation
-verilog/core161c.v	Core memory 161C simulation
-verilog/fast162.v	Fast memory 162 simulation
-verilog/modules.v	utility modules
-verilog/pdp6.v		top level module
-verilog/quartus		various files for my terasic board
-verilog/test_dec.v	inst decoding test
-verilog/test.v		misc tests
-verilog/test1.inc
-verilog/test2.inc
-verilog/test_fp.inc
+verilog/...	fpga stuff
 
 code	random code for the PDP-6, mostly testing
 code/bootstrap.txt	a list of boot loaders
@@ -128,5 +120,5 @@ misc	nothing important
 
 - repeat and maint. switches on panel
 - improve timing
-- implement 340 display
 - do more tests
+- ...
