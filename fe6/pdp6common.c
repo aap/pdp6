@@ -875,6 +875,10 @@ disasm(word w)
 		else
 			p += sprintf(p, "%o,", dev);
 	}else{
+		if(mnemonics[op][0] == '\0'){
+			sprintf(s, "%llo", w);
+			return s;
+		}
 		flags = instflags[op];
 		p += sprintf(p, "%s ", mnemonics[op]);
 		if(ac || (flags & NOAC) == 0){
@@ -885,8 +889,10 @@ disasm(word w)
 				p += sprintf(p, "%o,", ac);
 		}
 	}
-	if(flags & NOINST)
-		return "";
+	if(flags & NOINST){
+		sprintf(s, "%llo", w);
+		return s;
+	}
 	if(i)
 		p += sprintf(p, "@");
 

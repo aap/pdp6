@@ -1047,7 +1047,7 @@ module apr(
 		if(mbrt_fm_mbltJ)
 			mb[18:35] <= mb[0:17];
 		if(mb_fm_pc1)
-			mb[0:17] <= mb[0:17] | pc;
+			mb[18:35] <= mb[18:35] | pc;
 		if(mb_fm_ir1)
 			mb[18:35] <= mb[18:35] | ir;
 		if(mb1_8_clr)
