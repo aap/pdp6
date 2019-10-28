@@ -779,7 +779,7 @@ module apr(
 
 	/* FWT */
 	wire fwt_swap = ir_fwt & ir[5:6] == 1;
-	wire fwt_negate = ir_fwt_movn_m & (ir[6] | ar[0]);
+	wire fwt_negate = ir_fwt_movn_m & (~ir[6] | ar[0]);
 	wire fwt_00 = ir_fwt & ir[7:8] == 0;
 	wire fwt_01 = ir_fwt & ir[7:8] == 1;
 	wire fwt_10 = ir_fwt & ir[7:8] == 2;
@@ -895,8 +895,8 @@ module apr(
 		iot_conso & ~ar_eq_0 |
 		iot_consz & ar_eq_0;
 	wire selected_flag = ar_ov_flag & ir[9] |
-		ar_cry0 & ir[10] |
-		ar_cry1 & ir[11] |
+		ar_cry0_flag & ir[10] |
+		ar_cry1_flag & ir[11] |
 		ar_pc_chg_flag & ir[12];
 	wire pc_set_enable = memac_ac & accp_etal_test |
 		ir_aobjn & ar[0] |
@@ -1119,40 +1119,47 @@ module apr(
 	wire shc_lshc_OR_div = ir_lshc | shc_div;
 	wire shc_div = (ir_div | ir_fdv) & ~nrf2;
 
+	// ET0
+	wire ar_clr_et0 = boole_0 | boole_3 | boole_14 | boole_17;
+	wire ar_com_et0 = boole_2 | boole_4 |
+		boole_12 | boole_13 | boole_15;
+	wire ar_fm_mbJ_et0 = hwt_11 | fwt_00 | fwt_11 |
+		memac_mem | iot_blk | iot_datao;
+	// ET1
+	wire ar_fm_mb0_et1 = boole_1 | boole_2 | boole_15 | boole_16;
+	wire ar_fm_mb1_et1 = boole_3 | boole_4 | boole_7 |
+		boole_10 | boole_13 | acbm_set;
+	wire ar_fm_mb_xor_et1 = boole_6 | boole_11 | boole_14 | acbm_com;
+	wire ar_clr_et1 = hwt_ar_clr | iot_status | iot_datai;
+	// ET4
+	wire ar_com_et4 = boole_4 | boole_10 | boole_11 | boole_14 |
+		boole_15 | boole_16 | boole_17;
+	wire ar_fm_mbltJ_et4 = hwt_lt | iot_cono;
+	wire ar_fm_mbrtJ_et4 = hwt_rt;
+	// ET5
+	wire ar_com_et5 = ir_acbm;
+	// ET6
+	wire ar_fm_mb0_et6 = iot_consz | iot_conso;
+	// ET7
+	wire ar_com_et7 = ir_acbm;
+
 	wire ar_clr = dst2 | fat6 |
 		et0a & ar_clr_et0 |
 		et1 & ar_clr_et1 |
 		mst1_D0;
-	wire ar_clr_et0 = boole_0 | boole_3 | boole_14 | boole_17;
-	wire ar_clr_et1 = hwt_ar_clr | iot_status | iot_datai;
 	wire ar_com = ar_incdec_t0 | ar_negate_t0 |
 		et0a & ar_com_et0 |
 		et4 & ar_com_et4 |
 		et5 & ar_com_et5 |
 		et7 & ar_com_et7 |
 		ar_cry_comp & ar_com_cont;
-	wire ar_com_et0 = boole_2 | boole_4 |
-		boole_12 | boole_13 | boole_15;
-	wire ar_com_et4 = boole_4 | boole_10 | boole_11 | boole_14 |
-		boole_15 | boole_16 | boole_17;
-	wire ar_com_et5 = ir_acbm;
-	wire ar_com_et7 = ir_acbm;
 	wire ar_fm_mb0 = dct1 | lct0a |
 		et1 & ar_fm_mb0_et1 |
 		et6 & ar_fm_mb0_et6;
-	wire ar_fm_mb0_et1 = boole_3 | boole_4 | boole_7 |
-		boole_10 | boole_13 | acbm_set;
-	wire ar_fm_mb0_et6 = iot_consz | iot_conso;
-	wire ar_fm_mb1 = et1 & ar_fm_mb1_et1;
-	wire ar_fm_mb1_et1 = boole_6 | boole_11 | boole_14 | acbm_com;
 	wire ar_fm_mb_xor = et1 & ar_fm_mb_xor_et1;
-	wire ar_fm_mb_xor_et1 = boole_14 | boole_6 | boole_11 | acbm_com;
+	wire ar_fm_mb1 = et1 & ar_fm_mb1_et1;
 	wire ar_fm_mbJ = cht1 | lct0 | mpt2 |
 		et0a & ar_fm_mbJ_et0;
-	wire ar_fm_mbJ_et0 = hwt_11 | fwt_00 | fwt_11 |
-		memac_mem | iot_blk | iot_datao;
-	wire ar_fm_mbltJ_et4 = hwt_lt | iot_cono;
-	wire ar_fm_mbrtJ_et4 = hwt_rt;
 
 	wire ar_incdec_t0;
 	wire ar_negate_t0;
@@ -1247,7 +1254,7 @@ module apr(
 		.p(ar_cry_comp_D));
 
 	wire [0:35] ar_mb_cry = mb & ~ar;
-	wire [0:35] ar_cry_in = ar_cry_initiate ? { mb[1:35]&~ar[1:35], 1'b0 } :
+	wire [-1:35] ar_cry_in = ar_cry_initiate ? { mb[0:35]&~ar[0:35], 1'b0 } :
 		ar35_cry_in & ar17_cry_in ? 36'o000001000001 :
 		ar35_cry_in ? 36'o000000000001 :
 		ar17_cry_in ? 36'o000001000000 :
@@ -1255,6 +1262,7 @@ module apr(
 
 	// hold the cry out temporarily
 	reg cry0, cry1;
+	wire [0:35] ar_cry1_add = ar[1:35] + ar_cry_in[0:35];
 
 	always @(posedge clk) begin: arctl
 		integer i;
@@ -1263,7 +1271,7 @@ module apr(
 		if(arrt_clr)
 			ar[18:35] <= 0;
 		if(ar_cry_in) begin
-			cry1 <= (ar[1:35] + ar_cry_in[1:35]) + 36'o0 >> 35;
+			cry1 <= ar_cry1_add[0];
 			{cry0, ar} <= ar + ar_cry_in;
 		end
 		if(arlt_com)
