@@ -299,9 +299,15 @@ module apr(
 		.p(it1a));
 
 	wire it0_D, iat0_D0, iat0_D1;
+`ifdef simulation
+	ldly2us i_dly0(.clk(clk), .reset(rst),
+		.in(run_clr),
+		.l(at1_inh));
+`else
 	ldly100us i_dly0(.clk(clk), .reset(rst),
 		.in(run_clr),
 		.l(at1_inh));
+`endif
 	dly50ns i_dly1(.clk(clk), .reset(rst),
 		.in(it0),
 		.p(it0_D));
@@ -630,7 +636,8 @@ module apr(
 		.in(st6_D),
 		.p(st6a));
 	pa s_pa8(.clk(clk), .reset(rst),
-		.in(st3 & s_ac_inh |
+		.in(mc_rs_t1 & sf7 |
+		    st3 & s_ac_inh |
 		    st5a & ~s_ac_2 |
 		    cht8b & ir_cao |
 		    dst13 |

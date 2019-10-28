@@ -484,12 +484,21 @@ togglecont(void)
 void
 cpu_cont(void)
 {
+	int stop;
 X	typestr("<CONT>\r\n");
 
 	if(isrunning())
 		return;
+	stop = isstopped();
 	keyup(MM6_STOP);
 	togglecont();
+
+	// on stop the machine should halt after one instruction
+	// so restart
+	if(stop){
+		waithalt();
+		togglecont();
+	}
 }
 
 void
