@@ -231,15 +231,12 @@ module tb_apr();
 		cmem.core['o52] <= 36'o334000_000000;
 		cmem.core['o53] <= 36'o000000_000000;
 
-		cmem.core['o1733] <= 36'o300000_000000;
-		cmem.core['o1734] <= 36'o254400001736;	// jrst 10,1736
-		cmem.core['o1735] <= 36'o254200000000;
-		cmem.core['o1736] <= 36'o254200000001;
-		cmem.core['o1737] <= 36'o254200000002;
+		cmem.core['o100] <= 36'o173040000000;
+		cmem.core['o101] <= 36'o254200000000;
 
-		fmem.ff[0] <= 36'o0;
-		fmem.ff[1] <= 36'o0;
-		mas <= 'o1733;
+		fmem.ff[0] <= 36'o611042323251;
+		fmem.ff[1] <= 36'o472340710317;
+		mas <= 'o100;
 
 		#200;
 		sw_power <= 1;
@@ -247,8 +244,6 @@ module tb_apr();
 		#200;
 //		key_mem_stop <= 1;
 
-		apr.pir <= 'o177;
-		apr.pi_active <= 1;
 		key_start <= 1;
 		#1000;
 		key_start <= 0;

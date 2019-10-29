@@ -1067,7 +1067,7 @@ module apr(
 		if(mb1_8_clr)
 			mb[1:8] <= 0;
 		if(mb1_8_set)
-			mb[1:8] <= 1;
+			mb[1:8] <= 8'o377;
 		if(mb_fm_misc_bits1) begin
 			if(ar_ov_flag) mb[0] <= 1;
 			if(ar_cry0_flag) mb[1] <= 1;
@@ -1607,7 +1607,7 @@ module apr(
 	wire cfac_overflow = mpt0a & mpf2 & ar[0] |
 		mpt1 & ~ar_eq_0 |
 		nrt3 & ~sc[0] |
-		dst0a & ~ar0_eq_sc0 |
+		fst0a & ~ar0_eq_sc0 |
 		dst13;
 	wire cfac_ar_sh_lt = dst14a | nrt2 |
 		sct1 & (dcf1 | shift_op & ~mb[18]);
