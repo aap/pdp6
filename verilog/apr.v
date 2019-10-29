@@ -977,45 +977,52 @@ module apr(
 	wire mbrt_fm_mbltJ = mblt_mbrt_swap;
 	wire mb_fm_pc1 = mb_fm_pc1_init;
 
+	// ET0
+	wire mb_fm_mqJ_et0 = jp_pop | jp_popj | jp_jra;
+	wire mb_ar_swap_et0 = hwt_10 | jp_jsp | ir_exch | ir_blt | ir_fsb;
+	wire mb_fm_arJ_et0 = fwt_01 | fwt_10 | iot_status;
+	wire mbltrtJ_et0 = acbm_swap | iot_cono | jp_jsa;
+	// ET1
+	wire mb_fm_ar0_et1 = ir_acbm;
+	wire mbltrtJ_et1 = hwt_swap | fwt_swap | ir_blt;
+	// ET4
+	wire mb_ar_swap_et4 = fwt_swap | iot_blk | ir_acbm;
+	// ET6
+	wire mb_fm_pc1_et6 = jp_jsa;
+	// ET9
+	wire mb_ar_swap_et9 = ir_acbm | jp_AND_NOT_jsr;
+	// ET10
+	wire mb_fm_arJ_inh_et10 = ir_jp | ir_exch | ch_dep;
+	wire mb_ar_swap_et10 = jp_AND_ir6_0;
+	wire mb_fm_arJ_et10 = (f_c_e_pse | s_c_e) & ~mb_fm_arJ_inh_et10;
+
 	wire mb_clr = et5 & mb_pc_sto |
 		mc_mb_clr_D;
 	wire mblt_mbrt_swap = et0a & mbltrtJ_et0 |
 		et1 & mbltrtJ_et1 |
 		ft1a & f_c_c_aclt;
-	wire mbltrtJ_et0 = acbm_swap | iot_cono | jp_jsa;
-	wire mbltrtJ_et1 = hwt_swap | fwt_swap | ir_blt;
 	wire mb_fm_misc_bits1 = et6 & jp_flag_stor;
 	wire mb_fm_ar0 = et1 & mb_fm_ar0_et1 |
 		dct3 |
 		et6 & acbm_cl;
-	wire mb_fm_ar0_et1 = ir_acbm;
 	wire mb_fm_arJ = at3a | st5 | key_wr | dst1 | mst1 |
 		et0a & mb_fm_arJ_et0 |
 		et10 & mb_fm_arJ_et10 |
 		kt3 & key_execute;
-	wire mb_fm_arJ_et0 = fwt_01 | fwt_10 | iot_status;
-	wire mb_fm_arJ_et10 = (f_c_e_pse | s_c_e) & ~mb_fm_arJ_inh_et10;
-	wire mb_fm_arJ_inh_et10 = ir_jp | ir_exch | ch_dep;
 	wire mb_ar_swap = ft3 | blt_t1 | blt_t4 | blt_t6 |
 		et0a & mb_ar_swap_et0 |
 		et4 & mb_ar_swap_et4 |
 		et9 & mb_ar_swap_et9 |
 		et10 & mb_ar_swap_et10 |
 		ft1a & ~f_c_c_aclt_OR_rt;
-	wire mb_ar_swap_et0 = hwt_10 | jp_jsp | ir_exch | ir_blt | ir_fsb;
-	wire mb_ar_swap_et4 = fwt_swap | iot_blk | ir_acbm;
-	wire mb_ar_swap_et9 = ir_acbm | jp_AND_NOT_jsr;
-	wire mb_ar_swap_et10 = jp_AND_ir6_0;
 	wire mb_fm_mqJ = st6 | ft4a | blt_t0a |
 		et0a & mb_fm_mqJ_et0;
-	wire mb_fm_mqJ_et0 = jp_pop | jp_popj | jp_jra;
 	wire mb1_8_clr = (fpt3 | fat8a) & ~mb[0];
 	wire mb1_8_set = (fpt3 | fat8a) & mb[0];
 	wire mblt_fm_ir1_uuo_t0 = et3 & ex_ir_uuo;
 	wire mb_fm_pc1_init = et6 & mb_pc_sto |
 		et6 & mb_fm_pc1_et6;
 	wire mb_pc_sto = jp_pushj | jp_jsr | jp_jsp | ir_jrst;
-	wire mb_fm_pc1_et6 = jp_jsa;
 
 	wire mc_mb_clr_D;
 	dly100ns mb_dly0(.clk(clk), .reset(rst), .in(mc_mb_clr), .p(mc_mb_clr_D));
@@ -1056,7 +1063,7 @@ module apr(
 		if(mb_fm_pc1)
 			mb[18:35] <= mb[18:35] | pc;
 		if(mb_fm_ir1)
-			mb[18:35] <= mb[18:35] | ir;
+			mb[0:17] <= mb[0:17] | { ir[0:12], 5'b0 };
 		if(mb1_8_clr)
 			mb[1:8] <= 0;
 		if(mb1_8_set)
@@ -2056,7 +2063,8 @@ module apr(
 		.in((fat3_D | fat4_D) & sc0_2_eq_7),
 		.p(fat5));
 	pa fa_pa8(.clk(clk), .reset(rst),
-		.in(sct2 & faf3),
+		.in(sct2 & faf3 |
+		    fat6),
 		.p(fat5a));
 	pa fa_pa9(.clk(clk), .reset(rst),
 		.in((fat3_D | fat4_D) & ~sc0_2_eq_7),
@@ -2732,13 +2740,13 @@ module apr(
 	assign maN_set[30] = ma_fm_pich |
 		et3 & ex_ir_uuo;
 	assign maN_set[31] = 0;
-	assign maN_set[32] = pi_enc_32 |
+	assign maN_set[32] = ma_fm_pich & pi_enc_32 |
 		ma_fm_ir14_17 & ir[14] |
 		ma_fm_ir9_12 & ir[9];
-	assign maN_set[33] = pi_enc_33 |
+	assign maN_set[33] = ma_fm_pich & pi_enc_33 |
 		ma_fm_ir14_17 & ir[15] |
 		ma_fm_ir9_12 & ir[10];
-	assign maN_set[34] = pi_enc_34 |
+	assign maN_set[34] = ma_fm_pich & pi_enc_34 |
 		ma_fm_ir14_17 & ir[16] |
 		ma_fm_ir9_12 & ir[11];
 	assign maN_set[35] =
@@ -3153,6 +3161,7 @@ module apr(
 					pir[i] <= 1;
 			end
 		else
+if(pih)	// HACK so it can be set from testbench
 			pir <= pir & ~pih;
 
 		if(pi_reset)

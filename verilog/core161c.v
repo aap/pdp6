@@ -144,7 +144,6 @@ module core161c_x(
 	wire cmc_strb_sa;
 	wire cmc_proc_rs_P;
 	wire mb_pulse_out;
-	wire mb_pulse_in;
 	wire cmc_wr_rs;
 	wire cmc_t0;
 	wire cmc_t1;

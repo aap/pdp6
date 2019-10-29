@@ -431,6 +431,7 @@ X	typestr("<SETPC>\r\n");
 
 	cpu_stopinst();
 	X	run = 0;
+	// TODO: maybe INSTSTOP?
 	keydown(MM6_MEMSTOP);
 	keyup(MM6_ADRSTOP);
 	set_ta(a);
@@ -495,6 +496,7 @@ X	typestr("<CONT>\r\n");
 
 	// on stop the machine should halt after one instruction
 	// so restart
+	// BUG: if next instruction is HALT we'll continue past it
 	if(stop){
 		waithalt();
 		togglecont();

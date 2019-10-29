@@ -136,7 +136,6 @@ module core161c(
 	wire cmc_strb_sa;
 	wire cmc_proc_rs_P;
 	wire mb_pulse_out;
-	wire mb_pulse_in;
 	wire cmc_wr_rs;
 	wire cmc_t0;
 	wire cmc_t1;
@@ -160,7 +159,6 @@ module core161c(
 	pg cmc_pg2(.clk(clk), .reset(reset),
 		.in(cmpc_p0_rq | cmpc_p1_rq | cmpc_p2_rq | cmpc_p3_rq),
 		.p(cmc_t0));
-	pg cmc_pg3(.clk(clk), .reset(reset), .in(| mb_in), .p(mb_pulse_in));
 	pg cmc_pg4(.clk(clk), .reset(reset), .in(wr_rs), .p(cmpc_rs_strb));
 	pg cmc_pg5(.clk(clk), .reset(reset), .in(cmc_proc_rs), .p(cmc_proc_rs_P));
 	pg cmc_pg6(.clk(clk), .reset(reset), .in(cmc_pse_sync & cmc_proc_rs), .p(cmc_wr_rs));
@@ -194,9 +192,9 @@ module core161c(
 		.p(cmc_strb_sa));
 
 	// not on schematics
-	bd  cmc_bd0(.clk(clk), .reset(reset), .in(cmc_t1), .p(cmc_addr_ack));
-	bd  cmc_bd1(.clk(clk), .reset(reset), .in(cmc_strb_sa_D0), .p(cmc_rd_rs));
-	bd2 cmc_bd2(.clk(clk), .reset(reset), .in(cmc_strb_sa), .p(mb_pulse_out));
+	bd cmc_bd0(.clk(clk), .reset(reset), .in(cmc_t1), .p(cmc_addr_ack));
+	bd cmc_bd1(.clk(clk), .reset(reset), .in(cmc_strb_sa_D0), .p(cmc_rd_rs));
+	bd cmc_bd2(.clk(clk), .reset(reset), .in(cmc_strb_sa), .p(mb_pulse_out));
 
 	wire cmc_pwr_clr_D;
 	wire cmc_t0_D, cmc_t1_D, cmc_t2_D0, cmc_t2_D1, cmc_t4_D;
@@ -252,14 +250,14 @@ module core161c(
 				cmc_p2_act <= 0;
 				cmc_p3_act <= 0;
 			end
+			cmb <= cmb | mb_in;
 			if(cmc_cmb_clr)
 				cmb <= 0;
 			if(cmc_strb_sa)
 				cmb <= cmb | sa;
-			if(mb_pulse_in)
-				cmb <= cmb | mb_in;
 			if(cmpc_rs_strb)
 				cmc_proc_rs <= 1;
+
 			if(cmc_t0) begin
 				cmc_await_rq <= 0;
 				cmc_proc_rs <= 0;

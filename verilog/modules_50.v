@@ -116,7 +116,7 @@ module bd(input clk, input reset, input in, output p);
 				r <= 1;
 		end
 	end
-	assign p = r == 4;
+	assign p = r == 2;
 endmodule
 
 /* Same as above but with longer pulse. Used to pulse mb
@@ -135,5 +135,5 @@ module bd2(input clk, input reset, input in, output p);
 				r <= 1;
 		end
 	end
-	assign p = r == 4 || r == 5 || r == 6 || r == 7;
+	assign p = r == 2 || r == 3 || r == 4 || r == 5;
 endmodule

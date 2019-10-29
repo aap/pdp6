@@ -149,7 +149,7 @@ module fast162(
 		.p(fmc_restart));
 	pg fmc_pg2(.clk(clk), .reset(reset), .in(fmc_act), .p(fmct0));
 	pg fmc_pg3(.clk(clk), .reset(reset), .in(fma_rd_rq), .p(fma_rd_rq_P));
-	pg cmc_pg5(.clk(clk), .reset(reset), .in(wr_rs), .p(fmc_wr_rs));
+	pg fmc_pg5(.clk(clk), .reset(reset), .in(wr_rs), .p(fmc_wr_rs));
 
 	pa fmc_pa0(.clk(clk), .reset(reset),
 		.in(fmc_start |
@@ -167,7 +167,7 @@ module fast162(
 	pa fmc_pa4(.clk(clk), .reset(reset),
 		.in(fmct3_D),
 		.p(fmc_wr_set));
-	pg fmc_pg5(.clk(clk), .reset(reset),
+	pg fmc_pa5(.clk(clk), .reset(reset),
 		.in(fmct0 & ~fma_rd_rq & fma_wr_rq |
 		    fmct1_D & fma_wr_rq),
 		.p(fmct3));

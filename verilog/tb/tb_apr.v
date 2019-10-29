@@ -209,31 +209,51 @@ module tb_apr();
 		.membus_mb_in_p3(36'b0)
 	);
 
-	initial begin
+	initial begin: init
+		integer i;
+
 		$dumpfile("dump.vcd");
 		$dumpvars();
 
-		cmem.core['o1323] <= 36'o215000000001;
-		cmem.core['o1324] <= 36'o254200000000;
+		for(i = 0; i < 'o40000; i = i + 1)
+			cmem.core[i] <= 0;
 
-		cmem.core['o100] <= 36'o200000000105;
-		cmem.core['o101] <= 36'o202000000041;
-		cmem.core['o102] <= 36'o254200000000;
+		#10;
 
-		cmem.core['o105] <= 36'o000000001234;
+		cmem.core['o42] <= 36'o334000_000000;
+		cmem.core['o43] <= 36'o000000_000000;
+		cmem.core['o44] <= 36'o334000_000000;
+		cmem.core['o45] <= 36'o000000_000000;
+		cmem.core['o46] <= 36'o334000_000000;
+		cmem.core['o47] <= 36'o000000_000000;
+		cmem.core['o50] <= 36'o334000_000000;
+		cmem.core['o51] <= 36'o000000_000000;
+		cmem.core['o52] <= 36'o334000_000000;
+		cmem.core['o53] <= 36'o000000_000000;
 
-//		fmem.ff[0] <= 36'o1;
-		mas <= 'o100;
+		cmem.core['o1733] <= 36'o300000_000000;
+		cmem.core['o1734] <= 36'o254400001736;	// jrst 10,1736
+		cmem.core['o1735] <= 36'o254200000000;
+		cmem.core['o1736] <= 36'o254200000001;
+		cmem.core['o1737] <= 36'o254200000002;
+
+		fmem.ff[0] <= 36'o0;
+		fmem.ff[1] <= 36'o0;
+		mas <= 'o1733;
 
 		#200;
 		sw_power <= 1;
 
 		#200;
-		key_mem_stop <= 1;
+//		key_mem_stop <= 1;
+
+		apr.pir <= 'o177;
+		apr.pi_active <= 1;
 		key_start <= 1;
 		#1000;
 		key_start <= 0;
 
+/*
 		#500;
 		key_mem_stop <= 0;
 
@@ -246,7 +266,7 @@ module tb_apr();
 		key_inst_cont <= 1;
 		#500;
 		key_inst_cont <= 0;
-		
+*/
 	end
 
 	initial begin
