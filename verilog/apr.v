@@ -77,10 +77,10 @@ module apr(
 	output wire [0:7] ff13,
 
 	// membus
-	output wire membus_wr_rs,
-	output wire membus_rq_cyc,
 	output wire membus_rd_rq,
 	output wire membus_wr_rq,
+	output wire membus_rq_cyc,
+	output wire membus_wr_rs,
 	output wire [21:35] membus_ma,
 	output wire [18:21] membus_sel,
 	output wire membus_fmc_select,
@@ -98,10 +98,13 @@ module apr(
 	output wire iobus_cono_set,
 	output wire iobus_iob_fm_datai,
 	output wire iobus_iob_fm_status,
+	output wire iobus_rdi_pulse,	// unused on 6
 	output wire [3:9]  iobus_ios,
 	output wire [0:35] iobus_iob_out,
 	input  wire [1:7]  iobus_pi_req,
-	input  wire [0:35] iobus_iob_in
+	input  wire [0:35] iobus_iob_in,
+	input wire iobus_dr_split,
+	input wire iobus_rdi_data	// unused on 6
 );
 
 `ifdef simulation
@@ -111,6 +114,7 @@ module apr(
 `endif
 	wire rst = reset | ~sw_power;
 
+	assign iobus_rdi_pulse = 0;
 
 	assign ff0 = { key_ex_st, key_ex_sync, key_dep_st, key_dep_sync, key_rdwr, mc_rd, mc_wr, mc_rq  };
 	assign ff1 = { if1a, af0, af3, af3a, et4_ar_pse, f1a, f4a, f6a };
@@ -2846,7 +2850,7 @@ module apr(
 	// reg mc_stop;
 	reg mc_stop_sync;
 	reg mc_split_cyc_sync;
-	wire mc_dr_split = 0;	// we don't support drums right now
+	wire mc_dr_split = iobus_dr_split;
 	wire mc_sw_stop = key_mem_stop | sw_addr_stop | mc_dr_split;
 	wire mc_rd_rq_pulse;
 	wire mc_wr_rq_pulse;

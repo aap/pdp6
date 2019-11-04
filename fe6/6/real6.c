@@ -1,8 +1,7 @@
-#include "fe6.h"
+#include "../fe.h"
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-//#include "hps_0.h"
 
 #define H2F_BASE (0xC0000000)
 
@@ -378,13 +377,7 @@ static void waitmemstop(void)
 	int i;
 	if(!isrunning())
 		return;
-	for(i = 0; i < 10; i++){
-		if(isstopped())
-			return;
-		usleep(100);
-	}
-	keytoggle(MM6_MEMSTOP);
-	for(i = 0; i < 10; i++){
+	for(i = 0; i < 20; i++){
 		if(isstopped())
 			return;
 		usleep(100);
@@ -431,7 +424,6 @@ X	typestr("<SETPC>\r\n");
 
 	cpu_stopinst();
 	X	run = 0;
-	// TODO: maybe INSTSTOP?
 	keydown(MM6_MEMSTOP);
 	keyup(MM6_ADRSTOP);
 	set_ta(a);
@@ -443,6 +435,11 @@ X	typestr("<SETPC>\r\n");
 	keyup(MM6_MEMSTOP);
 	keytoggle(MM6_INSTSTOP);
 	X	run = 0;
+	h2f_apr[REG6_CTL2_DN] = MM6_THISEX;
+	usleep(1000);
+	h2f_apr[REG6_CTL2_UP] = MM6_THISEX;
+	usleep(1000);
+	X	memstop = 0;
 }
 
 void
@@ -452,6 +449,7 @@ X	typestr("<STOPINST>\r\n");
 
 	if(!isrunning())
 		return;
+	// TODO: what if memory stop?
 	keytoggle(MM6_INSTSTOP);
 	waithalt();
 	X	run = 0;
@@ -464,9 +462,10 @@ X	typestr("<STOPMEM>\r\n");
 
 	if(!isrunning() || isstopped())
 		return;
-	keytoggle(MM6_MEMSTOP);
+	keydown(MM6_MEMSTOP);
 	waitmemstop();
 	X	memstop = 1;
+	keyup(MM6_MEMSTOP);
 }
 
 static void
@@ -485,22 +484,12 @@ togglecont(void)
 void
 cpu_cont(void)
 {
-	int stop;
 X	typestr("<CONT>\r\n");
 
 	if(isrunning())
 		return;
-	stop = isstopped();
 	keyup(MM6_STOP);
 	togglecont();
-
-	// on stop the machine should halt after one instruction
-	// so restart
-	// BUG: if next instruction is HALT we'll continue past it
-	if(stop){
-		waithalt();
-		togglecont();
-	}
 }
 
 void
@@ -551,6 +540,7 @@ X	typestr("<RESET>\r\n");
 	if(isrunning())
 		err("?R? ");
 	keytoggle(MM6_RESET);
+	typestr("\r\n");
 }
 
 #include "flags.inc"

@@ -20,38 +20,14 @@ typedef uint8_t u8;
 
 #define MAXMEM (16*1024)
 
+#include "regs.h"
+
 enum {
-	APR_DS = 01000020,
-	APR_MAS,
-	APR_RPT,
-	APR_IR,
-	APR_MI,
-	APR_PC,
-	APR_MA,
-	APR_PIH,
-	APR_PIR,
-	APR_PIO,
-	APR_RUN,
-	APR_PION,
-	APR_STOP,
-
-#ifdef TEST
-	APR_CTL1_DN,
-	APR_CTL1_UP,
-	APR_CTL2_DN,
-	APR_CTL2_UP,
-	APR_MB,
-	APR_AR,
-	APR_MQ,
-
-	TTY_TTI,
-	TTY_ST,
-	PTR_PTR,
-	PTR_ST,
-	PTR_FE,
-
-	FE_REQ,
-#endif
+	FAKEFAKE = 01000017,
+#define X(str, name) name,
+PDP_REGS
+PDP_REGS_TEST
+#undef X
 
 	APR_END,
 };

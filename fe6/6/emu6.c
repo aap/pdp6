@@ -1,4 +1,4 @@
-#include "fe6.h"
+#include "../fe.h"
 #include <unistd.h>
 
 /* Memory mapped PDP-6 interface */

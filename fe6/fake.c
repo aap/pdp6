@@ -1,4 +1,4 @@
-#include "fe6.h"
+#include "fe.h"
 #include <unistd.h>
 
 static word memory[01000000];

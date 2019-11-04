@@ -1,3 +1,4 @@
+// AUTOGEN
 module iobus_1_connect(
 	// unused
 	input wire clk,
@@ -12,10 +13,13 @@ module iobus_1_connect(
 	input wire m_cono_set,
 	input wire m_iob_fm_datai,
 	input wire m_iob_fm_status,
+	input wire m_rdi_pulse,
 	input wire [3:9] m_ios,
 	input wire [0:35] m_iob_write,
 	output wire [1:7] m_pi_req,
 	output wire [0:35] m_iob_read,
+	output wire m_dr_split,
+	output wire m_rdi_data,
 
 	// Slave 0
 	output wire s0_iob_poweron,
@@ -26,13 +30,19 @@ module iobus_1_connect(
 	output wire s0_cono_set,
 	output wire s0_iob_fm_datai,
 	output wire s0_iob_fm_status,
+	output wire s0_rdi_pulse,
 	output wire [3:9] s0_ios,
 	output wire [0:35] s0_iob_write,
 	input wire [1:7] s0_pi_req,
-	input wire [0:35] s0_iob_read
+	input wire [0:35] s0_iob_read,
+	input wire s0_dr_split,
+	input wire s0_rdi_data
 );
-	assign m_pi_req = s0_pi_req;
+	assign m_pi_req = 0 | s0_pi_req;
 	assign m_iob_read = m_iob_write | s0_iob_read;
+	assign m_dr_split = 0 | s0_dr_split;
+	assign m_rdi_data = 0 | s0_rdi_data;
+
 
 	assign s0_iob_poweron = m_iob_poweron;
 	assign s0_iob_reset = m_iob_reset;
@@ -42,6 +52,7 @@ module iobus_1_connect(
 	assign s0_cono_set = m_cono_set;
 	assign s0_iob_fm_datai = m_iob_fm_datai;
 	assign s0_iob_fm_status = m_iob_fm_status;
+	assign s0_rdi_pulse = m_rdi_pulse;
 	assign s0_ios = m_ios;
 	assign s0_iob_write = m_iob_write;
 endmodule

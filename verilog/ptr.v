@@ -11,10 +11,13 @@ module ptr(
 	input  wire iobus_cono_set,
 	input  wire iobus_iob_fm_datai,
 	input  wire iobus_iob_fm_status,
+	input  wire iobus_rdi_pulse,	// unused on 6
 	input  wire [3:9]  iobus_ios,
 	input  wire [0:35] iobus_iob_in,
 	output wire [1:7]  iobus_pi_req,
 	output wire [0:35] iobus_iob_out,
+	output wire iobus_dr_split,
+	output wire iobus_rdi_data,	// unused on 6
 
 	/* Console panel */
 	input wire key_start,
@@ -29,6 +32,9 @@ module ptr(
 
 	output wire fe_data_rq
 );
+	assign iobus_dr_split = 0;
+	assign iobus_rdi_data = 0;
+
 	assign ptr_ind = ptr;
 	assign status_ind = { motor_on, ptr_b, ptr_busy, ptr_flag, ptr_pia };
 

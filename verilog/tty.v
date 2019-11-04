@@ -11,10 +11,13 @@ module tty(
 	input  wire iobus_cono_set,
 	input  wire iobus_iob_fm_datai,
 	input  wire iobus_iob_fm_status,
+	input  wire iobus_rdi_pulse,	// unused on 6
 	input  wire [3:9]  iobus_ios,
 	input  wire [0:35] iobus_iob_in,
 	output wire [1:7]  iobus_pi_req,
 	output wire [0:35] iobus_iob_out,
+	output wire iobus_dr_split,
+	output wire iobus_rdi_data,	// unused on 6
 
 	/* UART pins */
 	input wire rx,
@@ -24,6 +27,9 @@ module tty(
 	output wire [7:0] tti_ind,
 	output wire [6:0] status_ind
 );
+	assign iobus_dr_split = 0;
+	assign iobus_rdi_data = 0;
+
 	wire clk2;
 	clk14khz clock2(.inclk(clk),
 		.outclk(clk2));

@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <setjmp.h>
 
-#include "fe6.h"
+#include "fe.h"
 
 struct termios tiosaved;
 char erasec, killc, intrc;
@@ -224,20 +224,6 @@ struct Symbol
 
 Symbol symtab[] = {
 	{ "SM", 01000000 },
-//	{ "MM", 02000000 },
-	{ "DS", APR_DS },
-	{ "MAS", APR_MAS },
-	{ "RPT", APR_RPT },
-	{ "IR", APR_IR },
-	{ "MI", APR_MI },
-	{ "PC", APR_PC },
-	{ "MA", APR_MA },
-	{ "PIH", APR_PIH },
-	{ "PIR", APR_PIR },
-	{ "PIO", APR_PIO },
-	{ "RUN", APR_RUN },
-	{ "PION", APR_PION },
-	{ "STOP", APR_STOP },
 	{ "LED", 01001000 },
 	{ "SW", 01001001 },
 
@@ -254,21 +240,12 @@ Symbol symtab[] = {
 	{ "%DC", 0200 },
 	{ "%UTC", 0204 },
 	{ "%UTS", 0210 },
-#ifdef TEST
-	{ "CTL1U", APR_CTL1_UP },
-	{ "CTL1", APR_CTL1_DN },
-	{ "CTL2U", APR_CTL2_UP },
-	{ "CTL2", APR_CTL2_DN },
-	{ "MB", APR_MB },
-	{ "AR", APR_AR },
-	{ "MQ", APR_MQ },
-	{ "TTY.TTI", TTY_TTI },
-	{ "TTY.ST", TTY_ST },
-	{ "PTR.PTR", PTR_PTR },
-	{ "PTR.ST", PTR_ST },
-	{ "PTR.FE", PTR_FE },
-	{ "FE.REQ", FE_REQ },
-#endif
+
+#define X(str, name) { str, name },
+PDP_REGS
+PDP_REGS_TEST
+#undef X
+
 	{ nil, 0 },
 };
 
@@ -555,6 +532,15 @@ runline(void)
 }
 
 void
+zerocore(void)
+{
+	hword a;
+	for(a = 0; a < MAXMEM; a++)
+		deposit(a, 0);
+	typestr("\r\n");
+}
+
+void
 quit(void)
 {
 	reset(0);
@@ -753,6 +739,13 @@ main()
 
 			case 'Q':
 				combine(q);
+				break;
+
+			case 'Z':
+				if(flags & CCF)
+					zerocore();
+				else
+					err(" ?? ");
 				break;
 
 			case ALT:

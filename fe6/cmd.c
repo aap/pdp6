@@ -1,4 +1,4 @@
-#include "fe6.h"
+#include "fe.h"
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -58,6 +58,33 @@ splitops(void)
 			*p = '\0';
 		}
 	}
+}
+
+void
+loadsav(FILE *fp)
+{
+	word iowd;
+	word w;
+	while(w = readwbak(fp), w != ~0){
+		if(w >> 27 == 0254){
+		printf("PC: %o\r\n", right(w));
+		fflush(stdout);
+			cpu_setpc(right(w));
+			started = 1;
+			return;
+		}
+		iowd = w;
+		while(left(iowd) != 0){
+			iowd += 01000001;
+			w = readwbak(fp);
+			if(w == ~0)
+				goto format;
+			deposit(right(iowd), w);
+		}
+	}
+format:
+	printf("\r\nSAV format botch\r\n");
+	fflush(stdout);
 }
 
 void
@@ -209,6 +236,19 @@ c_load(int argc, char *argv[])
 	fclose(f);
 }
 
+void
+c_loadsav(int argc, char *argv[])
+{
+	FILE *f;
+	if(argc < 2)
+		return;
+	f = fopen(ops[1], "rb");
+	if(f == nil)
+		err("?F? ");
+	loadsav(f);
+	fclose(f);
+}
+
 struct dev devtab[] = {
 	{ "ptr", O_RDONLY, -1, nil },
 	{ "ptp", O_WRONLY | O_CREAT | O_TRUNC, -1, nil },
@@ -285,6 +325,7 @@ struct {
 	void (*f)(int, char **);
 } cmdtab[] = {
 	{ "load", c_load },
+	{ "loadsav", c_loadsav },
 	{ "dump", c_dump },
 	{ "mount", c_mount },
 	{ "unmount", c_unmount },

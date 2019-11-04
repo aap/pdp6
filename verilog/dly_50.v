@@ -1,3 +1,4 @@
+
 module dly50ns(input clk, input reset, input in, output p);
 	reg [2-1:0] r;
 	always @(posedge clk or posedge reset) begin
@@ -12,6 +13,7 @@ module dly50ns(input clk, input reset, input in, output p);
 	end
 	assign p = r == 2;
 endmodule
+
 
 module dly70ns(input clk, input reset, input in, output p);
 	reg [2-1:0] r;
@@ -28,6 +30,7 @@ module dly70ns(input clk, input reset, input in, output p);
 	assign p = r == 3;
 endmodule
 
+
 module dly100ns(input clk, input reset, input in, output p);
 	reg [3-1:0] r;
 	always @(posedge clk or posedge reset) begin
@@ -42,6 +45,7 @@ module dly100ns(input clk, input reset, input in, output p);
 	end
 	assign p = r == 5;
 endmodule
+
 
 module dly150ns(input clk, input reset, input in, output p);
 	reg [3-1:0] r;
@@ -58,6 +62,7 @@ module dly150ns(input clk, input reset, input in, output p);
 	assign p = r == 7;
 endmodule
 
+
 module dly200ns(input clk, input reset, input in, output p);
 	reg [4-1:0] r;
 	always @(posedge clk or posedge reset) begin
@@ -72,6 +77,7 @@ module dly200ns(input clk, input reset, input in, output p);
 	end
 	assign p = r == 10;
 endmodule
+
 
 module dly250ns(input clk, input reset, input in, output p);
 	reg [4-1:0] r;
@@ -88,6 +94,7 @@ module dly250ns(input clk, input reset, input in, output p);
 	assign p = r == 12;
 endmodule
 
+
 module dly300ns(input clk, input reset, input in, output p);
 	reg [4-1:0] r;
 	always @(posedge clk or posedge reset) begin
@@ -102,6 +109,7 @@ module dly300ns(input clk, input reset, input in, output p);
 	end
 	assign p = r == 15;
 endmodule
+
 
 module dly400ns(input clk, input reset, input in, output p);
 	reg [5-1:0] r;
@@ -118,6 +126,7 @@ module dly400ns(input clk, input reset, input in, output p);
 	assign p = r == 20;
 endmodule
 
+
 module dly450ns(input clk, input reset, input in, output p);
 	reg [5-1:0] r;
 	always @(posedge clk or posedge reset) begin
@@ -132,6 +141,7 @@ module dly450ns(input clk, input reset, input in, output p);
 	end
 	assign p = r == 22;
 endmodule
+
 
 module dly550ns(input clk, input reset, input in, output p);
 	reg [5-1:0] r;
@@ -148,6 +158,7 @@ module dly550ns(input clk, input reset, input in, output p);
 	assign p = r == 27;
 endmodule
 
+
 module dly750ns(input clk, input reset, input in, output p);
 	reg [6-1:0] r;
 	always @(posedge clk or posedge reset) begin
@@ -162,6 +173,7 @@ module dly750ns(input clk, input reset, input in, output p);
 	end
 	assign p = r == 37;
 endmodule
+
 
 module dly800ns(input clk, input reset, input in, output p);
 	reg [6-1:0] r;
