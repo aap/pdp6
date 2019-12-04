@@ -477,6 +477,8 @@ cpu_printflags(void)
 
 void fe_svc(void) {}
 
+void initcrt(const char *host) {}
+
 void
 init6(void)
 {

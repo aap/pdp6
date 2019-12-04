@@ -1195,8 +1195,8 @@ opline(word w, int io)
 		w |= 0000020000000;
 	w = fw(left(w), right(w)+right(y.val));
 	/* TODO: really warn about this? */
-	if(left(y.val))
-		err(0, "warning: address too large");
+//	if(left(y.val))
+//		err(0, "warning: address too large");
 	w = fw(left(w)+left(x.val), right(w)+right(x.val));
 	if(x.rel)
 		err(0, "warning: X relocation ignored");
@@ -1732,9 +1732,9 @@ checkundef(int glob)
 		   s->type != Operator && s->type != IoOperator && s->type != Pseudo){
 			unsixbit(s->name, name);
 			if(s->type == Undef){
-				if(glob)
-					s->type |= Extern;
-				else
+//				if(glob)
+//					s->type |= Extern;
+//				else
 					err(1, "undefined symbol: %s\n", name);
 			}
 		}
@@ -1909,6 +1909,7 @@ main(int argc, char *argv[])
 
 
 	pass2 = 1;
+	radix = 8;
 //	printf("\n   PASS2\n\n");
 
 	startitem(Name);

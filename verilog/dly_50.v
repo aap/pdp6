@@ -143,6 +143,45 @@ module dly450ns(input clk, input reset, input in, output p);
 endmodule
 
 
+module dly500ns(input clk, input reset, input in, output p);
+	reg [5-1:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 5'b1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 25;
+endmodule
+
+
+module ldly500ns(input clk, input reset, input in, output p, output reg l);
+	reg [5-1:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset) begin
+			r <= 0;
+			l <= 0;
+		end else begin
+			if(r)
+				r <= r + 5'b1;
+			if(in) begin
+				r <= 1;
+				l <= 1;
+			end
+			if(p) begin
+				r <= 0;
+				l <= 0;
+			end
+		end
+	end
+	assign p = r == 25;
+endmodule
+
+
 module dly550ns(input clk, input reset, input in, output p);
 	reg [5-1:0] r;
 	always @(posedge clk or posedge reset) begin
@@ -273,6 +312,38 @@ module ldly2us(input clk, input reset, input in, output p, output reg l);
 		end
 	end
 	assign p = r == 100;
+endmodule
+
+
+module dly2_8us(input clk, input reset, input in, output p);
+	reg [8-1:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 8'b1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 140;
+endmodule
+
+
+module dly35us(input clk, input reset, input in, output p);
+	reg [11-1:0] r;
+	always @(posedge clk or posedge reset) begin
+		if(reset)
+			r <= 0;
+		else begin
+			if(r)
+				r <= r + 11'b1;
+			if(in)
+				r <= 1;
+		end
+	end
+	assign p = r == 1750;
 endmodule
 
 

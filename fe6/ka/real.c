@@ -96,7 +96,8 @@ enum
 enum {
 	FEREG_REQ = 0,
 	FEREG_PTR,
-	FEREG_PTP
+	FEREG_PTP,
+	FEREG_DIS
 };
 
 
@@ -116,6 +117,7 @@ static volatile u32 *h2f_cmemif;
 static volatile u32 *h2f_fmemif;
 static volatile u32 *h2f_apr;
 static volatile u32 *h2f_fe;
+static volatile u32 *h2f_csl;
 
 void
 deposit(hword a, word w)
@@ -661,6 +663,23 @@ fflush(stdout);
 	write(fd, &c, 1);
 }
 
+int dis_fd;
+
+static void
+svc_dis(void)
+{
+	u32 pnt;
+	pnt = h2f_fe[FEREG_DIS];
+	if((pnt & 0x80000000) == 0)
+		return;
+	if(dis_fd >= 0)
+		write(dis_fd, &pnt, 4);
+	else{
+		printf("%X\r\n", pnt);
+		fflush(stdout);
+	}
+}
+
 void
 fe_svc(void)
 {
@@ -670,8 +689,30 @@ fe_svc(void)
 
 	if(req & 1) svc_ptr();
 	if(req & 2) svc_ptp();
+//	if(req & 4) svc_dis();
+	svc_dis();
 }
 
+void*
+wcsl_thread(void *arg)
+{
+	u32 ctl;
+	while(readn(dis_fd, &ctl, 4) == 0){
+//		printf("%o\r\n", ctl);
+//		fflush(stdout);
+		h2f_csl[ctl>>24] = ctl;
+	}
+}
+
+void
+initcrt(const char *host)
+{
+	dis_fd = dial(host, 3400);
+	if(dis_fd >= 0){
+		printf("display connected\n");
+		threadcreate(wcsl_thread, nil);
+	}
+}
 
 void
 init6(void)
@@ -699,6 +740,7 @@ init6(void)
 	h2f_fmemif = getLWH2Faddr(0x10010);
 	h2f_apr = getLWH2Faddr(0x10100);
 	h2f_fe = getLWH2Faddr(0x20000);
+	h2f_csl = getLWH2Faddr(0x30000);
 }
 
 void

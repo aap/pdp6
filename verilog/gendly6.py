@@ -52,6 +52,12 @@ def gendlyns(ns):
 	nb = ceil(log(n+1,2))
 	print(dly.format(type='%sns' % t, width=nb, n=n))
 
+def genldlyns(ns):
+	t = str(ns).replace('.', '_')
+	n = int(ns//clock)
+	nb = ceil(log(n+1,2))
+	print(ldly.format(type='%sns' % t, width=nb, n=n))
+
 def gendlyus(us):
 	t = str(us).replace('.', '_')
 	n = int(us*1000//clock)
@@ -93,6 +99,8 @@ gendlyns(250)
 gendlyns(300)
 gendlyns(400)
 gendlyns(450)
+gendlyns(500)
+genldlyns(500)
 gendlyns(550)
 gendlyns(750)
 gendlyns(800)
@@ -102,6 +110,8 @@ gendlyus(1)
 genldlyus(1)
 genldlyus(1.5)
 genldlyus(2)
+gendlyus(2.8)
+gendlyus(35)
 gendlyus(100)
 genldlyus(100)
 

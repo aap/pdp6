@@ -93,10 +93,10 @@ module core64k(
 		membus_rq_cyc_p3 &
 		cmc_await_rq;
 
-	wire ma_p0 = { membus_sel_p0[18:21], membus_ma_p0[22:35] };
-	wire ma_p1 = { membus_sel_p1[18:21], membus_ma_p1[22:35] };
-	wire ma_p2 = { membus_sel_p2[18:21], membus_ma_p2[22:35] };
-	wire ma_p3 = { membus_sel_p3[18:21], membus_ma_p3[22:35] };
+	wire [18:35] ma_p0 = { membus_sel_p0[18:21], membus_ma_p0[22:35] };
+	wire [18:35] ma_p1 = { membus_sel_p1[18:21], membus_ma_p1[22:35] };
+	wire [18:35] ma_p2 = { membus_sel_p2[18:21], membus_ma_p2[22:35] };
+	wire [18:35] ma_p3 = { membus_sel_p3[18:21], membus_ma_p3[22:35] };
 
 	wire [20:35] ma_in =
 		{16{cmc_p0_sel}}&ma_p0 |

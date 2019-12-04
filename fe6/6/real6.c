@@ -81,12 +81,17 @@ enum
 	REG6_PTR = 035,
 	REG6_PTR_LT = 036,
 	REG6_PTR_RT = 037,
+
+	REG6_DIS1 = 040,
+	REG6_DIS2 = 041,
+	REG6_DIS3 = 042,
 };
 
 enum {
 	FEREG_REQ = 0,
 	FEREG_PTR,
-	FEREG_PTP
+	FEREG_PTP,
+	FEREG_DIS
 };
 
 
@@ -106,6 +111,7 @@ static volatile u32 *h2f_cmemif, *h2f_cmemif2;
 static volatile u32 *h2f_fmemif, *h2f_fmemif2;
 static volatile u32 *h2f_apr;
 static volatile u32 *h2f_fe;
+static volatile u32 *h2f_csl;
 static volatile u32 *h2f_lw_led_addr;
 static volatile u32 *h2f_lw_sw_addr;
 
@@ -137,13 +143,16 @@ deposit(hword a, word w)
 		h2f_fmemif[1] = w & RT;
 		h2f_fmemif[2] = (w >> 18) & RT;
 	}else if(a < 01000020){
+void dep64(u32, u64);
+if(0 && a < 01000){
+printf("dep %o %llo\r\n", a, w);
+fflush(stdout);
+}
+//		dep64(a, w);
+
 		h2f_cmemif[0] = a & RT;
 		h2f_cmemif[1] = w & RT;
 		h2f_cmemif[2] = (w >> 18) & RT;
-	}else if(a >= 02000000){
-		h2f_cmemif2[0] = a & 01777777;
-		h2f_cmemif2[1] = w & RT;
-		h2f_cmemif2[2] = (w >> 18) & RT;
 	}else switch(a){
 	case APR_DS:
 		h2f_apr[REG6_DSLT] = w>>18 & RT;
@@ -179,6 +188,8 @@ deposit(hword a, word w)
 		*h2f_lw_led_addr = w;
 		break;
 	}
+
+//	usleep(5);
 }
 
 word
@@ -217,15 +228,13 @@ examine(hword a)
 		w <<= 18;
 		w |= h2f_fmemif[1] & RT;
 	}else if(a < 01000020){
+//u64 ex64(u32);
+//		w = ex64(a);
+
 		h2f_cmemif[0] = a & RT;
 		w = h2f_cmemif[2] & RT;
 		w <<= 18;
 		w |= h2f_cmemif[1] & RT;
-	}else if(a >= 02000000){
-		h2f_cmemif2[0] = a & 01777777;
-		w = h2f_cmemif2[2] & RT;
-		w <<= 18;
-		w |= h2f_cmemif2[1] & RT;
 	}else switch(a){
 	case APR_DS:
 		w = h2f_apr[REG6_DSLT];
@@ -557,6 +566,33 @@ prflags(const char *fmt, u8 flags)
 }
 
 void
+prdis(void)
+{
+	u32 dis1, dis2, dis3;
+	dis1 = h2f_apr[REG6_DIS1];
+	dis2 = h2f_apr[REG6_DIS2];
+	dis3 = h2f_apr[REG6_DIS3];
+	printf("\r\nDIS\r\n");
+	printf("BR/%06o\r\n", dis1);
+	printf("X/%04o Y/%04o BRM/%03o S/%02o  I/%o SZ/%o MODE/%o\r\n",
+		dis2&01777, (dis2>>10)&01777, (dis2>>20)&0177,
+		(dis3>>8)&017, (dis3>>5)&7, (dis3>>3)&3, dis3&7);
+	printf("DATA REQ/%o  STOP/%o  EDGE/%o  LP/%o  LP ON/%o LP FIND/%o\r\n",
+		!!(dis3 & 04000000),
+		!!(dis3 & 0400000),
+		!!(dis3 & 02000000),
+		!!(dis3 & 040000),
+		!!(dis3 & 020000),
+		!!(dis3 & 010000));
+	printf("MOVE/%o HALT/%o\r\n",
+		!!(dis3 & 0200000),
+		!!(dis3 & 0100000));
+
+	dis3 = h2f_apr[REG6_DIS3+1];
+	printf("%X\r\n", dis3);
+}
+
+void
 cpu_printflags(void)
 {
 	u32 ff1, ff2, ff3, ff4;
@@ -588,6 +624,8 @@ cpu_printflags(void)
 		pi>>15 & 0177, pi>>8 & 0177, pi>>1 & 0177, !!(pi & 1));
 	printf("RUN/%o     MEM STOP/%o\r\n",
 		!!(ctl1 & MM6_RUN), !!(ctl1 & MM6_MCSTOP));
+
+	prdis();
 
 	fflush(stdout);
 }
@@ -628,6 +666,25 @@ fflush(stdout);
 	write(fd, &c, 1);
 }
 
+int dis_fd = -1;
+
+static void
+svc_dis(void)
+{
+	u32 pnt;
+	pnt = h2f_fe[FEREG_DIS];
+	if((pnt & 0x80000000) == 0)
+		return;
+	if(dis_fd >= 0)
+		write(dis_fd, &pnt, 4);
+/*
+	else{
+		printf("%X\r\n", pnt);
+		fflush(stdout);
+	}
+*/
+}
+
 void
 fe_svc(void)
 {
@@ -637,8 +694,30 @@ fe_svc(void)
 
 	if(req & 1) svc_ptr();
 	if(req & 2) svc_ptp();
+//	if(req & 4) svc_dis();
+	svc_dis();
 }
 
+void*
+wcsl_thread(void *arg)
+{
+	u32 ctl;
+	while(readn(dis_fd, &ctl, 4) == 0){
+//		printf("%o\r\n", ctl);
+//		fflush(stdout);
+		h2f_csl[ctl>>24] = ctl;
+	}
+}
+
+void
+initcrt(const char *host)
+{
+	dis_fd = dial(host, 3400);
+	if(dis_fd >= 0){
+		printf("display connected\n");
+		threadcreate(wcsl_thread, nil);
+	}
+}
 
 void
 init6(void)
@@ -668,11 +747,17 @@ init6(void)
 	h2f_fmemif = getLWH2Faddr(0x10010);
 	h2f_fmemif2 = getLWH2Faddr(0x20010);
 
+	// enable sdram bridge (???)
+	*(u32*)((u8*)virtual_base + 0x5080) = 0xFFFF;
 
 	h2f_apr = getLWH2Faddr(0x10100);
 	h2f_fe = getLWH2Faddr(0x20000);
+	h2f_csl = getLWH2Faddr(0x30000);
 	h2f_lw_sw_addr = getLWH2Faddr(0x10020);
 	h2f_lw_led_addr = getLWH2Faddr(0x10040);
+
+
+//	testshit();
 }
 
 void

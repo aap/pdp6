@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include "util.h"
 #include "pdp6common.h"
+#include "threading.h"
 
 #define nil NULL
 
@@ -18,7 +19,8 @@ typedef uint8_t u8;
 #define FW (LT|RT)
 #define F0 0400000000000
 
-#define MAXMEM (16*1024)
+//#define MAXMEM (16*1024)
+#define MAXMEM (256*1024)
 
 #include "regs.h"
 
@@ -82,6 +84,9 @@ void cpu_ioreset(void);
 void cpu_printflags(void);
 
 void fe_svc(void);
+
+void initcrt(const char *host);
+void initnetmem(const char *host, int port);
 
 void init6(void);
 void deinit6(void);

@@ -155,10 +155,11 @@ module apr(
 	wire key_dp_OR_dp_nxt = key_dep_sync | key_dep_nxt;
 	wire key_run_AND_NOT_ex_OR_dep = run & ~key_ex_OR_dep_st;
 	wire key_ex_OR_ex_nxt = key_ex_sync | key_ex_nxt;
-	wire key_manual = key_ex | key_ex_nxt |
+	wire key_manual = ~key_pwr_clr_enbl &
+		(key_ex | key_ex_nxt |
 		key_dep | key_dep_nxt |
 		key_start | key_inst_cont | key_mem_cont |
-		key_io_reset | key_execute | key_read_in;
+		key_io_reset | key_execute | key_read_in);
 	wire key_ex_OR_dep_st = key_ex_st | key_dep_st;
 	wire key_run_AND_ex_OR_dep = run & key_ex_OR_dep_st;
 	wire key_execute_OR_dp_OR_dp_nxt = key_execute | key_dp_OR_dp_nxt;
@@ -185,6 +186,7 @@ module apr(
 
 	wire kt0a_D, kt1_D, kt2_D, kt3_D;
 `ifdef simulation
+	wire key_pwr_clr_enbl = 0;
 	pg key_pg0(.clk(clk), .reset(reset), .in(sw_power), .p(mr_pwr_clr));
 `else
 	wire sw_power_pulse;
@@ -1207,7 +1209,7 @@ module apr(
 	wire ar_jrst_AND_ir11 = ir_jrst & ir[11];
 	wire ar_flag_set = et1 & ar_jrst_AND_ir11;
 	wire ar_jfcl_clr = et10 & ir_jfcl;
-	wire ar_eq_fp_half = ar == 36'o000400000000;
+	wire ar_eq_fp_half = ar[9:35] == 27'o400000000;
 	wire ar_eq_0 = ar == 0;
 	wire ar0_xor_ar1 = ar[0] ^ ar[1];
 	wire ar_ov_set = ar_cry0 ^ ar_cry1;

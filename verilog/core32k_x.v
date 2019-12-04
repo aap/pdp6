@@ -121,10 +121,10 @@ module core32k(
 	assign membus_rd_rs_p1 = cmc_rd_rs&cmc_p1_sel;
 	assign membus_rd_rs_p2 = cmc_rd_rs&cmc_p2_sel;
 	assign membus_rd_rs_p3 = cmc_rd_rs&cmc_p3_sel;
-	assign membus_mb_out_p0 = sa & {36{strobe_sense & cmc_p0_sel}};
-	assign membus_mb_out_p1 = sa & {36{strobe_sense & cmc_p1_sel}};
-	assign membus_mb_out_p2 = sa & {36{strobe_sense & cmc_p2_sel}};
-	assign membus_mb_out_p3 = sa & {36{strobe_sense & cmc_p3_sel}};
+	assign membus_mb_out_p0 = sa & {36{stb_pulse & cmc_p0_sel}};
+	assign membus_mb_out_p1 = sa & {36{stb_pulse & cmc_p1_sel}};
+	assign membus_mb_out_p2 = sa & {36{stb_pulse & cmc_p2_sel}};
+	assign membus_mb_out_p3 = sa & {36{stb_pulse & cmc_p3_sel}};
 	wire cmpc_rs_set = membus_wr_rs_p0 & cmc_p0_sel |
 		membus_wr_rs_p1 & cmc_p1_sel |
 		membus_wr_rs_p2 & cmc_p2_sel |
@@ -159,7 +159,7 @@ module core32k(
 
 	wire cmc_t0, cmc_t1b, cmc_t1a, cmc_t2, cmc_t3;
 	wire cmc_t4, cmc_t5, cmc_t6, cmc_t6p;
-	wire cmc_t0_D, cmc_t1b_D, cmc_t1a_D1, cmc_t2_D1, cmc_t2_D2;
+	wire cmc_t0_D, cmc_t2_D1;
 	wire cmc_t3_D1, cmc_t3_D2;
 
 	wire cmc_restart;
@@ -187,14 +187,12 @@ module core32k(
 		cmc_start | cmc_t3 & ~cma_wr_rq | cmc_proc_rs_pulse,
 		cmc_state_clr);
 	pa pa6(clk, reset, cmc_rq_sync&cmc_cyc_done, cmc_t1b);
-	pa pa7(clk, reset, cmc_t1b, cmc_t1b_D);
-	pa pa8(clk, reset, cmc_t1b_D, cmc_t1a);
+	pa pa7(clk, reset, cmc_t1b, cmc_t1a);
 	pa pa9(clk, reset,
-		cmc_t1b | cmc_t2_D2&cma_rd_rq&cma_wr_rq,
+		cmc_t1b | cmc_pse_sync_set&cma_rd_rq&cma_wr_rq,
 		cmc_cmb_clr);
-	pa pa10(clk, reset, cmc_t1a_D1, cmc_t2);
 	pa pa11(clk, reset, cmc_t2_D1&cma_rd_rq, strobe_sense);
-	pa pa12(clk, reset, strobe_sense, cmc_rd_rs);
+	pa pa12(clk, reset, stb_pulse, cmc_rd_rs);
 
 	pa pa13(clk, reset, cmc_pse_sync&(cmc_proc_rs | ~cma_wr_rq), cmc_t3);
 	pa pa14(clk, reset, cmc_proc_rs, cmc_proc_rs_pulse);
@@ -204,15 +202,14 @@ module core32k(
 
 	dly250ns dly2(clk, reset, cmc_t6p, cmc_t6);
 	dly100ns dly3(clk, reset, cmc_t0, cmc_t0_D);
-	dly250ns dly4(clk, reset, cmc_t1a, cmc_t1a_D1);
-	dly450ns dly5(clk, reset, cmc_t1a, cmc_read_off);
-	dly550ns dly6(clk, reset, cmc_t1a, cmc_pse_sync_set);
+	dly250ns dly4(clk, reset, cmc_t1a, cmc_t2);
+	dly200ns dly5(clk, reset, cmc_t2, cmc_read_off);
+	dly100ns dly6(clk, reset, rd_pulse, cmc_pse_sync_set);
 	// Variable 35-100ns
 	dly70ns dly7(clk, reset, cmc_t2, cmc_t2_D1);
-	dly300ns dly8(clk, reset, cmc_t2, cmc_t2_D2);
 	dly50ns dly9(clk, reset, cmc_t3, cmc_t4);
-	dly550ns dly10(clk, reset, cmc_t3, cmc_t3_D1);
-	dly750ns dly11(clk, reset, cmc_t3, cmc_t3_D2);
+	dly500ns dly10(clk, reset, cmc_t4, cmc_t3_D1);
+	dly200ns dly11(clk, reset, cmc_t3_D1, cmc_t3_D2);
 	dly50ns dly12(clk, reset, cmpc_rs_set, cmpc_rs_set_D);
 
 
@@ -223,11 +220,31 @@ module core32k(
 	assign m_writedata = cmb;
 
 
+	reg stb_sync, stb_done;
+	wire stb_pulse;
+	pa pa100(clk, reset, stb_sync&stb_done, stb_pulse);
+
+	reg rd_sync, rd_done;
+	wire rd_pulse;
+	pa pa101(clk, reset, rd_sync&rd_done, rd_pulse);
+
+	reg wr_sync, wr_done;
+	wire wr_pulse;
+	pa pa102(clk, reset, wr_sync&wr_done, wr_pulse);
+
+
 	always @(posedge clk or posedge reset) begin
 		if(reset) begin
 			m_read <= 0;
 			m_write <= 0;
 			sa <= 0;
+
+			stb_sync <= 0;
+			stb_done <= 0;
+			rd_sync <= 0;
+			rd_done <= 0;
+			wr_sync <= 0;
+			wr_done <= 0;
 
 			// value doesn't matter
 			cmc_last_proc <= 0;
@@ -237,12 +254,16 @@ module core32k(
 		end else begin
 			if(m_write & ~m_waitrequest) begin
 				m_write <= 0;
+				wr_done <= 1;
 			end
 			if(m_read & ~m_waitrequest) begin
 				m_read <= 0;
 				sa <= m_readdata;
+				stb_done <= 1;
 			end
 
+			if(cmc_start)
+				wr_done <= 1;
 
 			if(cmc_state_clr) begin
 				cmc_p0_act <= 0;
@@ -298,8 +319,10 @@ module core32k(
 
 			if(cmc_pwr_clr)
 				cmc_cyc_done <= 0;
-			if(cmc_t6 & ~cmc_stop)
+			if(wr_pulse & ~cmc_stop)
 				cmc_cyc_done <= 1;
+			if(cmc_t6)
+				wr_sync <= 1;
 
 			if(cmc_t1b) begin
 				cmc_pse_sync <= 0;
@@ -335,7 +358,13 @@ module core32k(
 			if(cmc_cmb_clr)
 				cmb <= 0;
 			if(strobe_sense)
+				stb_sync <= 1;
+			if(stb_pulse) begin
+				stb_sync <= 0;
+				stb_done <= 0;
+				rd_done <= 1;
 				cmb <= cmb | sa;
+			end
 
 			/* Core */
 			if(cmc_pwr_clr | cmc_t5) begin
@@ -345,17 +374,31 @@ module core32k(
 			end
 			if(cmc_t1a) begin
 				cmc_read <= 1;
-				m_read <= 1;
+				m_read <= cma_rd_rq;
+				stb_done <= 0;
+				rd_done <= ~cma_rd_rq;
 				cmc_write <= 0;
 			end
-			if(cmc_read_off)
+			if(cmc_read_off) begin
 				cmc_read <= 0;
-			if(cmc_t3)
+				rd_sync <= 1;
+			end
+			if(rd_pulse) begin
+				rd_sync <= 0;
+				rd_done <= 0;
+			end
+			if(cmc_t3) begin
 				cmc_inh <= 1;
+				m_write <= cma_wr_rq;
+				wr_done <= ~cma_wr_rq;
+			end
 			if(cmc_t4) begin
 				cmc_write <= 1;
-				m_write <= 1;
 				cmc_read <= 0;
+			end
+			if(wr_pulse) begin
+				wr_sync <= 0;
+				wr_done <= 0;
 			end
 		end
 	end

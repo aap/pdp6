@@ -108,11 +108,28 @@ module tb_apr();
 		.iobus_iob_in(iobus_iob_in)
 	);
 
+        wire [17:0] av_address;
+        wire av_write;
+        wire av_read;
+        wire [35:0] av_writedata;
+        wire [35:0] av_readdata;
+        wire av_waitrequest;
+
+	memory_32k mem(
+		.i_clk(clk),
+		.i_reset_n(reset),
+		.i_address(av_address),
+		.i_write(av_write),
+		.i_read(av_read),
+		.i_writedata(av_writedata),
+		.o_readdata(av_readdata),
+		.o_waitrequest(av_waitrequest)
+	);
 
 	wire [0:35] membus_mb_read_0;
 	wire membus_addr_ack_0;
 	wire membus_rd_rs_0;
-	core161c cmem(
+	core32k cmem(
 		.clk(clk),
 		.reset(~reset),
 		.power(1'b1),
@@ -156,7 +173,14 @@ module tb_apr();
 		.membus_ma_p3(15'b0),
 		.membus_sel_p3(4'b0),
 		.membus_fmc_select_p3(1'b0),
-		.membus_mb_in_p3(36'b0)
+		.membus_mb_in_p3(36'b0),
+
+        .m_address(av_address),
+        .m_write(av_write),
+        .m_read(av_read),
+        .m_writedata(av_writedata),
+        .m_readdata(av_readdata),
+        .m_waitrequest(av_waitrequest)
 	);
 
 	wire [0:35] membus_mb_read_1;
@@ -216,26 +240,29 @@ module tb_apr();
 		$dumpvars();
 
 		for(i = 0; i < 'o40000; i = i + 1)
-			cmem.core[i] <= 0;
+			mem.ram.ram[i] <= 0;
 
 		#10;
 
-		cmem.core['o42] <= 36'o334000_000000;
-		cmem.core['o43] <= 36'o000000_000000;
-		cmem.core['o44] <= 36'o334000_000000;
-		cmem.core['o45] <= 36'o000000_000000;
-		cmem.core['o46] <= 36'o334000_000000;
-		cmem.core['o47] <= 36'o000000_000000;
-		cmem.core['o50] <= 36'o334000_000000;
-		cmem.core['o51] <= 36'o000000_000000;
-		cmem.core['o52] <= 36'o334000_000000;
-		cmem.core['o53] <= 36'o000000_000000;
+		mem.ram.ram['o42] <= 36'o334000_000000;
+		mem.ram.ram['o43] <= 36'o000000_000000;
+		mem.ram.ram['o44] <= 36'o334000_000000;
+		mem.ram.ram['o45] <= 36'o000000_000000;
+		mem.ram.ram['o46] <= 36'o334000_000000;
+		mem.ram.ram['o47] <= 36'o000000_000000;
+		mem.ram.ram['o50] <= 36'o334000_000000;
+		mem.ram.ram['o51] <= 36'o000000_000000;
+		mem.ram.ram['o52] <= 36'o334000_000000;
+		mem.ram.ram['o53] <= 36'o000000_000000;
 
-		cmem.core['o100] <= 36'o173040000000;
-		cmem.core['o101] <= 36'o254200000000;
+		mem.ram.ram['o100] <= 36'o202000001000;
+		mem.ram.ram['o101] <= 36'o254200000000;
+
+		mem.ram.ram['o1000] <= 36'o123321456654;
 
 		fmem.ff[0] <= 36'o611042323251;
 		fmem.ff[1] <= 36'o472340710317;
+		fmem.ff[2] <= 36'o545777777776;
 		mas <= 'o100;
 
 		#200;

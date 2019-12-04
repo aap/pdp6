@@ -364,7 +364,7 @@ static int char_q[] = {
 static int char_r[] = {
 	I, U|I, U|I, U|I, U|I,
 	D|R|I, U|R|I, R|I, D|R|I,
-	D|R, D|R, D|R,
+	D|R, D|R, D,
 	0
 };
 

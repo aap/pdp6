@@ -87,6 +87,7 @@ enum {
 	MODE_ASCII,
 	MODE_SIXBIT,
 	MODE_SQUOZE,
+	MODE_FLOAT,
 
 	/* flags */
 	CF = 1,		// one altmode
@@ -404,6 +405,7 @@ prword(int mode, word wd)
 	int i;
 	char c;
 	char s[7];
+	double f;
 
 	switch(mode){
 	case MODE_ASCII:
@@ -451,6 +453,12 @@ prword(int mode, word wd)
 		typenum(wd&0777777);
 		tyo(')');
 		typenum((wd>>18)&0777777);
+		break;
+
+	case MODE_FLOAT:
+		f = pdptod(wd);
+		printf("%lf", f);
+		fflush(stdout);
 		break;
 
 	default:
@@ -553,12 +561,14 @@ quit(void)
 int started;
 
 int
-main()
+threadmain(int argc, char *argv[])
 {
 	char chu;
 	word t;
 
 	init6();
+	initcrt("soma");
+//	initnetmem("10.0.0.222", 10006);
 
 	raw(0);
 	erasec = tiosaved.c_cc[VERASE];
@@ -603,6 +613,7 @@ main()
 				typestr("/   ");
 				t = examine(t);
 				prword(MODE_SYM, t);
+				q = t;
 				typestr("    ");
 				
 				started = 0;
@@ -897,6 +908,9 @@ main()
 				break;
 			case '=':
 				typeout(MODE_NUM);
+				break;
+			case ';':
+				typeout(MODE_FLOAT);
 				break;
 			case '"':
 				if(flags & CF)

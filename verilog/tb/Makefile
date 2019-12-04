@@ -1,11 +1,14 @@
 DEP=
 V=../clk.v ../memory.v ../arbiter.v ../memif.v ../membusif.v ../testcore161c.v ../core161c.v \
-	../core164.v ../core32k.v ../fast162.v ../fast162_dp.v ../modules_50.v \
+	../core164.v ../core32k_x.v ../fast162.v ../fast162_dp.v ../modules_50.v \
 	../dly_50.v ../onchip_ram.v ../memory_16.v ../memory_16k.v ../memory_32k.v \
-	../panel_6.v ../fakeapr.v ../apr.v ../ptr.v ../ptp.v
+	../panel_6.v ../fakeapr.v ../apr.v ../ptr.v ../ptp.v ../dis340.v
 
 tb_apr: tb_apr.v $(V) $(DEP)
 	iverilog -o $@ tb_apr.v $(V)
+
+tb_dis: tb_dis.v $(V) $(DEP)
+	iverilog -o $@ tb_dis.v $(V)
 
 tb_ptp: tb_ptp.v $(V) $(DEP)
 	iverilog -o $@ tb_ptp.v $(V)

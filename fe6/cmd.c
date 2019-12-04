@@ -114,8 +114,9 @@ sblk:
 
 			chk = (chk<<1 | chk>>35) + w & FW;
 
-			if(d)
+			if(d){
 				deposit(right(iowd), w);
+			}
 			iowd += 01000001;
 		}
 		if(readwits(fp) != chk)

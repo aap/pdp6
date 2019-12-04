@@ -2,6 +2,8 @@
 #include <string.h>
 #include <ctype.h>
 
+#include <sys/socket.h>
+#include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <unistd.h>
 #include <netdb.h>

@@ -46,7 +46,7 @@ module panel_6(
 	input wire reset,
 
 	// Avalon Slave
-	input wire [4:0] s_address,
+	input wire [5:0] s_address,
 	input wire s_write,
 	input wire s_read,
 	input wire [31:0] s_writedata,
@@ -142,6 +142,21 @@ module panel_6(
 	input wire [6:0] ptp_status,	// also includes motor on
 
 	/*
+	 * 340 display
+	 */
+	input wire [0:17] dis_br,
+	input wire [0:6] dis_brm,
+	input wire [0:9] dis_x,
+	input wire [0:9] dis_y,
+	input wire [1:4] dis_s,
+	input wire [0:2] dis_i,
+	input wire [0:2] dis_mode,
+	input wire [0:1] dis_sz,
+	input wire [0:8] dis_flags,
+	input wire [0:4] dis_fe,
+	input wire [31:0] dis_foo,
+
+	/*
 	 * External panel
 	 */
 	input wire [3:0] switches,
@@ -159,8 +174,11 @@ module panel_6(
 		3'b010: leds <= tty_status;
 		3'b011: leds <= ptr;
 		3'b100: leds <= ptr_status;
-		3'b101: leds <= ptp;
-		3'b110: leds <= ptp_status;
+
+//		3'b101: leds <= ptp;
+//		3'b110: leds <= ptp_status;
+		3'b101: leds <= dis_fe;
+
 		3'b111: leds <= ext;
 		default: leds <= 0;
 		endcase
@@ -169,57 +187,62 @@ module panel_6(
 
 	always @(*) begin
 		case(s_address)
-		5'o00: s_readdata <=
+		6'o00: s_readdata <=
 			{ 20'b0,
 			  power, mc_stop, run, sw_addr_stop,
 			  key_exec, key_io_reset, key_mem_stop, key_inst_stop,
 			  key_mem_cont, key_inst_cont, key_read_in, key_start
 			};
-		5'o01: s_readdata <= 0;
+		6'o01: s_readdata <= 0;
 
-		5'o02: s_readdata <=
+		6'o02: s_readdata <=
 			{ 22'b0,
 			  sw_mem_disable, sw_repeat,
 			  ptr_key_tape_feed, ptp_key_tape_feed,
 			  ptr_key_start, ptr_key_stop,
 			  key_ex_nxt, key_ex, key_dep_nxt, key_dep
 			};
-		5'o03: s_readdata <= 0;
+		6'o03: s_readdata <= 0;
 
-		5'o04: s_readdata <=
+		6'o04: s_readdata <=
 			{ 26'b0,
 			  sw_split_cyc, sw_sct_maint,
 			  sw_art3_maint, sw_repeat_bypass, sw_rim_maint,
 			  1'b0	// spare?
 			};
-		5'o05: s_readdata <= 0;
+		6'o05: s_readdata <= 0;
 
-		5'o06: s_readdata <= { 14'b0, datasw[0:17] };
-		5'o07: s_readdata <= { 14'b0, datasw[18:35] };
-		5'o10: s_readdata <= { 14'b0, mas };
-		5'o11: s_readdata <= 0;	// TODO: repeat
-		5'o12: s_readdata <= { 14'b0, ir };
-		5'o13: s_readdata <= { 14'b0, mi[0:17] };
-		5'o14: s_readdata <= { 14'b0, mi[18:35] };
-		5'o15: s_readdata <= { 14'b0, pc };
-		5'o16: s_readdata <= { 14'b0, ma };
-		5'o17: s_readdata <= { 10'b0, pih, pir, pio, pi_active };
-		5'o20: s_readdata <= { 14'b0, mb[0:17] };
-		5'o21: s_readdata <= { 14'b0, mb[18:35] };
-		5'o22: s_readdata <= { 14'b0, ar[0:17] };
-		5'o23: s_readdata <= { 14'b0, ar[18:35] };
-		5'o24: s_readdata <= { 14'b0, mq[0:17] };
-		5'o25: s_readdata <= { 14'b0, mq[18:35] };
-		5'o26: s_readdata <= { ff0, ff1, ff2, ff3 };
-		5'o27: s_readdata <= { ff4, ff5, ff6, ff7 };
-		5'o30: s_readdata <= { ff8, ff9, ff10, ff11 };
-		5'o31: s_readdata <= { ff12, ff13, 16'b0 };
-		5'o32: s_readdata <= { 8'b0, rla, rlr, pr };
-		5'o33: s_readdata <= { tty_tti, 2'b0, tty_status };
-		5'o34: s_readdata <= { ptp, 2'b0, ptp_status };
-		5'o35: s_readdata <= ptr_status;
-		5'o36: s_readdata <= ptr[35:18];
-		5'o37: s_readdata <= ptr[17:0];
+		6'o06: s_readdata <= { 14'b0, datasw[0:17] };
+		6'o07: s_readdata <= { 14'b0, datasw[18:35] };
+		6'o10: s_readdata <= { 14'b0, mas };
+		6'o11: s_readdata <= 0;	// TODO: repeat
+		6'o12: s_readdata <= { 14'b0, ir };
+		6'o13: s_readdata <= { 14'b0, mi[0:17] };
+		6'o14: s_readdata <= { 14'b0, mi[18:35] };
+		6'o15: s_readdata <= { 14'b0, pc };
+		6'o16: s_readdata <= { 14'b0, ma };
+		6'o17: s_readdata <= { 10'b0, pih, pir, pio, pi_active };
+		6'o20: s_readdata <= { 14'b0, mb[0:17] };
+		6'o21: s_readdata <= { 14'b0, mb[18:35] };
+		6'o22: s_readdata <= { 14'b0, ar[0:17] };
+		6'o23: s_readdata <= { 14'b0, ar[18:35] };
+		6'o24: s_readdata <= { 14'b0, mq[0:17] };
+		6'o25: s_readdata <= { 14'b0, mq[18:35] };
+		6'o26: s_readdata <= { ff0, ff1, ff2, ff3 };
+		6'o27: s_readdata <= { ff4, ff5, ff6, ff7 };
+		6'o30: s_readdata <= { ff8, ff9, ff10, ff11 };
+		6'o31: s_readdata <= { ff12, ff13, 16'b0 };
+		6'o32: s_readdata <= { 8'b0, rla, rlr, pr };
+		6'o33: s_readdata <= { tty_tti, 2'b0, tty_status };
+		6'o34: s_readdata <= { ptp, 2'b0, ptp_status };
+		6'o35: s_readdata <= ptr_status;
+		6'o36: s_readdata <= ptr[35:18];
+		6'o37: s_readdata <= ptr[17:0];
+		6'o40: s_readdata <= dis_br;
+		6'o41: s_readdata <= { dis_brm, dis_y, dis_x };
+		6'o42: s_readdata <= { dis_flags, dis_s, dis_i,
+			dis_sz, dis_mode };
+		6'o43: s_readdata <= dis_foo;
 		default: s_readdata <= 0;
 		endcase
 	end
@@ -266,7 +289,7 @@ module panel_6(
 			sw_power <= ext_sw_power;
 
 			if(s_write) case(s_address)
-			5'o00: begin
+			6'o00: begin
 				if(s_writedata[0])
 					{ key_read_in, key_start } <= 2'b01;
 				if(s_writedata[1])
@@ -286,7 +309,7 @@ module panel_6(
 				if(s_writedata[8])
 					sw_addr_stop <= 1;
 			end
-			5'o01: begin
+			6'o01: begin
 				if(s_writedata[0] | s_writedata[1])
 					{ key_read_in, key_start } <= 2'b00;
 				if(s_writedata[2] | s_writedata[3])
@@ -298,7 +321,7 @@ module panel_6(
 				if(s_writedata[8])
 					sw_addr_stop <= 0;
 			end
-			5'o02: begin
+			6'o02: begin
 				if(s_writedata[0])
 					{ key_dep_nxt, key_dep } <= 2'b01;
 				if(s_writedata[1])
@@ -320,7 +343,7 @@ module panel_6(
 				if(s_writedata[9])
 					sw_mem_disable <= 1;
 			end
-			5'o03: begin
+			6'o03: begin
 				if(s_writedata[0] | s_writedata[1])
 					{ key_dep_nxt, key_dep } <= 2'b00;
 				if(s_writedata[2] | s_writedata[3])
@@ -334,7 +357,7 @@ module panel_6(
 				if(s_writedata[9])
 					sw_mem_disable <= 0;
 			end
-			5'o04: begin
+			6'o04: begin
 				if(s_writedata[1])
 					sw_rim_maint <= 1;
 				if(s_writedata[2])
@@ -346,7 +369,7 @@ module panel_6(
 				if(s_writedata[5])
 					sw_split_cyc <= 1;
 			end
-			5'o05: begin
+			6'o05: begin
 				if(s_writedata[1])
 					sw_rim_maint <= 0;
 				if(s_writedata[2])
@@ -358,9 +381,9 @@ module panel_6(
 				if(s_writedata[5])
 					sw_split_cyc <= 0;
 			end
-			5'o06: datasw[0:17] <= s_writedata;
-			5'o07: datasw[18:35] <= s_writedata;
-			5'o10: mas <= s_writedata;
+			6'o06: datasw[0:17] <= s_writedata;
+			6'o07: datasw[18:35] <= s_writedata;
+			6'o10: mas <= s_writedata;
 			// TODO: 11 REPEAT
 			endcase
 		end
