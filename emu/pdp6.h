@@ -660,6 +660,18 @@ Device *makedis(int argc, char *argv[]);
 extern char *dis_ident;
 
 
+#define JOY (0420>>2)
+#define JOY_IDENT "joy420"
+Device *makejoy(int argc, char *argv[]);
+extern char *joy_ident;
+
+
+#define OJOY (0724>>2)
+#define OJOY_IDENT "joy724"
+Device *makeojoy(int argc, char *argv[]);
+extern char *ojoy_ident;
+
+
 typedef struct Netmem Netmem;
 struct Netmem
 {
