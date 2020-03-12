@@ -139,13 +139,6 @@ netconscycle(void *dev)
 		break;
 	}
 	return;
-err:
-	printf("error address %o\n", a);
-	nc->buf[0] = 1;
-	nc->buf[1] = 1;
-	nc->buf[2] = ERR;
-	writen(nc->fd, nc->buf, nc->buf[0]+2);
-	return;
 }
 
 Device*
