@@ -1,0 +1,267 @@
+From
+	Proposal to University of Queensland Brisbane
+	Multi-User, Time shared PDP-10 System
+
+
+1.	Physikalisches Institut der Technischen Hochschule Aachen
+	Quantity	Description
+	1		Type 136 Data Control
+	2		Type 161C Core Memory (16K - 5 μs)
+	1		Type 166 Arithmetic Processor
+	1		Type 461 Card Reader
+	1		Type 516 Magnetic Tape Control
+	1		Type 521 Magnetic Tape Control Interface (for 570)
+	1		Type 551 DECtape Control
+	2		Type 570 Magnetic Tape Transports
+	1		Type 626 Console Printer and Keyboard Control
+	1		Type 630 Data Communications System
+	1		Type 646 Line Printer
+	1		Type 760 Paper Tape Reader
+	1		Type 761 Paper Tape Punch
+	2		Type 555 Dual DECtape Transports
+
+2.	University of Western Australia
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	1		Type 760 Paper Tape Reader
+	1		Type 626 Console Printer and Keyboard Control
+	1		Type 163C Core Memory (16K - 1.7 μs)
+	1		Type 162 Fast Memory
+	1		Type 551 DECtape Control
+	4		Type 555 Dual DECtape Transports
+	1		Type 136 Data Control
+	1		Type 646 Line Printer
+	1		Type 461 Card Reader
+	1		Type 346 Incremental Display
+	1		Type 630 Data Communications System
+
+3.	University of California, Berkeley Division
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	1		Type 626 Console Printer Keyboard and Control
+	1		Type 760 Paper Tape Reader
+	1		Type 136 Data Control
+	1		Type 163C Core Memory (16K - 1.7 μs)
+	1		Type 461 Card Reader
+	1		Type 551 DECtape Control
+	2		Type 555 Dual DECtape Transports
+	1		Type 646 Line Printer
+	1		Type 346 Incremental Display
+
+4.	University of California, Lawrence Radiation Laboratories
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	1		Type 760 Paper Tape Reader
+	1		Type 626 Console Printer and Keyboard Control
+	1		Type 136 Data Control
+	2		Type 163C Core Memory (16K - 1.7 μs)
+	1		Type 516 Magnetic Tape Control
+	1		Type 522A Interface for IBM
+	1		Type 162 Fast Memory
+
+5.	Universität Bonn
+	Quantity	Description
+	1		Type 136 Data Control
+	2		Type 161C Core Memory (16K - 5 μs)
+	1		Type 166 Arithmetic Processor
+	1		Type 346 Incremental Display
+	1		Type 461 Card Reader
+	1		Type 516 Magnetic Tape Control
+	1		Type 521 Magnetic Tape Control Interface (for 570)
+	1		Type 551 DECtape Control
+	2		Type 570 Magnetic Tape Transports
+	1		Type 626 Console Printer and Keyboard Control
+	1		Type 630 Data Communications System
+	1		Type 646 Line Printer
+	1		Type 760 Paper Tape Reader
+	2		Type 555 Dual DECtape Transports
+
+6.	Brookhaven National Laboratories
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	2		Type 163C Core Memory (16K - 1.7 μs)
+	1		Type 162 Fast Memory
+	1		Type 551 DECtape Control
+	4		Type 555 Dual DECtape Transports
+	1		Type 760 Paper Tape Reader
+	1		Type 136 Data Control
+	1		Type 646 Line Printer
+	1		Type 516 Magnetic Tape Control
+	1		Type 521 Magnetic Tape Control Interface (for 570)
+	3		Type 570 Magnetic Tape Transports
+	1		Type 626 Console Printer and Keyboard Control
+	1		Type 761 Paper Tape Punch
+	1		Type 630 Data Communications System
+
+7.	Applied Logic Corporation
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	1		Type 626 Console Printer and Keyboard Control
+	1		Type 760 Paper Tape Reader
+	1		Type 761 Paper Tape Punch
+	1		Type 136 Data Control
+	2		Type 163C Core Memory (16K - 1.7 μs)
+	1		Type 551 DECtape Control
+	2		Type 555 Dual DECtape Transports
+	1		Type 646 Line Printer
+	1		Type 630 Data Communications System
+
+8.	University of Rochester
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	2		Type 555 Dual DECtape Transports
+	1		Type 136 Data Control
+	1		Type 551 DECtape Control
+	1		Type 163C Core Memory (16K - 1.7 μs)
+	1		Type 165C Memory Interface
+	1		Type 165B Computer Interface
+
+9.	Massachusetts Institute of Technology, L.N.S.
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	1		Type 626 Console Printer and Keyboard Control
+	1		Type 760 Paper Tape Reader
+	2		Type 136 Data Control
+	1		Type 551 DECtape Control
+	1		Type 516 Magnetic Tape Control
+	1		Type 520 Magnetic Tape Control Interface (for Potter Transport 50)
+	1		Type 163C Core Memory (16K - 1.7 μs)
+	2		Type 555 Dual DECtape Transports
+	1		Type 461 Card Reader
+	1		Type 348 Interface for Display
+	1		Type 630 Data Communications System
+
+10.	Massachusetts Institute of Technology, Project MAC
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	1		Type 161C Core Memory (16K - 5 μs)
+	1		Type 162 Fast Memory
+	1		Type 136 Data Control
+	2		Type 170 16K Memory
+	1		Type 340 Precision Display
+	1		Type 344 Display Interface
+	1		Type 626 Console Printer and Keyboard Control
+	1		Type 551 DECtape Control
+	1		Type 760 Paper Tape Reader
+	1		Type 761 Paper Tape Punch
+	1		Type 555 Dual DECtape Transports
+	1		Type 163 Core Memory (16K - 1.7 μs)
+
+11.	Rand Corporation
+	Quantity	Description
+	1		Type 136 Data Control
+	1		Type 162 Fast Memory
+	2		Type 163C Core Memory (16K - 1.7 μs)
+	1		Type 166 Arithmetic Processor
+	1		Type 516 Magnetic Tape Control
+	1		Type 520 Magnetic Tape Control Interface (for Potter Transport 50)
+	1		Type 551 DECtape Control
+	1		Type 626 Console Printer and Keyboard Control
+	1		Type 630 Data Communications System
+	1		Type 760 Paper Tape Reader
+	1		Type 761 Paper Tape Punch
+	2		Type 555 Dual DECtape Transports
+	1		Type 50 Magnetic Tape Transport
+	1		Type 270 Disc Control
+	40		Type 616 JOSS Consoles
+
+12.	Rutgers University
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	1		Type 760 Paper Tape Reader
+	1		Type 761 Paper Tape Punch
+	1		Type 626 Console Printer and Keyboard Control
+	1		Type 179 Memory (8K - 6 μs)
+	1		Type 136 Data Control
+	1		Type 551 DECtape Control
+	2		Type 555 Dual DECtape Transports
+	1		Type 346 Precision Display
+
+13.	United Aircraft
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	1		Type 626 Console Printer and Keyboard Control
+	1		Type 760 Paper Tape Reader
+	1		Type 136 Data Control
+	1		Type 163C Core Memory (16K - 1.7 μs)
+	1		Type 162 Fast Memory
+	1		Type 551 DECtape Control
+	2		Type 555 Dual DECtape Transports
+	1		Type 630 Data Communications System
+
+14.	Stanford University
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	1		Type 626 Console Printer and Keyboard Control
+	1		Type 760 Paper Tape Reader
+	1		Type 761 Paper Tape Punch
+	2		Type 136 Data Control
+	1		Type 551 DECtape Control
+	1		Type 162 Fast Memory
+	2		Type 163C Core Memory (16K - 1.7 μs)
+	4		Type 555 Dual DECtape Transports
+	1		Type 646 Line Printer
+	1		Type 165 Computer Intercommunication System
+	1		Type 630 Data Communications System
+	1		Type 167 Drum Processor
+
+15.	University of Pennsylvania
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	1		Type 760 Paper Tape Reader
+	4		Type 164 Core Memory (16K - 1.7 μs)
+	1		Type 162 Fast Memory
+	1		Type 136 Data Control
+	1		Type 551 DECtape Control
+	2		Type 555 Dual DECtape Transports
+	1		Type 646 Line Printer
+	1		Type 346 Incremental Display and Character Generator
+	2		Type 570 Magnetic Tape Transports
+	1		Type 461 Card Reader
+
+16.	Oxford
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	1		Type 162 Fast Memory
+	4		Type 164 Core Memory (16K - 1.7 μs)
+	1		Type 136 Data Control
+	4		Type 545 Magnetic Tape Transports
+	3		Type 555 Dual DECtape Transports
+	1		Type 646 Line Printer
+	1		Type 30 Display
+	1		Type 348 Interface for 30 Display
+	1		Type 370 High Speed Light Pen Display
+	1		Type 630 Data Communications System
+	1		Type 516 Magnetic Tape Control
+	1		Type 760 Paper Tape Reader
+	1		Type 761 Paper Tape Punch
+	1		Type 551 DECtape Control
+
+17.	Yale University
+	Quantity	Description
+	1		Type 163 Core Memory (16K - 1.7 μs)
+	2		Type 161 Core Memory (16K - 5 μs)
+	1		Type 136 Data Control
+	1		Type 30 Display and Interface
+	1		Type 551 DECtape Control
+	2		Type 555 Dual DECtape Transports
+	1		Type 516 Magnetic Tape Control
+	1		Type 461 Card Reader
+
+18.	Imperial
+	Quantity	Description
+	1		Type 166 Arithmetic Processor
+	1		Type 162 Fast Memory
+	4		Type 164 Core Memory (16K - 1.7 μs)
+	1		Type 136 Data Control
+	1		Type 551 DECtape Control
+	2		Type 555 Dual DECtape Transports
+	1		Type 516 Magnetic Tape Control
+	4		Type 545 Magnetic Tape Transports
+	1		Type 761 Paper Tape Punch
+	1		Type 461 Card Reader
+	1		Type 646 Line Printer
+	1		Type 30 Display
+	1		Type 370 High Speed Light Pen Display
+	1		Type 348 Interface for 30 Display
+	1		Data Communications System
