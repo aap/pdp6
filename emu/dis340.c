@@ -213,6 +213,14 @@ initiate(Dis340 *dis)
 }
 
 static void
+gronk(Dis340 *dis)
+{
+	dis->lp_flag = 0;
+	dis->hef = 0;
+	dis->vef = 0;
+}
+
+static void
 read_to_mode(Dis340 *dis)
 {
 	dis->mode = LDB(13, 3, dis->br);
@@ -969,6 +977,8 @@ wake_dis(void *dev)
 
 			if(bus->c12 & F29)
 				initiate(dis);
+			if(bus->c12 & F28)
+				gronk(dis);
 //printf("DIS CONO SET %012lo\n", bus->c12);
 		}
 		if(IOB_DATAO_CLEAR){
