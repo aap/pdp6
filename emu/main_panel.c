@@ -1259,6 +1259,8 @@ void main340(void);
 	if(apr == nil || tty == nil || ptr == nil || ptp == nil)
 		err("need APR, TTY, PTR and PTP");
 
+	music_init(apr);
+
 	while(awaitinit);
 
 	cmdchans[0] = chancreate(sizeof(char*), 1);
