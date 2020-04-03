@@ -1224,6 +1224,7 @@ void main340(void);
 
 	if(SDL_CreateWindowAndRenderer(1399, 740, 0, &window, &renderer) < 0)
 		err("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
+	SDL_SetWindowTitle(window, "PDP-6 console");
 
 	initpanel();
 	panelsynch.l = &panellock;

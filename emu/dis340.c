@@ -841,6 +841,7 @@ renderthread(void *arg)
 
 	if(SDL_CreateWindowAndRenderer(1024, 1024, 0, &window, &renderer) < 0)
 		err("SDL_CreateWindowAndRenderer() failed: %s\n", SDL_GetError());
+	SDL_SetWindowTitle(window, "Type 340 display");
 	tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888,
 		SDL_TEXTUREACCESS_STREAMING, 1024, 1024);
 	SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
