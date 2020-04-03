@@ -1,8 +1,11 @@
 #include "pdp6.h"
+#include <signal.h>
 #include <SDL2/SDL.h>
 
 char *joy_ident = JOY_IDENT;
 char *ojoy_ident = OJOY_IDENT;
+
+static int fd;
 
 typedef struct Joy Joy;
 struct Joy
@@ -79,8 +82,58 @@ joyinit(void)
   }
 }
 
-static word bits = 0777777777777;
+static void
+cscopeinit(void)
+{
+	fd = dial("localhost", 4200);
+	if(fd == -1)
+		fprintf(stderr, "Could not connect to color scope.\n");
+	signal(SIGPIPE, SIG_IGN);
+}
+
+#define CONO_BLUE    000000020  /* Color scope blue enable */
+#define CONO_SPCWAR  000000040  /* Spacewar consoles */
+#define CONO_GREEN   000020000  /* Color scope green enable */
+#define CONO_RANDOM  000040000  /* Random switches */
+#define CONO_RED     020000000  /* Color scope red enable */
+#define CONO_KNIGHT  040000000  /* Switches in TK's office */
+
+static word cono_bits = 0;
+static word datao_bits = 0;
+static word spcwar_bits = 0777777777777;
 static word obits = 0;
+
+static int red, green, blue;
+
+static void
+cscope_plot(void)
+{
+	int x = (datao_bits >> 9) & 0777;
+	int y = datao_bits & 0777;
+	int data;
+	char buf[4];
+	data = red << 28;
+	data += green << 24;
+	data += blue << 20;
+	data += x;
+	data += y << 10;
+	buf[0] = data & 0xFF;
+	buf[1] = (data >> 8) & 0xFF;
+	buf[2] = (data >> 16) & 0xFF;
+	buf[3] = (data >> 24) & 0xFF;
+	if (fd == -1) {
+		fd = dial("localhost", 4200);
+		if (fd != -1)
+			printf("Reconnected color scope\n");
+	}
+	if (fd != -1) {
+		if (writen(fd, buf, sizeof buf) == -1) {
+			printf("Lost color scope\n");
+			close(fd);
+			fd = -1;
+		}
+	}
+}
 
 void joy_motion (SDL_JoyAxisEvent *ev)
 {
@@ -89,11 +142,11 @@ void joy_motion (SDL_JoyAxisEvent *ev)
   n *= 9;
 
   if (ev->axis == 0) {
-    bits |= 0600LL << n;
+    spcwar_bits |= 0600LL << n;
     if (ev->value < -10000)
-      bits &= ~(0200LL << n);
+      spcwar_bits &= ~(0200LL << n);
     if (ev->value > 10000)
-      bits &= ~(0400LL << n);
+      spcwar_bits &= ~(0400LL << n);
 
     obits &= ~(060LL << m);
     if (ev->value < -10000)
@@ -101,13 +154,13 @@ void joy_motion (SDL_JoyAxisEvent *ev)
     if (ev->value > 10000)
       obits |= 040LL << m;
   } else if (ev->axis == 1) {
-    bits |= 0100LL << n;
+    spcwar_bits |= 0100LL << n;
     obits &= ~(0300LL << m);
     if (ev->value < -10000) {
-      bits &= ~(0100LL << n);
+      spcwar_bits &= ~(0100LL << n);
       obits |= 0200LL << m;
     } else if (ev->value > 10000) {
-      bits &= ~(0100LL << n);
+      spcwar_bits &= ~(0100LL << n);
       obits |= 0100LL << m;
     }
   }
@@ -131,10 +184,10 @@ void joy_button (SDL_JoyButtonEvent *ev)
   }
 
   if (ev->state) {
-    bits &= ~(y << n);
+    spcwar_bits &= ~(y << n);
     obits |= x << m;
   }  else {
-    bits |= y << n;
+    spcwar_bits |= y << n;
     obits &= ~(x << m);
   }
 }
@@ -180,15 +233,27 @@ wake_joy(void *dev)
 		if(IOB_STATUS){
 		}
 		if(IOB_DATAI){
-                  bus->c12 |= bits;
+		  if (cono_bits & CONO_SPCWAR)
+		    bus->c12 |= spcwar_bits;
 		}
 		if(IOB_CONO_CLEAR){
+		  cono_bits = 0;
 		}
 		if(IOB_CONO_SET){
+		  cono_bits |= bus->c12;
+		  if (cono_bits & CONO_RED)
+		    red = (cono_bits >> 12) & 017;
+		  if (cono_bits & CONO_GREEN)
+		    green = (cono_bits >> 6) & 017;
+		  if (cono_bits & CONO_BLUE)
+		    blue = cono_bits & 017;
 		}
 		if(IOB_DATAO_CLEAR){
+		  datao_bits = 0;
 		}
 		if(IOB_DATAO_SET){
+		  datao_bits |= bus->c12;
+		  cscope_plot();
 		}
 	}
 }
@@ -265,7 +330,8 @@ makejoy(int argc, char *argv[])
 	joy->dev.type = joy_ident;
 
 
-        joyinit();
+	joyinit();
+	cscopeinit();
 
 	return &joy->dev;
 }
