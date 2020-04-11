@@ -3109,6 +3109,7 @@ defpulse(mi_fm_mb)
 {
 	// 7-7
 	apr->mi |= apr->c.mb;
+	music_sample(apr->mi);
 }
 
 defpulse(mi_clr)

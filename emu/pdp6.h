@@ -704,3 +704,6 @@ Device *makenetcons(int argc, char *argv[]);
 
 void writeconsreg(Apr *apr, u32 addr, u32 data);
 u32 readconsreg(Apr *apr, u32 addr);
+
+void music_init(Apr *apr);
+void music_sample(word mi);
