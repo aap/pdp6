@@ -533,7 +533,8 @@ enum
 {
 	FmtUnk,
 	FmtSav,
-	FmtSblk
+	FmtSblk,
+	FmtRim10
 };
 
 static void
@@ -607,6 +608,63 @@ format:
 }
 
 static void
+loadrim10(FILE *fp)
+{
+	word iowd, w, chk;
+	int nldr;
+	int mac;
+
+	w = readw(fp);
+	nldr = 0;
+	while(left(w) != 0){
+		nldr++;
+		readw(fp);
+		w += 01000001;
+	}
+	if(nldr == 017)
+		mac = 1;
+	else if(nldr == 016)
+		mac = 0;
+	else
+		goto format;
+
+	/* Read a simple block */
+	while(w = readw(fp), w != ~0){
+		/* We expect an AOBJN word here */
+		if((w & F0) == 0)
+			goto end;
+		iowd = w;
+		chk = iowd;
+		while(left(iowd) != 0){
+			w = readw(fp);
+			if(w == ~0)
+				goto format;
+
+			if(mac){
+				chk = (chk<<1 | chk>>35) + w & FW;
+				dep(right(iowd), 0, w);
+			}else{
+				chk = chk + w & FW;
+				dep(right(iowd+1), 0, w);
+			}
+			iowd += 01000001;
+		}
+		if(readw(fp) != chk)
+			goto format;
+	}
+	goto format;
+end:
+	/* JRST */
+	if(left(w) != 0324000 && left(w) != 0254000)
+		goto format;
+	getapr()->pc = right(w);
+	return;
+
+format:
+	printf("RIM10 format botch\n");
+}
+
+static void
 c_load(int argc, char *argv[])
 {
 	char *argv0 = nil;
@@ -621,6 +679,9 @@ c_load(int argc, char *argv[])
 	case 'b':
 		fmt = FmtSblk;
 		break;
+	case 'r':
+		fmt = FmtRim10;
+		break;
 	}ARGEND;
 	if(argc < 1)
 		return;
@@ -633,6 +694,7 @@ c_load(int argc, char *argv[])
 	switch(fmt){
 	case FmtSav: loadsav(fp); break;
 	case FmtSblk: loadsblk(fp); break;
+	case FmtRim10: loadrim10(fp); break;
 	}
 	fclose(fp);
 }
@@ -680,7 +742,7 @@ struct {
 	{ "xdeposit", c_xdep,
 		"deposit device" },
 	{ "load", c_load,
-		"load file into memory: load [-sb] filename" },
+		"load file into memory: load [-sbr] filename" },
 	{ "show", c_show,
 		"show configuration" },
 	{ "quit", c_quit,

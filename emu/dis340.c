@@ -945,6 +945,8 @@ wake_dis(void *dev)
 
 	if(bus->devcode == DIS){
 		if(IOB_STATUS){
+			// HACK: for IO bus multiplexing. this bit means the 340 is on the 6
+			bus->c12 |= F0;
 			if(dis->lp_flag) bus->c12 |= F25;
 			if(dis->hef || dis->vef) bus->c12 |= F26;
 			if(dis->stop && dis->br&01000) bus->c12 |= F27;

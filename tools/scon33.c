@@ -1,3 +1,5 @@
+/* ASR33 "emulator" */
+
 #define _XOPEN_SOURCE 600	/* for ptys */
 #define _DEFAULT_SOURCE		/* for cfmakeraw */
 
