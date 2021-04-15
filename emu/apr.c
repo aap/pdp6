@@ -3553,6 +3553,7 @@ if(!apr->run){
 		if(dev->wake)
 			dev->wake(dev->dev);
 	}
+	updatebus(&apr->iobus);	// need this because IOB RESET can be set
 	if(apr->iobus.c34_pulse & IOBUS_IOB_RESET){
 		int d;
 		for(d = 0; d < 128; d++){
