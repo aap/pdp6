@@ -58,3 +58,4 @@ int threadid(void);
 void **threaddata(void);
 void threadkill(int id);
 void threadwait(int id);
+void threadname(char *name);

@@ -1336,6 +1336,7 @@ void main340(void);
 //		SDL_UnlockSurface(screen);
 
 		SDL_RenderPresent(renderer);
+SDL_Delay(30);
 	}
 	return 0;
 }

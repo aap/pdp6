@@ -619,7 +619,8 @@ threadmain(int argc, char *argv[])
 				started = 0;
 			}
 			fe_svc();
-		//	usleep(1000);
+			// this was commented out, why?
+			usleep(1000);
 			continue;
 		}
 

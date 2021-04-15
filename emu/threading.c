@@ -1,3 +1,4 @@
+#define _GNU_SOURCE	// TODO, make portable
 #include "threading.h"
 #include <assert.h>
 
@@ -206,6 +207,13 @@ void
 threadwait(int id)
 {
 	pthread_join(gethandle(id), nil);
+}
+
+void
+threadname(char *name)
+{
+	// TODO: make portable
+	pthread_setname_np(pthread_self(), name);
 }
 
 int

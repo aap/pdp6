@@ -109,6 +109,9 @@ rtcthread(void *p)
 	RtcMsg msg;
 	int loss;
 
+	threadname("rtc");
+
+	struct timespec slp = { 0, 1*1000*1000 }; // 1ms
 	loss = 0;
 	for(;;){
 		clock_gettime(CLOCK_REALTIME, &now);
@@ -133,6 +136,9 @@ rtcthread(void *p)
 			else
 				rtcstop(msg.c);
 		}
+
+		// make this thread sleep a bit
+		nanosleep(&slp, nil);
 	}
 }
 

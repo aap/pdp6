@@ -828,6 +828,7 @@ cli(FILE *in, Channel **c)
 void*
 cmdthread(void *p)
 {
+	threadname("cli");
 	cli(stdin, p);
 	quit(0);
 	return nil;

@@ -56,6 +56,8 @@ simthread(void *p)
 {
 	Task *t;
 
+	threadname("sim");
+
 	printf("[simthread] start\n");
 	for(;;)
 		for(t = tasks; t; t = t->next){

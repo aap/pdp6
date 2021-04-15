@@ -835,6 +835,8 @@ renderthread(void *arg)
 	SDL_Event ev;
 	SDL_Texture *tex;
 
+	threadname("dis340");
+
 	dis = arg;
 
 	crtinit();
@@ -866,12 +868,15 @@ renderthread(void *arg)
 		SDL_RenderClear(renderer);
 
 		render(dis->crt);
-//		SDL_Delay(30);
 
 		SDL_UpdateTexture(tex, nil, dis->crt->pixels, 1024*sizeof(u32));
 		SDL_RenderCopy(renderer, tex, nil, nil);
 
 		SDL_RenderPresent(renderer);
+
+		// probably not the best idea to do it like this,
+		// should perhaps add a time delta to render instead
+		SDL_Delay(30);
 	}
 	return nil;
 }

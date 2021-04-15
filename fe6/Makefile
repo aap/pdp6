@@ -18,5 +18,8 @@ fe6_emu: $(SRC) 6/emu6.c
 	$(CC) -I6 $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 
+fe6_fastemu: $(SRC) fastemu.c ../femu/fpdp6.c
+	$(CC) -I6 $(CFLAGS) $(LDFLAGS) -o $@ $^
+
 feka: $(SRC) ka/real.c
 	$(XX)gcc -Ika $(CFLAGS) $(LDFLAGS) -o $@ $^
