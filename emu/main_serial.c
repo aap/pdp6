@@ -8,6 +8,15 @@
 
 // TODO: get rid of this
 void updatepanel(Apr *apr) {}
+void writeconsreg(Apr *apr, u32 addr, u32 data)
+{ // stub
+}
+u32
+readconsreg(Apr *apr, u32 addr)
+{
+	// stub
+	return 0;
+}
 
 #define KEYPULSE(k) (apr->k && !oldapr.k)
 

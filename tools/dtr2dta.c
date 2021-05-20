@@ -257,8 +257,11 @@ dumpdtr(word *wp, word *bmp, word *ibp, FILE *f)
 	int i, j;
 	int ck;
 
-	wrf(f, TapeEndR, nil, 0);
-	wrf(f, TapeEndR, nil, 0);
+	for(i = 0; i < 2700; i++)
+	{
+		wrf(f, TapeEndR, nil, 0);
+		wrf(f, TapeEndR, nil, 0);
+	}
 
 	for(i = 0; i < NUMBLOCKS; i++){
 		w = *bmp++;
@@ -269,8 +272,10 @@ dumpdtr(word *wp, word *bmp, word *ibp, FILE *f)
 		wrf(f, DataSync, nil, LDB(18, 18, w));
 		wrf(f, DataEndR, nil, LDB(0, 18, w));
 
-		ck = 0;
-		wrf(f, DataEndR, &ck, 0007777);	// rev check
+		ck = 077;
+//		wrf(f, DataEndR, nil, 0007777);	// rev check
+		// this seems what 551 actually does
+		wrf(f, DataEndR, nil, 0000000);	// rev check
 
 		/* the data */
 		w = *wp++;
@@ -296,8 +301,11 @@ dumpdtr(word *wp, word *bmp, word *ibp, FILE *f)
 		wrf(f, BlockSpace, nil, LDB(0, 18, w));	// rev block mark
 	}
 
-	wrf(f, TapeEndF, nil, 0);
-	wrf(f, TapeEndF, nil, 0);
+	for(i = 0; i < 2700; i++)
+	{
+		wrf(f, TapeEndF, nil, 0);
+		wrf(f, TapeEndF, nil, 0);
+	}
 }
 
 uchar*
