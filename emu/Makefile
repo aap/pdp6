@@ -16,6 +16,8 @@ pdp6: main_panel.c dis340.c chargen.inc joy.c $(SRC) $(H)
 	$(CC) -o $@ $(CFLAGS) $(SDLFLAGS) main_panel.c dis340.c joy.c $(SRC) $(LIBS) $(SDLLIBS)
 pdp6_s: main_serial.c $(SRC) $(H)
 	$(CC) -o $@ $(CFLAGS) main_serial.c $(SRC) $(LIBS)
+pdp6_n: main_net.c $(SRC) $(H)
+	$(CC) -o $@ $(CFLAGS) main_net.c $(SRC) $(LIBS)
 
 test_dc: test_dc.c dc.c $(H)
 	$(CC) -o $@ $(CFLAGS) test_dc.c dc.c

@@ -5,6 +5,8 @@
 char *dt_ident = DT_IDENT;
 char *dx_ident = DX_IDENT;
 
+// TODO: currently only selected drive will move, this is wrong
+
 // TODO: find out how this should be controlled
 #define DEVNO 1
 
@@ -40,10 +42,12 @@ dxmove(Dx555 *dx)
 {
 	// At end of tape read the last word forever
 	if(dx->dt->ut_rev){
+dx->motion = -1;
 		dx->cur--;
 		if(dx->cur < dx->start)
 			dx->cur = dx->start+5;
 	}else{
+dx->motion = 1;
 		dx->cur++;
 		if(dx->cur >= dx->end)
 			dx->cur = dx->end-6;
@@ -318,6 +322,8 @@ char state = 'n';
 
 #define REV (dt->ut_rev && !UT_BM)
 
+static int selectdx(Dt551 *dt);
+
 /* This is a function for debugging purposes */
 static void
 setstat(Dt551 *dt, int state)
@@ -329,7 +335,7 @@ static void
 dtsetgo(Dt551 *dt, int go)
 {
 /*
-	printf("setting GO %d %d\n", dt->ut_go, go);
+//	printf("setting GO %d %d\n", dt->ut_go, go);
 	if(dt->ut_go != go){
 		if(go)
 			printf("DECtape started\n\n\n");
@@ -337,6 +343,10 @@ dtsetgo(Dt551 *dt, int go)
 			printf("DECtape stopped\n\n\n");
 	}
 */
+	// little hack: stop tape motion here. motion is set in dxmove
+	// i hope selectdx is safe?
+	if(!go && selectdx(dt) == 1)
+		dt->seldx->motion = 0;
 	dt->ut_go = go;
 }
 
@@ -657,13 +667,13 @@ wake_dt(void *dev)
 	if(IOB_RESET){
 		dt->ut_incomp_block = 0;
 
+		dtsetgo(dt, 0);	// have to do this before deselection
 		dt->ut_pia = 0;
 		dt->ut_units = 0;
 		dt->ut_units_select = 0;
 		dt->ut_fcn = 0;
 		dt->ut_time = 0;
 		dt->ut_wren = 0;
-		dtsetgo(dt, 0);
 		dt->ut_rev = 0;
 		dt->ut_tape_end_flag = 0;
 		dt->ut_tape_end_enable = 0;
@@ -728,13 +738,13 @@ dbg("UTC CONO CLEAR\n");
 			setstat(dt, RW_NULL);
 		}
 		if(IOB_CONO_SET){
+			dtsetgo(dt, bus->c12>>13 & 1);	// have to do this before deselection
 			dt->ut_pia = bus->c12 & 07;
 			dt->ut_units = bus->c12>>3 & 07;
 			dt->ut_fcn = bus->c12>>6 & 07;
 			dt->ut_time = bus->c12>>9 & 03;
 			dt->time_enable = bus->c12>>11 & 1;
 			dt->ut_rev = bus->c12>>12 & 1;
-			dtsetgo(dt, bus->c12>>13 & 1);
 			dt->ut_jb_done_enable = bus->c12>>14 & 1;
 			dt->ut_tape_end_enable = bus->c12>>15 & 1;
 			dt->ut_units_select = bus->c12>>16 & 1;

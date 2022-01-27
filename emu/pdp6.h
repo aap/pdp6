@@ -580,6 +580,7 @@ struct Dx555
 
 	int unit;
 	int wrlock;
+	int motion;	// -1 rev, 0 stop, 1 fwd
 
 	int fd;
 	uchar *start;
