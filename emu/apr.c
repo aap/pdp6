@@ -508,7 +508,7 @@ void
 ar_cry_in(Apr *apr, word c)
 {
 	word a;
-	a = (apr->n.ar & ~F0) + (c & ~F0);
+	a = (apr->n.ar & ~F0) + c;
 	apr->n.ar += c;
 	if(apr->n.ar & FCRY) apr->ar_cry0 = 1;
 	if(a         &   F0) apr->ar_cry1 = 1;
@@ -2347,7 +2347,8 @@ defpulse(ar_cry_comp)
 {
 	if(apr->ar_com_cont){
 		AR_COM;				// 6-8
-		pulse(apr, &art3, 100);		// 6-9
+		if(!apr->sw_art3_maint)
+			pulse(apr, &art3, 100);		// 6-9
 	}
 }
 
@@ -2361,7 +2362,7 @@ defpulse_(ar_pm1_t1)
 	// but I don't quite know how this works,
 	// so we just use 100ns as the average value
 	// given in "The Evolution of the DECsystem-10"
-	if(!apr->ar_com_cont)
+	if(!apr->ar_com_cont && !apr->sw_art3_maint)
 		pulse(apr, &art3, 100);		// 6-9
 	pulse(apr, &ar_cry_comp, 100);		// 6-9
 }
@@ -2383,7 +2384,7 @@ defpulse(ar_ast2)
 {
 	ar_cry_in(apr, (~apr->c.ar & apr->c.mb) << 1);	// 6-8
 	// see comment in ar_pm1_t1
-	if(!apr->ar_com_cont)
+	if(!apr->ar_com_cont && !apr->sw_art3_maint)
 		pulse(apr, &art3, 50);			// 6-9
 	pulse(apr, &ar_cry_comp, 50);			// 6-9
 }
@@ -3372,6 +3373,8 @@ defpulse(kt2)
 	if(KEY_EXECUTE_DP_DPNXT)
 		apr->n.ar |= apr->data;		// 5-2
 	pulse(apr, &kt3, 200);	// 5-2
+	if(apr->sw_art3_maint)
+		pulse(apr, &art3, 0);		// 6-9
 }
 
 defpulse_(kt1)
@@ -3482,18 +3485,15 @@ aprcycle(void *p)
 
 	int foo;
 	if(channbrecv(apr->clkchan, &foo) == 1){
-/* This isn't correct but how else can you single step? */
-if(apr->run){
 		apr->cpa_clock_flag = 1;
 		recalc_cpa_req(apr);
-}
 	}
-/*
+/* This isn't correct but how else can you single step? */
+// just force it OFF
 if(!apr->run){
 		apr->cpa_clock_flag = 0;
 		recalc_cpa_req(apr);
 }
-*/
 
 	if(channbrecv(apr->rptchan, &foo) == 1){
 		if(KEY_MANUAL)
