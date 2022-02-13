@@ -1026,7 +1026,11 @@ makedis(int argc, char *argv[])
 
 	/* dunno about the frequency here */
 //	t = (Task){ nil, discycle, dis, 50, 0 };
-	t = (Task){ nil, discycle, dis, 20, 0 };
+//	t = (Task){ nil, discycle, dis, 20, 0 };
+	// MACDMP starts breaking if we go too high
+	// other programs start breaking if we go too low
+	// TODO: gahhhhhhh
+	t = (Task){ nil, discycle, dis, 13, 0 };
 	addtask(t);
 
 	lock(&initlock);

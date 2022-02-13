@@ -442,7 +442,7 @@ static int char_ex[] = {
 
 static int char_dq[] = {
 	U, U, U, U|R|I, U|I, U|I,
-	R, R|I, D|I, D|I, D|R, D|R, D, D,
+	R, R|I, D|I, D|I, D|R, D|R, D|R, D,
 	0
 };
 
