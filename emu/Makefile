@@ -4,6 +4,7 @@ H=pdp6.h ../tools/pdp6common.h threading.h
 #CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses \
 #        -Wno-bitwise-op-parentheses
 #GCCFLAGS=-fno-diagnostics-show-caret
+GCCFLAGS=-Wno-implicit-function-declaration
 CFLAGS= -g -O3 -Wall -Wno-parentheses $(GCCFLAGS)
 #CFLAGS= -g -Wall -Wno-parentheses -fno-diagnostics-show-caret
 SDLFLAGS=`sdl2-config --cflags` `pkg-config SDL2_image --cflags` -DGRAPHICS
