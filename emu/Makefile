@@ -4,7 +4,15 @@ H=pdp6.h ../tools/pdp6common.h threading.h
 #CFLAGS= -Wno-shift-op-parentheses -Wno-logical-op-parentheses \
 #        -Wno-bitwise-op-parentheses
 #GCCFLAGS=-fno-diagnostics-show-caret
-GCCFLAGS=-Wno-implicit-function-declaration
+
+ifeq ($(shell uname),Darwin)
+    GCCFLAGS=-Wno-unused-function -Wno-unused-variable -Wno-format -Wno-implicit-function-declaration
+else ifeq ($(shell uname),Linux)
+    #GCCFLAGS=-Wno-format
+else ifeq ($(OS),Windows_NT)
+    #GCCFLAGS=-Wno-unused-variable -Wno-format -Wno-implicit-function-declaration
+endif
+
 CFLAGS= -g -O3 -Wall -Wno-parentheses $(GCCFLAGS)
 #CFLAGS= -g -Wall -Wno-parentheses -fno-diagnostics-show-caret
 SDLFLAGS=`sdl2-config --cflags` `pkg-config SDL2_image --cflags` -DGRAPHICS
@@ -28,3 +36,5 @@ test_dt: test_dt.c dc.c dt.c $(H)
 
 test_apr: test_apr.c main_panel.c dis340.c $(SRC) $(H)
 	$(CC) -o $@ $(CFLAGS) $(SDLFLAGS) test_apr.c main_panel.c dis340.c $(SRC) $(LIBS) $(SDLLIBS)
+clean:
+    # add clean code here
