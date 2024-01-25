@@ -213,7 +213,8 @@ void
 threadname(char *name)
 {
 	// TODO: make portable
-	pthread_setname_np(pthread_self(), name);
+	// pthread_setname_np(pthread_self(), name);
+           pthread_setname_np(name);
 }
 
 int
