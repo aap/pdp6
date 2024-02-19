@@ -1,6 +1,7 @@
 #include "pdp6.h"
+#include <unistd.h>
 #include <signal.h>
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 char *joy_ident = JOY_IDENT;
 char *ojoy_ident = OJOY_IDENT;
