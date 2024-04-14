@@ -1030,7 +1030,8 @@ makedis(int argc, char *argv[])
 	// MACDMP starts breaking if we go too high
 	// other programs start breaking if we go too low
 	// TODO: gahhhhhhh
-	t = (Task){ nil, discycle, dis, 13, 0 };
+	// for now i increased the delay in MACDMP slightly
+	t = (Task){ nil, discycle, dis, 20, 0 };
 	addtask(t);
 
 	lock(&initlock);
