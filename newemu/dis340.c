@@ -17,7 +17,7 @@ enum Modes
 
 struct Dis340
 {
-	int fd;
+	FD fd;
 
 	/* 344 interface for PDP-6.
 	 * no schematics unfortunately */
@@ -75,8 +75,8 @@ addcmd(Dis340 *dis, u32 cmd)
 {
 	dis->cmdbuf[dis->ncmds++] = cmd;
 	if(dis->ncmds == nelem(dis->cmdbuf)) {
-		if(write(dis->fd, dis->cmdbuf, sizeof(dis->cmdbuf)) < sizeof(dis->cmdbuf))
-			dis->fd = -1;
+		if(write(dis->fd.fd, dis->cmdbuf, sizeof(dis->cmdbuf)) < sizeof(dis->cmdbuf))
+			dis->fd.fd = -1;
 		dis->ncmds = 0;
 	}
 }
@@ -84,7 +84,7 @@ addcmd(Dis340 *dis, u32 cmd)
 static void
 agedisplay(Dis340 *dis)
 {
-	if(dis->fd < 0)
+	if(dis->fd.fd < 0)
 		return;
 	u32 cmd = 511<<23;
 	assert(dis->lasttime <= dis->simtime);
@@ -105,7 +105,7 @@ intensify(Dis340 *dis)
 		if(dx*dx + dy*dy <= 4)
 			dis->lp_find = 1;
 	}
-	if(dis->fd >= 0){
+	if(dis->fd.fd >= 0){
 		agedisplay(dis);
 		u32 cmd;
 		cmd = dis->x;
@@ -278,11 +278,13 @@ cycle_dis(PDP6 *pdp, IOdev *dev, int pwr)
 	}
 
 	agedisplay(dis);
-	if(dis->inputtimer < simtime) {
+	if(dis->fd.fd >= 0 && dis->inputtimer < simtime) {
 		dis->inputtimer = simtime + 30000000;
-		if(hasinput(dis->fd)) {
+		if(dis->fd.ready) {
 			u32 cmds[512];
-			int n = read(dis->fd, cmds, sizeof(cmds));
+			int n = read(dis->fd.fd, cmds, sizeof(cmds));
+			if(n <= 0)
+				return;
 			n /= 4;
 			for(int i = 0; i < n; i++) {
 				u32 cmd = cmds[i];
@@ -290,6 +292,7 @@ cycle_dis(PDP6 *pdp, IOdev *dev, int pwr)
 				dis->penx = (cmd>>10) & 01777;
 				dis->pen = (cmd>>20) & 1;
 			}
+			waitfd(&dis->fd);
 		}
 	}
 
@@ -615,7 +618,9 @@ static IOdev joy_dev = { 0, 0420, nil, handle_joy, nil };
 Dis340*
 attach_dis(PDP6 *pdp)
 {
-	dis.fd = -1;
+	dis.fd.fd = -1;
+	dis.fd.id = -1;
+
 	installdev(pdp, &dis_dev);
 
 	installdev(pdp, &joy_dev);
@@ -626,7 +631,8 @@ attach_dis(PDP6 *pdp)
 void
 dis_connect(Dis340 *dis, int fd)
 {
-	if(dis->fd >= 0)
-		close(dis->fd);
-	dis->fd = fd;
+	if(dis->fd.fd >= 0)
+		closefd(&dis->fd);
+	dis->fd.fd = fd;
+	waitfd(&dis->fd);
 }

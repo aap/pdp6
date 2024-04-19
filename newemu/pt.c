@@ -217,17 +217,15 @@ cycle_ptr(PDP6 *pdp, IOdev *dev, int pwr)
 		pdp->ptr_timer = simtime + PTR_DLY;
 	}
 	pdp->ptr_clutch = clutch;
-	if(!pdp->ptr_clutch || pdp->ptr_timer >= simtime)
+	if(!pdp->ptr_clutch || pdp->ptr_fd.fd < 0 || pdp->ptr_timer >= simtime)
 		return;
 	pdp->ptr_timer = simtime + PTR_DLY;
 
-	if(!hasinput(pdp->ptr_fd))
+	if(!pdp->ptr_fd.ready)
 		return;
-	if(read(pdp->ptr_fd, &c, 1) <= 0) {
-		close(pdp->ptr_fd);
-		pdp->ptr_fd = -1;
+	if(read(pdp->ptr_fd.fd, &c, 1) <= 0)
 		return;
-	}
+	waitfd(&pdp->ptr_fd);
 	if(pdp->ptr_busy && (c & 0200 || !pdp->ptr_b)) {
 		// PTR STROBE
 		// actually 400μs after feed hole edge
@@ -262,5 +260,8 @@ calc_ptr_req(PDP6 *pdp)
 void
 attach_ptr(PDP6 *pdp)
 {
+	pdp->ptr_fd.fd = -1;
+	pdp->ptr_fd.id = -1;
+
 	installdev(pdp, &ptr_dev);
 }

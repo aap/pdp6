@@ -1,7 +1,6 @@
 # PDP-6 Emulator
 
-This project aims to revive the PDP-6 (and later PDP-10)
-computers by DEC.
+This project aims to revive the PDP-6 computer by DEC.
 
 I started by writing a very low level emulator in C based on
 the schematics. Later I also wrote an accurate verilog simulation
@@ -72,7 +71,7 @@ tools/dtr2dta.c	convert between raw (dtr) and simh (dta) DECtape format
 tools/mkpty.c	make a pty and connect to the controlling tty
 tools/mkpty33.c	as above but try to pretend an ASR33
 tools/as6.c	an assembler, roughly modeled on MACRO
-tools/ld6.c	a loader or relocatable files
+tools/ld6.c	a loader of relocatable files
 tools/pdp6bin.h
 tools/pdp6common.c	useful functions for PDP-6 code
 tools/pdp6common.h

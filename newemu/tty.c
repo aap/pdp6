@@ -68,9 +68,9 @@ cycle_tty(PDP6 *pdp, IOdev *dev, int pwr)
 
 	if(pdp->tto_active && pdp->tto_timer < simtime) {
 		pdp->tto_active = 0;
-		if(pdp->tty_fd >= 0) {
+		if(pdp->tty_fd.fd >= 0) {
 			char c = pdp->tto & 0177;
-			write(pdp->tty_fd, &c, 1);
+			write(pdp->tty_fd.fd, &c, 1);
 		}
 		pdp->tto = 0;
 		pdp->tto_busy = 0;
@@ -83,16 +83,14 @@ cycle_tty(PDP6 *pdp, IOdev *dev, int pwr)
 	// t=0	read char
 	// t=9	set flag (simulate reading done)
 	// t=11	ready to accept next char
-	if(pdp->tti_timer < simtime) {
+	if(pdp->tty_fd.fd >= 0 && pdp->tti_timer < simtime) {
 		pdp->tti_timer = simtime + pdp->tty_dly;
 		if(pdp->tti_state == 0) {
-			if(hasinput(pdp->tty_fd)) {
+			if(pdp->tty_fd.ready) {
 				char c;
-				if(read(pdp->tty_fd, &c, 1) <= 0) {
-					close(pdp->tty_fd);
-					pdp->tty_fd = -1;
+				if(read(pdp->tty_fd.fd, &c, 1) <= 0)
 					return;
-				}
+				waitfd(&pdp->tty_fd);
 				pdp->tti = c;
 				pdp->tti_busy = 1;
 				pdp->tti_flag = 0;
@@ -128,6 +126,9 @@ calc_tty_req(PDP6 *pdp)
 void
 attach_tty(PDP6 *pdp)
 {
+	pdp->tty_fd.fd = -1;
+	pdp->tty_fd.id = -1;
+
 	pdp->tty_baud = 110;
 	pdp->tty_dly = 1000000000 / pdp->tty_baud;
 	installdev(pdp, &tty_dev);

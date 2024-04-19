@@ -209,7 +209,7 @@ struct PDP6
 	bool ptr_flag;
 	bool ptr_b;
 	int ptr_pia;
-	int ptr_fd;
+	FD ptr_fd;
 	u64 ptr_timer;
 
 
@@ -224,7 +224,7 @@ struct PDP6
 	u8 tti;
 	//
 	int tty_baud, tty_dly;
-	int tty_fd;
+	FD tty_fd;
 	int tti_state;
 	u64 tti_timer;
 	u64 tto_timer;

@@ -4,7 +4,7 @@
 
 #include <fcntl.h>
 #include <unistd.h>
-#include <pthread.h>
+#include <time.h>
 
 #include <signal.h>
 
@@ -272,21 +272,25 @@ main(int argc, char *argv[])
 	initemu(pdp);
 	configmachine(pdp);
 
+	startpolling();
+
 	int dis_fd = dial(host, port);
 	if(dis_fd < 0)
 		printf("can't open display\n");
 	nodelay(dis_fd);
 	dis_connect(dis, dis_fd);
 
-//	const char *tape = "t/hello.rim";
+	const char *tape = "t/hello.rim";
 //	const char *tape = "t/ptp_test.rim";
-	const char *tape = "t/bla.txt";
-	pdp->ptr_fd = open(tape, O_RDONLY);
+//	const char *tape = "t/bla.txt";
+	pdp->ptr_fd.fd = open(tape, O_RDONLY);
+	waitfd(&pdp->ptr_fd);
 	pdp->ptp_fd = open("out.ptp", O_CREAT|O_WRONLY|O_TRUNC, 0644);
 
-	pdp->tty_fd = open("/tmp/tty", O_RDWR);
-	if(pdp->tty_fd < 0)
+	pdp->tty_fd.fd = open("/tmp/tty", O_RDWR);
+	if(pdp->tty_fd.fd < 0)
 		printf("can't open /tmp/tty\n");
+	waitfd(&pdp->tty_fd);
 
 	emu(pdp, panel);
 	return 0;	// can't happen

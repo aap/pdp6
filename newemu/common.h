@@ -32,3 +32,15 @@ void nsleep(u64 ns);
 #define NEVER (~0)
 
 char **split(char *line, int *pargc);
+
+
+typedef struct FD FD;
+struct FD
+{
+	int fd;
+	int ready;
+	int id;
+};
+void startpolling(void);
+void waitfd(FD *fd);
+void closefd(FD *fd);
