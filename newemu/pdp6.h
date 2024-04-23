@@ -164,6 +164,7 @@ struct PDP6
 	bool ex_ill_op;
 	Hword pr, rlr, rla;
 
+	bool mem_busy;
 	bool mc_rq, mc_rd, mc_wr;
 
 	bool cpa_iot_user;
@@ -230,6 +231,8 @@ struct PDP6
 	u64 tto_timer;
 
 
+	FD netmem_fd;
+
 	bool dotrace;
 	u64 clk_timer;
 
@@ -246,6 +249,7 @@ void pwrclr(PDP6 *pdp);
 void kt0(PDP6 *pdp);
 void cycle(PDP6 *pdp);
 void clr_run(PDP6 *pdp);
+void handlenetmem(PDP6 *pdp);
 
 extern u64 simtime;
 extern u64 realtime;

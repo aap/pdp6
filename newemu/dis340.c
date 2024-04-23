@@ -613,7 +613,16 @@ handle_joy(PDP6 *pdp, IOdev *dev, int cmd)
 		break;
 	}
 }
+static void
+handle_ojoy(PDP6 *pdp, IOdev *dev, int cmd)
+{
+	switch(cmd) {
+	case IOB_DATAI:
+		break;
+	}
+}
 static IOdev joy_dev = { 0, 0420, nil, handle_joy, nil };
+static IOdev ojoy_dev = { 0, 0724, nil, handle_ojoy, nil };
 
 Dis340*
 attach_dis(PDP6 *pdp)
@@ -624,6 +633,7 @@ attach_dis(PDP6 *pdp)
 	installdev(pdp, &dis_dev);
 
 	installdev(pdp, &joy_dev);
+	installdev(pdp, &ojoy_dev);
 
 	return &dis;
 }

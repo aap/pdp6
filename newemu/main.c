@@ -201,6 +201,7 @@ stopmusic();
 			updatelights(pdp, panel);
 
 			cycle_io(pdp, 1);
+			handlenetmem(pdp);
 
 			if(throttle) while(realtime < simtime) realtime = gettime();
 		} else {
@@ -291,6 +292,12 @@ main(int argc, char *argv[])
 	if(pdp->tty_fd.fd < 0)
 		printf("can't open /tmp/tty\n");
 	waitfd(&pdp->tty_fd);
+
+//	pdp->netmem_fd.fd = dial("maya", 10006);
+	pdp->netmem_fd.fd = dial("maya", 20006);
+	if(pdp->netmem_fd.fd >= 0)
+		printf("netmem connected\n");
+	waitfd(&pdp->netmem_fd);
 
 	emu(pdp, panel);
 	return 0;	// can't happen

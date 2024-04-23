@@ -405,6 +405,7 @@ trace("WR\t\t%06o  %06o %d <- %012llo\n", MA, pdp->rla, pdp->key_rim_sbr, MB);
 void
 rdwrrq(PDP6 *pdp, int ret)
 {
+	pdp->mem_busy = 1;
 	rdrq(pdp, ret);
 }
 
@@ -412,6 +413,7 @@ void
 wrrs(PDP6 *pdp, int ret)
 {
 	wrrq(pdp, ret);
+	pdp->mem_busy = 0;
 }
 
 
@@ -429,6 +431,9 @@ initdevs(PDP6 *pdp)
 	numdevs = 0;
 	installdev(pdp, &cpa_dev);
 	installdev(pdp, &pi_dev);
+
+	pdp->netmem_fd.fd = -1;
+	pdp->netmem_fd.id = -1;
 }
 
 void
@@ -463,6 +468,8 @@ pwrclr(PDP6 *pdp)
 	pdp->run = 0;
 	mr_start(pdp);
 	mr_clr(pdp);
+
+	pdp->mem_busy = 0;
 }
 
 void
