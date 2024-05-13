@@ -609,7 +609,7 @@ debug("ILL op %d %d %d\n", nunits, dt->ut_btm_switch, UT_WRTM);
 
 			if(UT_WRTM)		// 3-14
 				setstat(dt, RW_ACTIVE);
-			else if(!UT_DN)		// TODO: is this right?
+			else if(!UT_DN)
 				setstat(dt, RW_RQ);
 		}else
 			/* Don't move during delay.
@@ -795,7 +795,7 @@ dbg("SEL/%o GO/%o REV/%o TIME/%o FCN/%o\n", dt->ut_units_select,
 				// now wait
 dbg("starting delay %d\n", dt->delay);
 			}else
-				if(!UT_DN &&		// TODO: is this right?
+				if(!UT_DN &&
 				   !UT_WRTM)		// 3-14
 					setstat(dt, RW_RQ);
 		}

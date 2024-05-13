@@ -1,7 +1,6 @@
-# PDP-6 Emulator and Verilog Simulation
+# PDP-6 Emulator
 
-This project aims to revive the PDP-6 (and later PDP-10)
-computers by DEC.
+This project aims to revive the PDP-6 computer by DEC.
 
 I started by writing a very low level emulator in C based on
 the schematics. Later I also wrote an accurate verilog simulation
@@ -41,23 +40,6 @@ the data control and DECtape are implemented.
 The panel is missing the repeat delay knobs,
 but the functionality is implemented.
 
-## Verilog Simulation
-
-The verilog code is a very accurate transcription of the schematics as well.
-Since the real machine is asynchronous I had to pull some tricks to make it
-work on an FPGA.
-The real machine uses delays that are triggered by pulses and output another
-pulse after some time. Instead of pulses I use clock enables, and delays are
-implemented by a counter synchronized to the 50MHz system clock.
-
-### FPGA
-
-I'm using a DE0-Nano-SoC with has an ARM hps connected to the Cyclone V FPGA.
-On the ARM side runs fe6 (a DDT-like interface) which communicates with
-the FPGA through memory mapped IO registers.
-The quartus project is not yet part of this repo
-but the important modules are in the verilog directory.
-
 ## File tree
 NB: not up to date
  
@@ -89,7 +71,7 @@ tools/dtr2dta.c	convert between raw (dtr) and simh (dta) DECtape format
 tools/mkpty.c	make a pty and connect to the controlling tty
 tools/mkpty33.c	as above but try to pretend an ASR33
 tools/as6.c	an assembler, roughly modeled on MACRO
-tools/ld6.c	a loader or relocatable files
+tools/ld6.c	a loader of relocatable files
 tools/pdp6bin.h
 tools/pdp6common.c	useful functions for PDP-6 code
 tools/pdp6common.h
@@ -99,9 +81,6 @@ tools/test.s	old test code for the assembler/linker
 tools/test2.s
 tools/ptdump.c	print a paper tape file in octal
 tools/dtdump.c	print dtr DECtape
-
-verilog
-verilog/...	fpga stuff
 
 code	random code for the PDP-6, mostly testing
 code/bootstrap.txt	a list of boot loaders

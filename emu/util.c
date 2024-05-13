@@ -2,6 +2,10 @@
 #include <string.h>
 #include <ctype.h>
 
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -134,4 +138,52 @@ nodelay(int fd)
 {
 	int flag = 1;
 	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+}
+
+
+void*
+createseg(const char *name, size_t sz)
+{
+	int fd;
+	void *p;
+
+	mode_t mask = umask(0);
+	fd = open(name, O_RDWR|O_CREAT, 0666);
+	umask(mask);
+	// if we try to open a /tmp file owned by another user
+	// with O_CREAT, the above will fail (even for root).
+	// so try again without O_CREAT
+	if(fd == -1)
+		fd = open(name, O_RDWR);
+	if(fd == -1) {
+		fprintf(stderr, "couldn't open file %s\n", name);
+		return NULL;
+	}
+	ftruncate(fd, sz);
+	p = mmap(NULL, sz, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if(p == MAP_FAILED) {
+		fprintf(stderr, "couldn't mmap file\n");
+		return NULL;
+	}
+
+	return p;
+}
+void*
+attachseg(const char *name, size_t sz)
+{
+	int fd;
+	void *p;
+
+	fd = open(name, O_RDWR);
+	if(fd == -1) {
+		fprintf(stderr, "couldn't open file %s\n", name);
+		return NULL;
+	}
+	p = mmap(NULL, sz, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if(p == MAP_FAILED) {
+		fprintf(stderr, "couldn't mmap file\n");
+		return NULL;
+	}
+
+	return p;
 }

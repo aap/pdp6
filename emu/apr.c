@@ -89,6 +89,9 @@ pulse(Apr *apr, Pulse *p, int t)
 {
 	TPulse *tp, **pp;
 
+	// IDEA execute pulse directly if t == 0
+	// currently this would break stuff, but maybe it can be fixed
+
 	assert(apr->pfree);
 	tp = apr->pfree;
 	apr->pfree = tp->next;
@@ -1454,7 +1457,7 @@ defpulse(lct0)
 
 defpulse(cht9)
 {
-	apr->sc = apr->fe;		// 6-15
+	apr->sc |= apr->fe;		// 6-15
 	apr->chf5 = 1;			// 6-19
 	apr->chf7 = 1;			// 6-19
 	pulse(apr, &at0, 0);		// 5-3
@@ -1472,7 +1475,7 @@ defpulse(cht8b)
 {
 	apr->chf2 = 0;			// 6-19
 	apr->chf6 = 0;			// 6-19
-	apr->fe = apr->c.mb>>30 & 077;	// 6-14, 6-15
+	apr->fe |= apr->c.mb>>30 & 077;	// 6-14, 6-15
 	SC_COM;				// 6-15
 	if(apr->inst == CAO)
 		pulse(apr, &st7, 0);	// 5-6
@@ -2143,7 +2146,7 @@ defpulse(fdt1)
 defpulse_(fdt0b)
 {
 	apr->fdf2 = 0;		// 6-22
-	apr->sc = apr->fe;	// 6-15
+	apr->sc |= apr->fe;	// 6-15
 	apr->nrf2 = 1;		// 6-27
 	pulse(apr, &fdt1, 100);	// 6-22
 }
@@ -2152,7 +2155,7 @@ defpulse_(fdt0a)
 {
 	apr->fdf1 = 0;		// 6-22
 	apr->fdf2 = 1;		// 6-22
-	apr->sc = 0741;		// 6-14
+	apr->sc |= 0741;	// 6-14
 	pulse(apr, apr->c.ar & F0 ? &dst0 : &dst10, 0);	// 6-25
 }
 

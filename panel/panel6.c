@@ -161,6 +161,7 @@ set36lights(uchar *b, Element *l)
 	setlights(b[4], l+32, 4);
 }
 
+
 uchar
 getswitches(Element *sw, int n, int state)
 {
@@ -180,6 +181,25 @@ getswitches_(Element *sw, int n, int state)
 	b = 0;
 	for(i = 0; i < n; i++)
 		b |= (uchar)(sw[i].state == state) << 5-i;
+	return b;
+}
+
+void
+setnlights(int b, Element *l, int n, int bit)
+{
+	int i;
+	for(i = 0; i < n; i++, bit >>= 1)
+		l[i].state = !!(b & bit);
+}
+
+int
+getnswitches(Element *sw, int bit, int n, int state)
+{
+	int b, i;
+	b = 0;
+	for(i = 0; i < n; i++, bit >>= 1)
+		if(sw[i].state == state)
+			b |= bit;
 	return b;
 }
 
@@ -472,6 +492,81 @@ servethread(void *x)
 	serve(2000, handlenetwork, nil);
 }
 
+#include "panel6.h"
+
+void*
+shmthread(void *x)
+{
+	int key = 666;
+	int id;
+	Panel6 *p;
+	int sw;
+
+	p = createseg("/tmp/pdp6_panel", sizeof(Panel6));
+	if(p == nil)
+		exit(1);
+
+	// set switches from previous state
+	setnlights(p->sw0, data_sw+18, 18, 0400000);
+	setnlights(p->sw1, data_sw, 18, 0400000);
+	setnlights(p->sw2, ma_sw, 18, 0400000);
+	misc_sw[0].state = !!(p->sw3 & SW_REPEAT);
+	misc_sw[1].state = !!(p->sw3 & SW_ADDR_STOP);
+	misc_sw[2].state = !!(p->sw3 & SW_POWER);
+	misc_sw[3].state = !!(p->sw3 & SW_MEM_DISABLE);
+
+	for(;;) {
+		p->sw0 = getnswitches(data_sw+18, 0400000, 18, 1);
+		p->sw1 = getnswitches(data_sw, 0400000, 18, 1);
+		p->sw2 = getnswitches(ma_sw, 0400000, 18, 1);
+		sw = 0;
+		if(keys[0].state == 1) sw |= KEY_START;
+		if(keys[0].state == 2) sw |= KEY_READIN;
+		if(keys[1].state == 1) sw |= KEY_INST_CONT;
+		if(keys[1].state == 2) sw |= KEY_MEM_CONT;
+		if(keys[2].state == 1) sw |= KEY_INST_STOP;
+		if(keys[2].state == 2) sw |= KEY_MEM_STOP;
+		if(keys[3].state == 1) sw |= KEY_IO_RESET;
+		if(keys[3].state == 2) sw |= KEY_EXEC;
+		if(keys[4].state == 1) sw |= KEY_DEP;
+		if(keys[4].state == 2) sw |= KEY_DEP_NXT;
+		if(keys[5].state == 1) sw |= KEY_EX;
+		if(keys[5].state == 2) sw |= KEY_EX_NXT;
+		if(misc_sw[0].state == 1) sw |= SW_REPEAT;
+		if(misc_sw[1].state == 1) sw |= SW_ADDR_STOP;
+		if(misc_sw[2].state == 1) sw |= SW_POWER;
+		if(misc_sw[3].state == 1) sw |= SW_MEM_DISABLE;
+		p->sw3 = sw;
+
+		sw = 0;
+		if(keys[6].state == 1) sw |= KEY_MOTOR_OFF;
+		if(keys[6].state == 2) sw |= KEY_MOTOR_ON;
+		if(keys[7].state == 1) sw |= KEY_PTP_FEED;
+		if(keys[7].state == 2) sw |= KEY_PTR_FEED;
+		p->sw4 = sw;
+
+		setnlights(p->lights0, mi_l+18, 18, 0400000);
+		setnlights(p->lights1, mi_l, 18, 0400000);
+		setnlights(p->lights2, ma_l, 18, 0400000);
+		setnlights(p->lights3, ir_l, 18, 0400000);
+		setnlights(p->lights4, pc_l, 18, 0400000);
+
+		misc_l[0].state = !!(p->lights5 & L5_PI_ON);
+		misc_l[1].state = !!(p->lights5 & L5_MC_STOP);
+		misc_l[2].state = !!(p->lights5 & L5_RUN);
+		misc_l[3].state = !!(p->lights5 & L5_REPEAT);
+		misc_l[4].state = !!(p->lights5 & L5_ADDR_STOP);
+		misc_l[5].state = !!(p->lights5 & L5_POWER);
+		misc_l[6].state = !!(p->lights5 & L5_MEM_DISABLE);
+		setnlights(p->lights5, pio_l, 7, 0100);
+
+		setnlights(p->lights6, pir_l, 7, 0100);
+		setnlights(p->lights6, pih_l, 7, 020000);
+
+		usleep(30);
+	}
+}
+
 void*
 openserial(void *x)
 {
@@ -677,8 +772,9 @@ main(int argc, char *argv[])
 	extra_l = e; e += 1;
 
 //	pthread_create(&comthread, nil, talki2c, nil);
-	pthread_create(&comthread, nil, servethread, nil);
+//	pthread_create(&comthread, nil, servethread, nil);
 //	pthread_create(&comthread, nil, talkserial, nil);
+	pthread_create(&comthread, nil, shmthread, nil);
 
 	for(;;){
 		while(SDL_PollEvent(&ev))
@@ -714,6 +810,7 @@ main(int argc, char *argv[])
 			drawelement(renderer, e, 1);
 
 		SDL_RenderPresent(renderer);
+		SDL_Delay(30);
 	}
 	return 0;
 }

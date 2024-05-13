@@ -29,6 +29,7 @@ enum
 	RIM = 0,
 	RIM10,
 	SAV,
+	SBLK
 };
 
 char *argv0;
@@ -413,12 +414,14 @@ saverim(const char *filename)
 	FILE *out;
 	hword i;
 	out = mustopen(filename, "wb");
+	for(i = 0; i < 32; i++) putc(0, out);
 	for(i = locmin; i <= locmax; i++){
 		writew(fw(0710440, i), out);	/* DATAI PTR,i */
 		writew(mem[i], out);
 	}
 	writew(fw(0254200, start), out);	/* HALT start */
 	writew(0, out);
+	for(i = 0; i < 32; i++) putc(0, out);
 	fclose(out);
 }
 
@@ -500,6 +503,38 @@ savesav(const char *filename)
 	fclose(out);
 }
 
+/* Saves in SAV format. Only one block is saved.
+ *	-count,,origin
+ *	word
+ *	...
+ *	word
+ *	checksum
+ *	...
+ *	JRST start
+ */
+void
+savesblk(const char *filename)
+{
+	FILE *out;
+	word w, chk;
+	hword i;
+	out = mustopen(filename, "wb");
+	/* write fake loader */
+	writewits(0254000000001, out);
+
+	chk = fw(-(locmax+1-locmin), locmin);
+	writewits(chk, out);
+	for(i = locmin; i <= locmax; i++) {
+		w = mem[i];
+		chk = ((chk<<1 | chk>>35) + w) & 0777777777777;
+		writewits(w, out);
+	}
+	writewits(chk, out);
+
+	writewits(fw(0254000, start), out);	/* JRST start */
+	fclose(out);
+}
+
 void
 usage(void)
 {
@@ -538,10 +573,12 @@ main(int argc, char *argv[])
 		fmtstr = EARGF(usage());
 		if(strcmp(fmtstr, "rim") == 0)
 			fmt = RIM;
-		if(strcmp(fmtstr, "rim10") == 0)
+		else if(strcmp(fmtstr, "rim10") == 0)
 			fmt = RIM10;
 		else if(strcmp(fmtstr, "sav") == 0)
 			fmt = SAV;
+		else if(strcmp(fmtstr, "sblk") == 0)
+			fmt = SBLK;
 		else
 			usage();
 		break;
@@ -559,6 +596,8 @@ main(int argc, char *argv[])
 			outfile = "a.rim";
 		else if(fmt == SAV)
 			outfile = "a.sav";
+		else if(fmt == SBLK)
+			outfile = "a.bin";
 	}
 
 	nfiles = argc;
@@ -597,6 +636,8 @@ main(int argc, char *argv[])
 		saverim10(outfile);
 	else if(fmt == SAV)
 		savesav(outfile);
+	else if(fmt == SBLK)
+		savesblk(outfile);
 
 	return 0;
 }
