@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <SDL.h>
+#include <unistd.h>
 
 char *joy_ident = JOY_IDENT;
 char *ojoy_ident = OJOY_IDENT;
