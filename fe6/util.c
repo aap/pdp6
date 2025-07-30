@@ -2,6 +2,10 @@
 #include <string.h>
 #include <ctype.h>
 
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -129,43 +133,57 @@ serve(int port, void (*handlecon)(int, void*), void *arg)
 	return;
 }
 
-int
-serve1(int port)
-{
-	int sockfd, confd;
-	socklen_t len;
-	struct sockaddr_in server, client;
-	int x;
-
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if(sockfd < 0){
-		perror("error: socket");
-		return -1;
-	}
-
-	x = 1;
-	setsockopt (sockfd, SOL_SOCKET, SO_REUSEADDR, (void *)&x, sizeof x);
-	
-	memset(&server, 0, sizeof(server));
-	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = INADDR_ANY;
-	server.sin_port = htons(port);
-	if(bind(sockfd, (struct sockaddr*)&server, sizeof(server)) < 0){
-		perror("error: bind");
-		return -1;
-	}
-	listen(sockfd, 5);
-	len = sizeof(client);
-	while(confd = accept(sockfd, (struct sockaddr*)&client, &len),
-	      confd >= 0)
-		return confd;
-	perror("error: accept");
-	return -1;
-}
-
 void
 nodelay(int fd)
 {
 	int flag = 1;
 	setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
+}
+
+
+void*
+createseg(const char *name, size_t sz)
+{
+	int fd;
+	void *p;
+
+	mode_t mask = umask(0);
+	fd = open(name, O_RDWR|O_CREAT, 0666);
+	umask(mask);
+	// if we try to open a /tmp file owned by another user
+	// with O_CREAT, the above will fail (even for root).
+	// so try again without O_CREAT
+	if(fd == -1)
+		fd = open(name, O_RDWR);
+	if(fd == -1) {
+		fprintf(stderr, "couldn't open file %s\n", name);
+		return NULL;
+	}
+	ftruncate(fd, sz);
+	p = mmap(NULL, sz, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if(p == MAP_FAILED) {
+		fprintf(stderr, "couldn't mmap file\n");
+		return NULL;
+	}
+
+	return p;
+}
+void*
+attachseg(const char *name, size_t sz)
+{
+	int fd;
+	void *p;
+
+	fd = open(name, O_RDWR);
+	if(fd == -1) {
+		fprintf(stderr, "couldn't open file %s\n", name);
+		return NULL;
+	}
+	p = mmap(NULL, sz, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+	if(p == MAP_FAILED) {
+		fprintf(stderr, "couldn't mmap file\n");
+		return NULL;
+	}
+
+	return p;
 }

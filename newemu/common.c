@@ -119,7 +119,7 @@ serve1(int port)
 	}
 	listen(sockfd, 5);
 	len = sizeof(client);
-	confd = accept(sockfd, (struct sockaddr*)&client, &len),
+	confd = accept(sockfd, (struct sockaddr*)&client, &len);
 	close(sockfd);
 	if(confd >= 0)
 		return confd;

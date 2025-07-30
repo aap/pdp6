@@ -75,9 +75,12 @@ addcmd(Dis340 *dis, u32 cmd)
 {
 	dis->cmdbuf[dis->ncmds++] = cmd;
 	if(dis->ncmds == nelem(dis->cmdbuf)) {
-		if(write(dis->fd.fd, dis->cmdbuf, sizeof(dis->cmdbuf)) < sizeof(dis->cmdbuf))
-			dis->fd.fd = -1;
+		int n = write(dis->fd.fd, dis->cmdbuf, sizeof(dis->cmdbuf));
 		dis->ncmds = 0;
+		if(n < (int)sizeof(dis->cmdbuf)) {
+// TODO: close fd
+			dis->fd.fd = -1;
+		}
 	}
 }
 
@@ -86,11 +89,11 @@ agedisplay(Dis340 *dis)
 {
 	if(dis->fd.fd < 0)
 		return;
-	u32 cmd = 511<<23;
+	u32 cmd = 510<<23;
 	assert(dis->lasttime <= dis->simtime);
 	u64 dt = (dis->simtime - dis->lasttime)/1000;
-	while(dt >= 511) {
-		dis->lasttime += 511*1000;
+	while(dt >= 510) {
+		dis->lasttime += 510*1000;
 		addcmd(dis, cmd);
 		dt = (dis->simtime - dis->lasttime)/1000;
 	}

@@ -4,14 +4,17 @@ LDFLAGS=-lpthread
 
 SRC=fe.c cmd.c util.c netmem.c pdp6common.c threading.c
 
-all: fe6_emu fe6_fake fe6 feka
+all: fe6_panel fe6_emu fe6_fake fe6 feka
 clean:
-	rm fe6_emu fe6_fake fe6
+	rm fe6_panel fe6_emu fe6_fake fe6
 
 fe6: $(SRC) 6/real6.c
 	$(XX)gcc -I6 $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 fe6_fake: $(SRC) fake.c
+	$(CC) -I6 $(CFLAGS) $(LDFLAGS) -o $@ $^
+
+fe6_panel: $(SRC) panel.c
 	$(CC) -I6 $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 fe6_emu: $(SRC) 6/emu6.c

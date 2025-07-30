@@ -515,10 +515,15 @@ shmthread(void *x)
 	misc_sw[2].state = !!(p->sw3 & SW_POWER);
 	misc_sw[3].state = !!(p->sw3 & SW_MEM_DISABLE);
 
+#define X if(1)
+#define Y X ; else
 	for(;;) {
-		p->sw0 = getnswitches(data_sw+18, 0400000, 18, 1);
-		p->sw1 = getnswitches(data_sw, 0400000, 18, 1);
-		p->sw2 = getnswitches(ma_sw, 0400000, 18, 1);
+X		p->sw0 = getnswitches(data_sw+18, 0400000, 18, 1);
+X		p->sw1 = getnswitches(data_sw, 0400000, 18, 1);
+X		p->sw2 = getnswitches(ma_sw, 0400000, 18, 1);
+Y		setnlights(p->sw0, data_sw+18, 18, 0400000);
+Y		setnlights(p->sw1, data_sw, 18, 0400000);
+Y		setnlights(p->sw2, ma_sw, 18, 0400000);
 		sw = 0;
 		if(keys[0].state == 1) sw |= KEY_START;
 		if(keys[0].state == 2) sw |= KEY_READIN;
@@ -536,14 +541,14 @@ shmthread(void *x)
 		if(misc_sw[1].state == 1) sw |= SW_ADDR_STOP;
 		if(misc_sw[2].state == 1) sw |= SW_POWER;
 		if(misc_sw[3].state == 1) sw |= SW_MEM_DISABLE;
-		p->sw3 = sw;
+X		p->sw3 = sw;
 
 		sw = 0;
 		if(keys[6].state == 1) sw |= KEY_MOTOR_OFF;
 		if(keys[6].state == 2) sw |= KEY_MOTOR_ON;
 		if(keys[7].state == 1) sw |= KEY_PTP_FEED;
 		if(keys[7].state == 2) sw |= KEY_PTR_FEED;
-		p->sw4 = sw;
+X		p->sw4 = sw;
 
 		setnlights(p->lights0, mi_l+18, 18, 0400000);
 		setnlights(p->lights1, mi_l, 18, 0400000);

@@ -539,6 +539,8 @@ runline(void)
 	}
 }
 
+void zerocore(void);
+/*
 void
 zerocore(void)
 {
@@ -547,6 +549,7 @@ zerocore(void)
 		deposit(a, 0);
 	typestr("\r\n");
 }
+*/
 
 void
 quit(void)
@@ -567,7 +570,7 @@ threadmain(int argc, char *argv[])
 	word t;
 
 	init6();
-	initcrt("soma");
+//	initcrt("soma");
 //	initnetmem("10.0.0.222", 10006);
 
 	raw(0);
@@ -585,6 +588,7 @@ threadmain(int argc, char *argv[])
 	hasnum = 0;
 	linemode = 0;
 
+	started = isrunning();
 	for(;;){
 		if(hasinput(0)){
 			ch = tyi();
