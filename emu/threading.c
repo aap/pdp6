@@ -1,4 +1,6 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE	// TODO, make portable
+#endif
 #include "threading.h"
 #include <assert.h>
 
