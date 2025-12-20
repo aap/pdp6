@@ -18,7 +18,9 @@ typedef uint16_t u16;
 typedef int8_t   i8;
 typedef uint8_t  u8;
 typedef unsigned char uchar;
+#if __STDC_VERSION__ < 202000
 typedef uchar bool;
+#endif
 
 extern FILE *debugfp;
 extern int dotrace;
