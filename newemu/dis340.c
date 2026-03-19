@@ -63,6 +63,7 @@ struct Dis340
 	int pnt;
 	u32 cmdbuf[128];
 	u32 ncmds;
+	u32 agetime;
 };
 
 #define LDB(p, s, w) ((w)>>(p) & (1<<(s))-1)
@@ -71,54 +72,67 @@ static void calc_dis_req(PDP6 *pdp, Dis340 *dis);
 
 
 static void
-addcmd(Dis340 *dis, u32 cmd)
+flushdis(Dis340 *d)
 {
-	dis->cmdbuf[dis->ncmds++] = cmd;
-	if(dis->ncmds == nelem(dis->cmdbuf)) {
-		int n = write(dis->fd.fd, dis->cmdbuf, sizeof(dis->cmdbuf));
-		dis->ncmds = 0;
-		if(n < (int)sizeof(dis->cmdbuf)) {
-// TODO: close fd
-			dis->fd.fd = -1;
-		}
-	}
+	int sz = d->ncmds*sizeof(d->cmdbuf[0]);
+	int n = write(d->fd.fd, d->cmdbuf, sz);
+	d->ncmds = 0;
+	if(n < sz)
+		closefd(&d->fd);
 }
 
 static void
-agedisplay(Dis340 *dis)
+discmd(Dis340 *d, u32 cmd)
 {
-	if(dis->fd.fd < 0)
+	d->cmdbuf[d->ncmds++] = cmd;
+	if(d->ncmds == nelem(d->cmdbuf))
+		flushdis(d);
+}
+
+static void
+agedisplay(Dis340 *d)
+{
+	if(d->fd.fd < 0)
 		return;
-	u32 cmd = 510<<23;
-	assert(dis->lasttime <= dis->simtime);
-	u64 dt = (dis->simtime - dis->lasttime)/1000;
-	while(dt >= 510) {
-		dis->lasttime += 510*1000;
-		addcmd(dis, cmd);
-		dt = (dis->simtime - dis->lasttime)/1000;
+	int ival = d->agetime;
+	assert(d->lasttime <= d->simtime);
+	u64 dt = (d->simtime - d->lasttime)/1000;
+	if(dt >= ival) {
+		discmd(d, 511<<23);
+		discmd(d, dt);
+		d->lasttime = d->simtime;
+		flushdis(d);
+		if(d->agetime < 1000*1000)
+			d->agetime += d->agetime/10;
 	}
 }
 
 static void
 intensify(Dis340 *dis)
 {
+	// need to make sure dt field doesn't overflow cmd
+	dis->agetime = 510;
+	agedisplay(dis);
+	// reset age interval for every point shown
+	dis->agetime = 50*1000;
+	if(dis->fd.fd < 0)
+		return;
+
 	if(dis->pen && dis->lp_enable) {
 		int dx = dis->penx - dis->x;
 		int dy = dis->peny - dis->y;
 		if(dx*dx + dy*dy <= 4)
 			dis->lp_find = 1;
 	}
-	if(dis->fd.fd >= 0){
-		agedisplay(dis);
-		u32 cmd;
-		cmd = dis->x;
-		cmd |= dis->y<<10;
-		cmd |= dis->i<<20;
-		int dt = (dis->simtime - dis->lasttime)/1000;
-		cmd |= dt<<23;
-		dis->lasttime = dis->simtime;
-		addcmd(dis, cmd);
-	}
+
+	int dt = (dis->simtime - dis->lasttime)/1000;
+	u32 cmd;
+	cmd = dis->x;
+	cmd |= dis->y<<10;
+	cmd |= dis->i<<20;
+	cmd |= dt<<23;
+	dis->lasttime = dis->simtime;
+	discmd(dis, cmd);
 }
 
 enum {
@@ -646,6 +660,12 @@ dis_connect(Dis340 *dis, int fd)
 {
 	if(dis->fd.fd >= 0)
 		closefd(&dis->fd);
-	dis->fd.fd = fd;
-	waitfd(&dis->fd);
+	else {
+		nodelay(fd);
+		dis->fd.fd = fd;
+		dis->fd.id = -1;
+		waitfd(&dis->fd);
+		dis->lasttime = dis->simtime;
+		dis->agetime = 50*1000;
+	}
 }

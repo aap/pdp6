@@ -279,8 +279,12 @@ void cycle_io(PDP6 *pdp, int pwr);
 void setreq(PDP6 *pdp, IOdev *dev, u8 req);
 
 void attach_ptp(PDP6 *pdp);
+void ptpunmount(PDP6 *pdp);
+void ptpmount(PDP6 *pdp, int fd);
 void ptr_set_motor(PDP6 *pdp, int state);
 void attach_ptr(PDP6 *pdp);
+void ptrunmount(PDP6 *pdp);
+void ptrmount(PDP6 *pdp, int fd);
 void attach_tty(PDP6 *pdp);
 
 

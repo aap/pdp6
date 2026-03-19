@@ -15,6 +15,8 @@
 #include <netinet/in.h> 
 #include <netinet/tcp.h>
 #include <netdb.h>
+#include <poll.h>
+
 
 #include "common.h"
 
@@ -59,6 +61,35 @@ readn(int fd, void *data, int n)
 }
 
 int
+socketlisten(int port)
+{
+	int x;
+	struct sockaddr_in server;
+	int fd;
+
+	fd = socket(AF_INET, SOCK_STREAM, 0);
+	if(fd < 0) {
+		perror("error: socket");
+		return -1;
+	}
+
+	x = 1;          
+	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *)&x, sizeof x);
+
+	memset(&server, 0, sizeof(server));
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = INADDR_ANY;
+	server.sin_port = htons(port);
+	if(bind(fd, (struct sockaddr*)&server, sizeof(server)) < 0) {
+		close(fd);              
+		perror("error: bind");
+		return -1;
+	}
+	listen(fd, 1);  
+	return fd;              
+}
+
+int
 dial(const char *host, int port)
 {
 	char portstr[32];
@@ -97,27 +128,12 @@ serve1(int port)
 {
 	int sockfd, confd;
 	socklen_t len;
-	struct sockaddr_in server, client;
-	int x;
+	struct sockaddr_in client;
 
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if(sockfd < 0){
-		perror("error: socket");
+	sockfd = socketlisten(port);
+	if(sockfd < 0)
 		return -1;
-	}
 
-	x = 1;
-	setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (void *)&x, sizeof x);
-
-	memset(&server, 0, sizeof(server));
-	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = INADDR_ANY;
-	server.sin_port = htons(port);
-	if(bind(sockfd, (struct sockaddr*)&server, sizeof(server)) < 0){
-		perror("error: bind");
-		return -1;
-	}
-	listen(sockfd, 5);
 	len = sizeof(client);
 	confd = accept(sockfd, (struct sockaddr*)&client, &len);
 	close(sockfd);
@@ -126,6 +142,50 @@ serve1(int port)
 	perror("error: accept");
 	return -1;
 }
+
+// listen on multiple ports
+void
+serveN(struct PortHandler *ports, int nports, void *arg)
+{
+	int i;
+	int confd;
+	struct pollfd pfds[100];
+	struct sockaddr_in client;
+	socklen_t len;
+
+	// create and listen on sockets for the given ports
+	for(i = 0; i < nports; i++) {
+		pfds[i].revents = 0;
+		pfds[i].events = 0;
+		pfds[i].fd = socketlisten(ports[i].port);
+		if(pfds[i].fd >= 0)
+			pfds[i].events = POLLIN;
+	}
+
+	// now poll to accept connections and hand off to handle function
+	for(;;) {
+		int ret = poll(pfds, nports, -1);
+		if(ret < 0)
+			break;
+		if(ret == 0)
+			continue;
+
+		for(i = 0; i < nports; i++) {
+			if(pfds[i].revents & POLLIN) {
+				len = sizeof(client);
+				confd = accept(pfds[i].fd, (struct sockaddr*)&client, &len);
+				if(confd >= 0)
+					ports[i].handle(confd, arg);
+			} else if(pfds[i].revents) {
+				printf("weird stuff on port %d\n", ports[i].port);
+			}
+		}
+	}
+
+	for(i = 0; i < nports; i++)
+		close(pfds[i].fd);
+}
+
 void
 nodelay(int fd)
 {
@@ -254,8 +314,6 @@ split(char *line, int *pargc)
 	return argv;
 }
 
-
-#include <poll.h>
 
 struct FDmsg
 {

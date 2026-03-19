@@ -5,6 +5,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
+#include <pthread.h>
+
+#include <sys/socket.h>
 
 #include <signal.h>
 
@@ -46,7 +49,7 @@ readmemory(const char *path)
 	FILE *f;
 
 	f = fopen(path, "r");
-	if(f == NULL) {
+	if(f == nil) {
 		printf("couldn't open file %s\n", path);
 		return 0;
 	}
@@ -68,7 +71,54 @@ readmemory(const char *path)
 	return pc;
 }
 
-const bool throttle = 1;
+void
+readmem(const char *file, Word *mem, Hword size)
+{
+	FILE *f;
+	char buf[100], *s;
+	Hword a;
+	Word w;
+	if(f = fopen(file, "r"), f == nil)
+		return;
+	a = 0;
+	while(s = fgets(buf, 100, f)){
+		while(*s){
+			if(*s == ';')
+				break;
+			else if('0' <= *s && *s <= '7'){
+				w = strtoull(s, &s, 8);
+				if(*s == ':' || *s == '/'){
+					a = w;
+					s++;
+				}else if(a < size)
+					mem[a++] = w;
+				else
+					fprintf(stderr, "Address out of range: %o\n", a++);
+			}else
+				s++;
+		}
+	}
+	fclose(f);
+}
+
+void
+dumpmem(const char *file, Word *mem, Hword size)
+{
+	FILE *f;
+	Hword a;
+
+	if(f = fopen("coremem", "w"), f == nil)
+		return;
+
+	for(a = 0; a < size; a++)
+		if(mem[a] != 0){
+			fprintf(f, "%06o/	", a);
+			fprintf(f, "%012llo\n", mem[a]);
+		}
+	fclose(f);
+}
+
+const bool dothrottle = 1;
 
 // TODO: this sucks
 Dis340 *dis;
@@ -80,8 +130,8 @@ Ux555 *ux4;
 void
 configmachine(PDP6 *pdp)
 {
-	uxmount(ux1, "t/systemdis.dtr");
-//	uxmount(ux1, "t/system.dtr");
+//	uxmount(ux1, "t/systemdis.dtr");
+	uxmount(ux1, "t/system.dtr");
 //	uxmount(ux2, "t/syseng.dtr");
 	uxmount(ux2, "t/its138.dtr");
 //	uxmount(ux3, "t/foo.dtr");
@@ -117,8 +167,8 @@ configmachine(PDP6 *pdp)
 	//        assumes reader motor will be off
 //	memory[0101] |= I(0, 1, 0, 0, 0);	// disable device tests in part3
 	// part4: start with 1 in switches, flip back to 0 at some point
-//	pdp->pc = readmemory("t/ddt.16k.oct");
-	pdp->pc = readmemory("t/ddt.d16k.oct");	// needs moby
+	pdp->pc = readmemory("t/ddt.16k.oct");
+//	pdp->pc = readmemory("t/ddt.d16k.oct");	// needs moby
 //	pdp->pc = readmemory("t/nts.lisp.u16k.oct");
 //	pdp->pc = readmemory("t/nts.teco6.u256k.oct");
 //	pdp->pc = readmemory("t/spcwar.oct");
@@ -151,11 +201,42 @@ initemu(PDP6 *pdp)
 	attach_ge(pdp);
 
 
-	srand(time(NULL));
+	srand(time(nil));
 	pwrclr(pdp);
 	cycle_io(pdp, 0);
 
 if(domusic) initmusic();
+}
+
+
+void prompt(void) { printf("> "); fflush(stdout); }
+void
+cli(PDP6 *pdp, FD *fd)
+{
+	char line[1024];
+	int n;
+
+	n = read(fd->fd, line, sizeof(line));
+	if(n <= 0) {
+		printf("\n");
+		exit(0);
+	}
+	if(n > 0 && n < sizeof(line))  {
+		line[n] = '\0';
+void doline(char *line);
+		doline(line);
+		prompt();
+		waitfd(fd);
+	}
+}
+
+void
+throttle(void)
+{
+	while(realtime < simtime) {
+		usleep(1000);
+		realtime = gettime();
+	}
 }
 
 void
@@ -166,6 +247,12 @@ emu(PDP6 *pdp, Panel *panel)
 	bool power;
 
 	updateswitches(pdp, panel);
+
+	FD clifd;
+	clifd.id = -1;
+	clifd.fd = 0;
+	prompt();
+	waitfd(&clifd);
 
 	inittime();
 	simtime = 0;	//gettime();
@@ -203,7 +290,8 @@ stopmusic();
 			cycle_io(pdp, 1);
 			handlenetmem(pdp);
 
-			if(throttle) while(realtime < simtime) realtime = gettime();
+			if(dothrottle) throttle();
+while(realtime < simtime) realtime = gettime();
 		} else {
 stopmusic();
 			if(power)
@@ -211,23 +299,72 @@ stopmusic();
 
 			lightsoff(panel);
 
-			if(throttle)
+			if(dothrottle)
 				simtime = gettime();
 			else
 				simtime += 1500;
 			cycle_io(pdp, 0);
 		}
 
-//		cli(pdp);
+		if(clifd.ready)
+			cli(pdp, &clifd);
 	}
 }
 
+void 
+handledis(int fd, void *arg)
+{
+//	PDP6 *pdp = (PDP6*)arg;
+	nodelay(fd);
+	dis_connect(dis, fd);
+}
+
+void
+handleptr(int fd, void *arg)
+{
+	PDP6 *pdp = (PDP6*)arg;
+	nodelay(fd);
+	ptrmount(pdp, fd);
+}
+
+void
+handleptp(int fd, void *arg)
+{
+	PDP6 *pdp = (PDP6*)arg;
+	nodelay(fd);
+	ptpmount(pdp, fd);
+}
+
+void*
+netthread(void *arg)
+{
+	struct PortHandler ports[] = {
+//		{ 1640, handlenetcmd },
+//		// 1041 is teletype
+		{ 1642, handleptr },
+		{ 1643, handleptp },
+		{ 3400, handledis },
+	};
+	serveN(ports, nelem(ports), arg);
+        return nil;
+}
+
+/*
 char *argv0;
 void
 usage(void)
 {
 	fprintf(stderr, "usage: %s [-h host] [-p port]\n", argv0);
 	exit(1);
+}
+*/
+
+static void
+cleanup(void *arg)
+{
+	Panel *panel = (Panel*)arg;
+	lightsoff(panel);
+	dumpmem("coremem", memory, 01000000);
 }
 
 void
@@ -239,9 +376,11 @@ inthandler(int sig)
 int
 main(int argc, char *argv[])
 {
+	pthread_t th;
 	Panel *panel;
 	PDP6 pdp6, *pdp = &pdp6;
 
+/*
 	const char *host;
 	int port;
 
@@ -257,6 +396,7 @@ main(int argc, char *argv[])
 	default:
 		usage();
 	} ARGEND;
+*/
 
 	panel = getpanel();
 	if(panel == nil) {
@@ -268,36 +408,61 @@ main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGINT, inthandler);
 
-	addcleanup((void (*)(void*))lightsoff, panel);
+	addcleanup(cleanup, panel);
 
 	initemu(pdp);
-	configmachine(pdp);
+	readmem("coremem", memory, 01000000);
 
 	startpolling();
 
+// now in lua
+//	configmachine(pdp);
+
+/*
 	int dis_fd = dial(host, port);
 	if(dis_fd < 0)
 		printf("can't open display\n");
 	nodelay(dis_fd);
 	dis_connect(dis, dis_fd);
+*/
 
+/*
 	const char *tape = "t/hello.rim";
 //	const char *tape = "t/ptp_test.rim";
 //	const char *tape = "t/bla.txt";
 	pdp->ptr_fd.fd = open(tape, O_RDONLY);
 	waitfd(&pdp->ptr_fd);
-	pdp->ptp_fd = open("out.ptp", O_CREAT|O_WRONLY|O_TRUNC, 0644);
 
+	pdp->ptp_fd = open("out.ptp", O_CREAT|O_WRONLY|O_TRUNC, 0644);
+*/
+
+/*
 	pdp->tty_fd.fd = open("/tmp/tty", O_RDWR);
 	if(pdp->tty_fd.fd < 0)
 		printf("can't open /tmp/tty\n");
 	waitfd(&pdp->tty_fd);
+*/
+
+
 
 //	pdp->netmem_fd.fd = dial("maya", 10006);
+/*
 	pdp->netmem_fd.fd = dial("maya", 20006);
 	if(pdp->netmem_fd.fd >= 0)
 		printf("netmem connected\n");
 	waitfd(&pdp->netmem_fd);
+*/
+
+void initlua(PDP6 *pdp);
+        initlua(pdp);
+
+	pthread_create(&th, nil, netthread, pdp);
+	int fd[2];
+	socketpair(AF_UNIX, SOCK_STREAM, 0, fd);
+	pdp->tty_fd.fd = fd[0];
+	waitfd(&pdp->tty_fd);
+void ttytelnet(int port, int fd);
+	ttytelnet(1641, fd[1]);
 
 	emu(pdp, panel);
 	return 0;	// can't happen

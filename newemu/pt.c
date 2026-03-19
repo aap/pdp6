@@ -129,7 +129,23 @@ calc_ptp_req(PDP6 *pdp)
 void
 attach_ptp(PDP6 *pdp)
 {
+	pdp->ptp_fd = -1;
 	installdev(pdp, &ptp_dev);
+}
+
+void
+ptpunmount(PDP6 *pdp)
+{
+	if(pdp->ptp_fd >= 0)
+		close(pdp->ptp_fd);
+	pdp->ptp_fd = -1;
+}
+
+void
+ptpmount(PDP6 *pdp, int fd)
+{
+	ptpunmount(pdp);
+	pdp->ptp_fd = fd;
 }
 
 /* PTR */
@@ -223,8 +239,13 @@ cycle_ptr(PDP6 *pdp, IOdev *dev, int pwr)
 
 	if(!pdp->ptr_fd.ready)
 		return;
-	if(read(pdp->ptr_fd.fd, &c, 1) <= 0)
+	if(read(pdp->ptr_fd.fd, &c, 1) <= 0) {
+		closefd(&pdp->ptr_fd);
 		return;
+	}
+	// write back in case this is over a socket
+	// and we need to synchronize
+	write(pdp->ptr_fd.fd, &c, 1);
 	waitfd(&pdp->ptr_fd);
 	if(pdp->ptr_busy && (c & 0200 || !pdp->ptr_b)) {
 		// PTR STROBE
@@ -264,4 +285,19 @@ attach_ptr(PDP6 *pdp)
 	pdp->ptr_fd.id = -1;
 
 	installdev(pdp, &ptr_dev);
+}
+
+void
+ptrunmount(PDP6 *pdp)
+{
+	if(pdp->ptr_fd.fd >= 0)
+		closefd(&pdp->ptr_fd);
+}
+
+void
+ptrmount(PDP6 *pdp, int fd)
+{
+	ptrunmount(pdp);
+	pdp->ptr_fd.fd = fd;
+	waitfd(&pdp->ptr_fd);
 }

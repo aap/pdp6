@@ -129,7 +129,8 @@ attach_tty(PDP6 *pdp)
 	pdp->tty_fd.fd = -1;
 	pdp->tty_fd.id = -1;
 
-	pdp->tty_baud = 110;
+//	pdp->tty_baud = 110;
+	pdp->tty_baud = 300;
 	pdp->tty_dly = 1000000000 / pdp->tty_baud;
 	installdev(pdp, &tty_dev);
 }
